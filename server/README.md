@@ -5,6 +5,8 @@
 2. 終端機 2：`cd client && npm install && npm run dev`
 3. 瀏覽器開啟 `http://localhost:5173`
 
+此模式（`VITE_SERVER_URL=http://localhost:3001`）僅適用於單機本地測試，區網多人連線請改用下方「正式/區網模式」。
+
 ## 正式/區網模式（伺服器一併伺服前端）
 1. `cd client && npm run build`
 2. `cd server && npm start`
