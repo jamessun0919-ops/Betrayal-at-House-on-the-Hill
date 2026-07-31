@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const path = require('path');
 const { Server } = require('socket.io');
 
 function createApp() {
@@ -7,6 +8,7 @@ function createApp() {
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
+  app.use(express.static(path.join(__dirname, '../../client/dist')));
   return { app };
 }
 
