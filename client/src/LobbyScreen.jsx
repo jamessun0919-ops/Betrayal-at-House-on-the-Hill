@@ -1,6 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSocket } from './socket';
 
+const ERROR_MESSAGES = {
+  ROOM_NOT_FOUND: '找不到這個房號，請確認後再試一次',
+};
+
+function translateError(code) {
+  return ERROR_MESSAGES[code] || '發生未知錯誤，請稍後再試';
+}
+
 export default function LobbyScreen() {
   const socketRef = useRef(null);
   const [name, setName] = useState('');
@@ -26,7 +34,7 @@ export default function LobbyScreen() {
   function handleJoin() {
     socketRef.current.emit('lobby:join', { roomCode: joinCode, playerName: name }, (res) => {
       if (res.error) {
-        setError(res.error);
+        setError(translateError(res.error));
         return;
       }
       setRoomCode(joinCode);
