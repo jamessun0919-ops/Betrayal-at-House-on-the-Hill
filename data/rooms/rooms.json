@@ -1,0 +1,170 @@
+[
+  {
+    "id": "room_chapel",
+    "name": "禮拜堂",
+    "floor": "ground",
+    "drawType": "",
+    "text": "若在此房結束回合，可獲得1級神志。每位探險者在遊戲中只能受益於此房一次。",
+    "effects": [
+      { "type": "stat_change", "stat": "sanity", "delta": 1, "onceOnlyPerPlayer": true }
+    ],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_research_lab",
+    "name": "研究室",
+    "floor": "ground",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_library",
+    "name": "圖書室",
+    "floor": "upper",
+    "drawType": "",
+    "text": "若在此房結束回合，可獲得1級知識。每位探險者在遊戲中只能受益於此房一次。",
+    "effects": [
+      { "type": "stat_change", "stat": "knowledge", "delta": 1, "onceOnlyPerPlayer": true }
+    ],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_master_bedroom",
+    "name": "主臥房",
+    "floor": "upper",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_conservatory",
+    "name": "溫室",
+    "floor": "ground",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_game_room",
+    "name": "遊戲室",
+    "floor": "upper",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_gardens",
+    "name": "庭院",
+    "floor": "ground",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_patio",
+    "name": "露台",
+    "floor": "ground",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_balcony",
+    "name": "陽台",
+    "floor": "upper",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_statuary_corridor",
+    "name": "雕像長廊",
+    "floor": "upper",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_tower",
+    "name": "塔橋",
+    "floor": "upper",
+    "drawType": "",
+    "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_kitchen",
+    "name": "廚房",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_abandoned_room",
+    "name": "廢棄的房間",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_larder",
+    "name": "食品儲藏室",
+    "floor": "any",
+    "drawType": "",
+    "text": "若在此房結束回合，可獲得1級力量。每位探險者在遊戲中只能受益於此房一次。",
+    "effects": [
+      { "type": "stat_change", "stat": "might", "delta": 1, "onceOnlyPerPlayer": true }
+    ],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_bedroom",
+    "name": "臥房",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_servants_quarters",
+    "name": "傭人房",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_charred_room",
+    "name": "焦黑的房間",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_bloody_room",
+    "name": "染血的房間",
+    "floor": "any",
+    "drawType": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  }
+]

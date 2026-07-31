@@ -1,0 +1,15 @@
+[
+  { "id": "omen_001", "name": "噬咬", "text": "", "effects": [] },
+  { "id": "omen_002", "name": "書", "text": "", "effects": [] },
+  { "id": "omen_003", "name": "水晶球", "text": "", "effects": [] },
+  { "id": "omen_004", "name": "狗", "text": "", "effects": [] },
+  { "id": "omen_005", "name": "女孩", "text": "", "effects": [] },
+  { "id": "omen_006", "name": "聖符", "text": "", "effects": [] },
+  { "id": "omen_007", "name": "瘋漢", "text": "", "effects": [] },
+  { "id": "omen_008", "name": "面具", "text": "", "effects": [] },
+  { "id": "omen_009", "name": "徽章", "text": "", "effects": [] },
+  { "id": "omen_010", "name": "戒指", "text": "", "effects": [] },
+  { "id": "omen_011", "name": "頭骨", "text": "", "effects": [] },
+  { "id": "omen_012", "name": "長矛", "text": "", "effects": [] },
+  { "id": "omen_013", "name": "通靈板", "text": "", "effects": [] }
+]

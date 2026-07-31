@@ -1,0 +1,10 @@
+[
+  {
+    "id": "item_EXAMPLE",
+    "name": "（範例，請刪除或覆蓋）",
+    "text": "把卡片上的完整文字照抄貼在這裡",
+    "effects": [
+      { "type": "stat_change", "stat": "might", "delta": 1 }
+    ]
+  }
+]
