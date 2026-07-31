@@ -41,3 +41,24 @@
 
 **開發者交代備忘事項**：
 - 下一階段工作：呼叫 `subagent-driven-development` skill，依 M1 計畫逐任務執行
+
+## 2026-07-31 第 3 次工作階段
+
+**當日工作內容**：
+- 讀取 Handover，呼叫 `subagent-driven-development` skill 執行 M1 計畫
+- 建立獨立 worktree（分支 `worktree-m1-server-lobby-skeleton`），依序派 subagent 執行並 review Task 1-4：伺服器骨架、LobbyManager、Socket.IO 事件層、React 大廳畫面
+- Task 3 review 時發現 implementer 修正了計畫測試程式碼裡的一個競態條件（已驗證是正確修正，非隨意試錯）
+- Task 4 review 發現 1 個 Important 問題（錯誤訊息顯示英文而非繁中，違反規則），跑完一輪修正並通過 re-review
+- 修正兩處 `.gitignore` 疏漏：worktree 內漏了 `node_modules/`，main 分支漏了 `.claude/`
+- 發現並關閉兩個殘留 jest/node process（來自本次 session 的 Task 3 測試，implementer 誤判為無關）
+- 依開發者指示，Task 5 與 M1 最終驗收留到下一階段，本階段先收工
+
+**完成項目**：
+- M1 Task 1-4 實作完成並 review 通過（程式碼在 worktree/分支上，未合併回 main）
+- Worktree 分支已推送至 GitHub 備份
+
+**遇到瓶頸**：
+- 無重大瓶頸；Task 4 的錯誤訊息語言問題已透過 fix loop 解決
+
+**開發者交代備忘事項**：
+- 下一階段工作：進入同一個 worktree（`.claude/worktrees/m1-server-lobby-skeleton`，分支 `worktree-m1-server-lobby-skeleton`），從 Task 5 繼續 `subagent-driven-development`，完成後跑 final review 並用 `finishing-a-development-branch` 決定合併方式
