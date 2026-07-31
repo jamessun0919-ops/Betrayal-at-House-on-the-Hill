@@ -62,3 +62,23 @@
 
 **開發者交代備忘事項**：
 - 下一階段工作：進入同一個 worktree（`.claude/worktrees/m1-server-lobby-skeleton`，分支 `worktree-m1-server-lobby-skeleton`），從 Task 5 繼續 `subagent-driven-development`，完成後跑 final review 並用 `finishing-a-development-branch` 決定合併方式
+
+## 2026-07-31 第 4 次工作階段
+
+**當日工作內容**：
+- 讀取 Handover，開發者要求先評估外部資源 `Claude-Code-Game-Studios`（遊戲開發工作室範本）是否對本專案有幫助，查看後判斷不適合採用（技術棧不符、規模過度工程），已跟開發者說明並確認
+- 繼續執行 M1 Task 5（正式環境靜態檔案伺服＋區網說明），一輪修正（`client/dist/` 補 `.gitignore`）後 review 通過
+- 跑全分支 final review：抓到 1 個 Critical bug（格式錯誤的 socket 事件會讓伺服器整個崩潰）與 3 個 Important 問題（幽靈玩家/房間、斷線無提示、暱稱未驗證），一次性修正並通過 scoped re-review
+- 用 `finishing-a-development-branch` skill 收尾：開發者選擇「push + 建立 PR」，建立 [PR #1](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/1)
+- 開發者確認後將 PR merge 進 `main`（merge 時遇到 `.gitignore` 小衝突，已解決），刪除功能分支與本地 worktree
+
+**完成項目**：
+- **M1 里程碑全部完成並合併進 main**（5 任務 + final review + 1 輪修正）
+- Jest 測試 26/26 通過（main 分支上驗證）
+
+**遇到瓶頸**：
+- Merge 時 `.gitignore` 有小衝突（兩分支各自獨立新增了不同行），手動解決
+- `gh pr merge` 因本地 `main` 分支被另一個 worktree 佔用而報錯，但實際上 API 端已 merge 成功，之後手動清理殘留的遠端分支
+
+**開發者交代備忘事項**：
+- 下一階段工作：開始規劃並撰寫 M2（探索引擎）詳細實作計畫
