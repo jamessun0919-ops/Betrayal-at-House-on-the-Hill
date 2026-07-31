@@ -42,3 +42,34 @@ test('findRoomByPlayerId finds the room a player belongs to, or null', () => {
   expect(manager.findRoomByPlayerId(playerId)).toBe(roomCode);
   expect(manager.findRoomByPlayerId('unknown-id')).toBeNull();
 });
+
+test('createRoom trims a valid name with surrounding whitespace', () => {
+  const manager = new LobbyManager();
+  const { roomCode, playerId } = manager.createRoom('  Alice  ', 'socket-1');
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice' }]);
+});
+
+test.each([
+  ['undefined', undefined],
+  ['null', null],
+  ['empty string', ''],
+  ['whitespace only', '   '],
+  ['non-string', 42],
+  ['too long', 'a'.repeat(21)],
+])('createRoom rejects an invalid name (%s)', (_label, badName) => {
+  const manager = new LobbyManager();
+  expect(() => manager.createRoom(badName, 'socket-1')).toThrow('INVALID_NAME');
+});
+
+test('createRoom accepts a name at the 20-character length cap', () => {
+  const manager = new LobbyManager();
+  const name = 'a'.repeat(20);
+  const { roomCode, playerId } = manager.createRoom(name, 'socket-1');
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name }]);
+});
+
+test('joinRoom rejects an invalid name', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  expect(() => manager.joinRoom(roomCode, '   ', 'socket-2')).toThrow('INVALID_NAME');
+});

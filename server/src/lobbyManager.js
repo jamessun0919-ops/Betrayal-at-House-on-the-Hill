@@ -1,4 +1,5 @@
 const ROOM_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+const MAX_PLAYER_NAME_LENGTH = 20;
 
 function generateRoomCode() {
   let code = '';
@@ -12,12 +13,24 @@ function generatePlayerId() {
   return 'p_' + Math.random().toString(36).slice(2, 10);
 }
 
+function normalizePlayerName(name) {
+  if (typeof name !== 'string') {
+    throw new Error('INVALID_NAME');
+  }
+  const trimmed = name.trim();
+  if (!trimmed || trimmed.length > MAX_PLAYER_NAME_LENGTH) {
+    throw new Error('INVALID_NAME');
+  }
+  return trimmed;
+}
+
 class LobbyManager {
   constructor() {
     this.rooms = new Map(); // roomCode -> { players: Map(playerId -> { name, socketId }) }
   }
 
   createRoom(hostName, hostSocketId) {
+    const name = normalizePlayerName(hostName);
     let roomCode;
     do {
       roomCode = generateRoomCode();
@@ -25,7 +38,7 @@ class LobbyManager {
 
     const playerId = generatePlayerId();
     this.rooms.set(roomCode, {
-      players: new Map([[playerId, { name: hostName, socketId: hostSocketId }]]),
+      players: new Map([[playerId, { name, socketId: hostSocketId }]]),
     });
     return { roomCode, playerId };
   }
@@ -35,8 +48,9 @@ class LobbyManager {
     if (!room) {
       throw new Error('ROOM_NOT_FOUND');
     }
+    const name = normalizePlayerName(playerName);
     const playerId = generatePlayerId();
-    room.players.set(playerId, { name: playerName, socketId });
+    room.players.set(playerId, { name, socketId });
     return { playerId };
   }
 
