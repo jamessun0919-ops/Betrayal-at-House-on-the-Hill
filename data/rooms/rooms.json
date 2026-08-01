@@ -2,9 +2,10 @@
   {
     "id": "room_chapel",
     "name": "禮拜堂",
+    "description": "",
     "floor": "ground",
-    "drawType": "",
-    "text": "若在此房結束回合，可獲得1級神志。每位探險者在遊戲中只能受益於此房一次。",
+    "drawType": "omen",
+    "text": "若在此房結束回合，可獲得1級意志。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
       { "type": "stat_change", "stat": "sanity", "delta": 1, "onceOnlyPerPlayer": true }
     ],
@@ -13,8 +14,9 @@
   {
     "id": "room_research_lab",
     "name": "研究室",
+    "description": "",
     "floor": "ground",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -22,8 +24,9 @@
   {
     "id": "room_library",
     "name": "圖書室",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
+    "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級知識。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
       { "type": "stat_change", "stat": "knowledge", "delta": 1, "onceOnlyPerPlayer": true }
@@ -33,8 +36,9 @@
   {
     "id": "room_master_bedroom",
     "name": "主臥房",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
+    "drawType": "item",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -42,8 +46,9 @@
   {
     "id": "room_conservatory",
     "name": "溫室",
+    "description": "",
     "floor": "ground",
-    "drawType": "",
+    "drawType": "omen",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -51,8 +56,9 @@
   {
     "id": "room_game_room",
     "name": "遊戲室",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
+    "drawType": "item",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -60,8 +66,9 @@
   {
     "id": "room_gardens",
     "name": "庭院",
+    "description": "",
     "floor": "ground",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -69,8 +76,9 @@
   {
     "id": "room_patio",
     "name": "露台",
+    "description": "",
     "floor": "ground",
-    "drawType": "",
+    "drawType": "omen",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -78,8 +86,9 @@
   {
     "id": "room_balcony",
     "name": "陽台",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -87,8 +96,9 @@
   {
     "id": "room_statuary_corridor",
     "name": "雕像長廊",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -96,17 +106,19 @@
   {
     "id": "room_tower",
     "name": "塔橋",
+    "description": "",
     "floor": "upper",
-    "drawType": "",
-    "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
+    "drawType": "omen",
+    "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
     "effects": [],
     "needsCustomLogic": true
   },
   {
     "id": "room_kitchen",
     "name": "廚房",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -114,8 +126,9 @@
   {
     "id": "room_abandoned_room",
     "name": "廢棄的房間",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -123,8 +136,9 @@
   {
     "id": "room_larder",
     "name": "食品儲藏室",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "item",
     "text": "若在此房結束回合，可獲得1級力量。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
       { "type": "stat_change", "stat": "might", "delta": 1, "onceOnlyPerPlayer": true }
@@ -134,8 +148,9 @@
   {
     "id": "room_bedroom",
     "name": "臥房",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -143,8 +158,9 @@
   {
     "id": "room_servants_quarters",
     "name": "傭人房",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "item",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -152,8 +168,9 @@
   {
     "id": "room_charred_room",
     "name": "焦黑的房間",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "omen",
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -161,8 +178,141 @@
   {
     "id": "room_bloody_room",
     "name": "染血的房間",
+    "description": "",
     "floor": "any",
-    "drawType": "",
+    "drawType": "omen",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_gymnasium",
+    "name": "健身房",
+    "description": "",
+    "floor": "any",
+    "drawType": "item",
+    "text": "若在此房結束回合，可獲得1級速度。每位探險者在遊戲中只能受益於此房一次。",
+    "effects": [
+      { "type": "stat_change", "stat": "speed", "delta": 1, "onceOnlyPerPlayer": true }
+    ],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_vault",
+    "name": "保險庫",
+    "description": "",
+    "floor": "upper",
+    "drawType": "item",
+    "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_weapon_room",
+    "name": "武器室",
+    "description": "",
+    "floor": "any",
+    "drawType": "item",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_specimen_room",
+    "name": "標本室",
+    "description": "",
+    "floor": "any",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_ballroom",
+    "name": "舞廳",
+    "description": "",
+    "floor": "any",
+    "drawType": "omen",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_piano_room",
+    "name": "琴房",
+    "description": "",
+    "floor": "upper",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_messy_room",
+    "name": "雜亂的房間",
+    "description": "",
+    "floor": "any",
+    "drawType": "omen",
+    "text": "要離開房間時，必須通過速度考驗，擲骰點數大於3才能離開",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_atrium",
+    "name": "天井",
+    "description": "",
+    "floor": "ground",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_guest_room",
+    "name": "客房",
+    "description": "",
+    "floor": "ground",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_vine_conservatory",
+    "name": "藤蔓糾纏的溫室",
+    "description": "",
+    "floor": "any",
+    "drawType": "omen",
+    "text": "要離開房間時，必須通過速度考驗，擲骰點數大於4才能離開",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_baby_room",
+    "name": "嬰兒房",
+    "description": "",
+    "floor": "upper",
+    "drawType": "item",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_bathroom_ground",
+    "name": "一樓浴廁",
+    "description": "",
+    "floor": "ground",
+    "drawType": "item",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_bathroom_upper",
+    "name": "二樓浴廁",
+    "description": "",
+    "floor": "upper",
+    "drawType": "item",
     "text": "",
     "effects": [],
     "needsCustomLogic": false

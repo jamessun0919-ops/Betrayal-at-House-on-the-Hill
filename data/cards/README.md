@@ -27,7 +27,7 @@
 | type | 說明 | 範例 |
 |---|---|---|
 | `stat_change` | 屬性增減 | `{ "type": "stat_change", "stat": "sanity", "delta": -1 }`（`stat` 可填 `might`/`speed`/`knowledge`/`sanity`） |
-| `dice_check` | 擲骰檢定，依結果分支 | `{ "type": "dice_check", "stat": "knowledge", "success": [...], "failure": [...] }`（`success`/`failure` 裡面再放效果陣列） |
+| `dice_check` | 擲骰考驗，依結果分支 | `{ "type": "dice_check", "stat": "knowledge", "success": [...], "failure": [...] }`（`success`/`failure` 裡面再放效果陣列） |
 | `draw_card` | 抽一張指定牌庫的卡 | `{ "type": "draw_card", "deck": "item" }`（`deck` 可填 `event`/`item`/`omen`） |
 | `add_item` / `remove_item` | 取得/失去道具 | `{ "type": "add_item", "itemId": "item_003" }` |
 | `move` | 移動（少用，多半是事件卡專屬效果） | `{ "type": "move", "target": "same_floor_any_room" }` |
@@ -37,7 +37,7 @@
 
 ## 目前已知的內容
 
-`omen-cards.json` 已經預先填好 13 種真實預兆卡名稱（從生存者手冊的「作祟劇本查詢表」查到的），`name` 欄位是真的，但 `text` 欄位還是空的，麻煩對照實體卡片補上文字。其中 **書、戒指、聖符、女孩** 這 4 張是劇本1〈神鬼痴漢〉會用到的，麻煩優先填。
+`omen-cards.json` 已經預先填好 13 種真實預兆卡名稱（從生存者手冊的「邪祟劇本查詢表」查到的），`name` 欄位是真的，但 `text` 欄位還是空的，麻煩對照實體卡片補上文字。其中 **書、戒指、聖符、女孩** 這 4 張是劇本1〈神鬼痴漢〉會用到的，麻煩優先填。
 
 `event-cards.json`、`item-cards.json` 完全是空的範本（只留一個範例物件示範格式），因為這兩類卡片的名稱我這邊完全沒有資料來源，需要你從實體卡片一張一張填入。範例物件請直接刪掉或覆蓋掉。
 

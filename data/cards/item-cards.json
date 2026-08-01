@@ -1,10 +1,114 @@
 [
   {
-    "id": "item_EXAMPLE",
-    "name": "（範例，請刪除或覆蓋）",
-    "text": "把卡片上的完整文字照抄貼在這裡",
-    "effects": [
-      { "type": "stat_change", "stat": "might", "delta": 1 }
-    ]
+    "id": "item_001",
+    "name": "左輪手槍",
+    "description": "",
+    "text": "玩家回合中進行襲擊時可改以速度進行考驗，並多擲一顆骰子。可對相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。本道具使用次數於取得時隨機決定１～６次。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_002",
+    "name": "炸藥",
+    "description": "",
+    "text": "使用炸藥時視為一次襲擊，可對本房間與相鄰房間使用炸藥，該房間的所有人物／怪物以速度進行考驗，骰數總和大於五：不受傷害；骰數０到４：人物受到四點肉體傷害／怪物陷入昏迷。炸藥效果對於沒有速度屬性或靈體怪物無效。本道具使用一次後消失。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_003",
+    "name": "治療藥膏",
+    "description": "",
+    "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的力量、速度或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_004",
+    "name": "嗅鹽",
+    "description": "",
+    "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的知識、意志或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_005",
+    "name": "天使羽毛",
+    "description": "",
+    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後玩家選擇０～８範圍內數字，取代該次擲骰的結果。本道具使用一次後消失。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_006",
+    "name": "詭異人偶",
+    "description": "",
+    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後可以多投擲兩顆骰子（最多八顆），使用後意志降低一個級別，每回合限用一次，本道具使用後不會消失",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_007",
+    "name": "幸運兔腳",
+    "description": "",
+    "text": "每當玩家擲骰子後可以選擇使用此物品，選擇重新投擲其中一顆，以重新投擲後的數字為結果，每回合限使用一次。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_008",
+    "name": "中世紀鎧甲",
+    "description": "",
+    "text": "每當受到肉體損傷時，損傷減少一點。本物品不可被偷竊。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_009",
+    "name": "魔術方塊",
+    "description": "",
+    "text": "玩家在其回合內可以進行知識考驗，骰數大於等於六：抽取兩張物品牌，魔術方塊消失。骰數０至五：沒有事情發生",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_010",
+    "name": "蠟燭",
+    "description": "",
+    "text": "當玩家因事件卡需要進行考驗時，可以多投擲一顆骰子（最多八顆）",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_011",
+    "name": "斧頭",
+    "description": "",
+    "text": "玩家以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_012",
+    "name": "獻祭之劍",
+    "description": "",
+    "text": "玩家以力量進行襲擊時，可以多投擲三顆骰子（最多八顆），同時進行知識考驗，大於等於六：無副作用；骰數３到５：受到一點精神損傷；骰數０到２：投擲兩顆骰子，點數總和為玩家受到的肉體損傷，且本次襲擊視為無效且不能再次發動襲擊",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "",
+    "name": "",
+    "description": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "",
+    "name": "",
+    "description": "",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
   }
 ]
