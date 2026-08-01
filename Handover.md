@@ -1,6 +1,6 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-01（第 2 次工作階段）
+最後更新：2026-08-01（第 3 次工作階段）
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -24,17 +24,19 @@
   - 三份 PDF 沒有事件卡/道具卡的完整內容庫，也沒有房間樓層對照表，已跟開發者確認用「JSON 範本讓開發者自己填」處理
   - **用詞已全專案統一**（`data/` 資料夾 + spec 文件，不含歷史 worklog/chatlog）：「作祟」→「邪祟」、「奸徒」→「叛徒」、「神智/神志/理智」→「意志」、「檢定」→「考驗」
   - **卡牌/房間文字的人稱慣例**：內文一律用「玩家」不用「你」；若代換後語意會混淆，要先跟開發者確認怎麼改寫，不要自己決定
-- **卡片機制衍生的特殊系統，已整理成獨立參考文件**：[docs/superpowers/specs/2026-08-01-card-mechanics-reference.md](docs/superpowers/specs/2026-08-01-card-mechanics-reference.md)——彙整預兆卡+道具卡+事件卡（三種卡片都已整理完）內容揭露的機制模式共 17 項（觸發時機系統、持有中被動加成、不可轉移旗標、穿戴切換、牌堆偷看重排、消耗次數系統、目標選擇同房/全域、回復基本值、情境限定加骰、範圍攻擊與免疫、攻擊/傷害型態轉換、反噬風險、玩家主動選屬性、附著於玩家/房間的持續性標記、多階骰結果、無屬性純骰數判定），含 M2/M3 分工建議與**「AI主持人代勞」設計原則**。**這份文件也是之後設計原創劇本/卡片時遇到新機制的第一個參考來源**
-- **⚠️ 傷害系統是目前最大的設計缺口**：「肉體損傷」「精神損傷」在三種卡片裡大量出現，但還沒定案要怎麼影響屬性（降哪個/哪幾個屬性、降多少），這是 M3 詳細設計時要優先定案的模型，定案前所有牽涉「損傷」的卡片效果都先標記 `needsCustomLogic: true`
+- **兩份核心設計參考文件已完成，M2/M3 需要的規則設計大致齊全**：
+  - [docs/superpowers/specs/2026-08-01-card-mechanics-reference.md](docs/superpowers/specs/2026-08-01-card-mechanics-reference.md)：卡片機制模式（17項）、**傷害系統（已定案：物理傷害扣力量/速度、精神傷害扣知識/意志，邪祟前不死）**、**戰鬥規則（M3：同房攻防對擲、平手無事、偷竊條件、攻擊分兩層選擇—先選攻擊屬性再選武器）**、**觸發時機分類表（36張卡全部分類完，含哪些卡是「同時機點擇一使用」）**、多階骰結果的門檻陣列格式、持續性標記/buff-debuff通用機制（`removeWhen` 可擴充詞彙）
+  - [docs/superpowers/specs/2026-08-01-turn-flow-and-action-points.md](docs/superpowers/specs/2026-08-01-turn-flow-and-action-points.md)（**新文件**）：核心回合流程狀態機——行動力＝當下速度值，第一層20秒選「移動/道具/襲擊/操作」逾時放棄本回合，選道具/襲擊/操作會再跳第二層20秒選具體項目且不可返回上一步（防止拖延漏洞），移動含開門判斷，開門後行動力歸零；沒有主動結束回合按鈕（逾時即表態）；傷害分配逾時的預設規則。**「操作」專指房間本身觸發的機制（如保險庫），面具/魔術方塊這類卡片主動能力歸在「道具」選項下，不是「操作」**（開發者已更正這點）。設計上刻意讓這些參數（20秒、行動力算法）可被劇本模組覆寫，保留原創劇本調整回合流程的彈性
+  - 房間門/連接系統：`rooms.json` 新增 `size`（固定`"1x1"`）與 `doors`（1~4，開發者手動填，目前 `null`）欄位；門的實際朝向由引擎動態計算（進入方向必有門＋剩餘隨機＋衝突旋轉＋四向都衝突就強制對齊、其餘當牆）
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`（GitHub: donchitos/claude-code-game-studios）——整包遊戲工作室範本，技術棧/規模都跟本專案不符，已跟開發者說明並確認不採用
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-**三種卡片內容都已填完（預兆13/道具12/事件11），但還有收尾細節**：`rooms.json` 的 `description` 欄位還沒填；`item-cards.json`、`event-cards.json` 各有 1-2 筆空白項目待確認用途；`item-cards.json` 缺 `description` 欄位（跟房間/事件卡不一致）。更重要的是，M2 的效果詞彙/資料格式需要依 [card-mechanics-reference.md](docs/superpowers/specs/2026-08-01-card-mechanics-reference.md) 列出的 17 種機制模式擴充，且傷害系統（肉體/精神損傷）的模型還沒定案——這些都要先跟開發者討論定案，才能開始寫 M2 實作計畫（`writing-plans` skill 規定不能有佔位/編造內容）。
+規則設計已大致完備（傷害系統、戰鬥、回合流程、房間連接都定案）。還剩收尾資料細節：`rooms.json` 的 `doors` 欄位還沒填（`description` 欄位開發者說可暫時略過，不用管）。**技術上還沒決定的是：怎麼把「20秒彈窗詢問玩家」這種互動模式，具體轉成 Socket.IO 事件設計**——這是 M1 只有簡單請求/回應模式（`lobby:create`等）沒遇過的新通訊型態，**開發者指定下一階段工作就是討論這個**。
 
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 只需讀 2026-08-01（今日）+ 2026-07-31（前一日）範圍
-2. **收尾資料細節**：跟開發者確認 `rooms.json` 的 `description`、`item-cards.json`/`event-cards.json` 的空白項目、`item-cards.json` 補 `description` 欄位這幾件事要不要現在處理
-3. **跟開發者討論 `card-mechanics-reference.md` 列出的機制模式要怎麼設計成具體的資料格式與程式介面**，尤其是傷害系統模型（肉體/精神損傷分別影響哪個/哪些屬性、多少）——這是目前最大的未定案項目
+2. **一開始先檢查 `data/rooms/rooms.json` 的 `doors` 欄位是否還是 `null`，如果是，提醒開發者補上**（開發者要求每次階段開始都要檢查提醒；`description` 欄位不用提醒，開發者說可以先略過）
+3. **開發者指定的下一步：討論「20秒彈窗詢問」怎麼設計成 Socket.IO 事件**（例如伺服器 emit 一個帶 `deadline` 的 prompt 事件給特定玩家、玩家端倒數並送出選擇或逾時預設值）——規則設計都定案了，這是最後的技術設計討論
 4. 資料與效果詞彙都確認無誤後，才開始撰寫 M2 詳細實作計畫（呼叫 `writing-plans` skill），計畫需以 M1 實際完成的程式碼介面為基礎延伸：
    - `LobbyManager` 現有方法（`createRoom`/`joinRoom`/`leaveRoom`/`getPlayers`/`findRoomByPlayerId`）
    - Socket.IO 事件命名慣例（`lobby:xxx` 前綴、`ack(callback)` 防呆模式、`socket.data.roomCode`/`socket.data.playerId` 儲存方式）——final review 已明確指出 M2 新增的遊戲事件應該延用同一套防呆/驗證模式，寫進 M2 的 Global Constraints
