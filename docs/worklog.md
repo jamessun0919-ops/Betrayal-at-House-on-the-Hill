@@ -151,3 +151,25 @@
 **開發者交代備忘事項**：
 - 下一階段開始時，先檢查 `rooms.json` 的 `doors` 欄位是否已填，若還是 `null` 要提醒開發者（`description` 欄位不用提醒，開發者說可暫時略過）
 - 下一階段工作：討論「20秒彈窗詢問玩家」的互動模式要怎麼設計成 Socket.IO 事件，確認後才開始撰寫 M2 實作計畫
+
+## 2026-08-01 第 4 次工作階段
+
+**當日工作內容**：
+- 檢查 `rooms.json` 的 `doors` 欄位，確認仍是 `null`，提醒開發者
+- 討論 Socket.IO 提問協定設計（`game:prompt`/`game:promptRespond`/`game:promptResolved`），確認全房間同時最多一個提問、其他人可見、伺服器端權威倒數、斷線不特別處理，記錄進 `turn-flow-and-action-points.md`
+- 開發者要求撰寫 M2 實作計畫，因範圍過大提議拆成 M2a/M2b/M2c 三個子計畫依序執行，開發者同意
+- 撰寫 M2a（遊戲核心狀態＋房間版圖系統）計畫前，讀取 M1 實際程式碼與真實房間資料，發現「起始房間」與「樓層連接」機制先前完全沒設計，跟開發者確認後定案（4塊固定起始房間、梯廳固定連接二樓平台、一二樓為獨立座標網格），建立 `data/rooms/starting-rooms.json`
+- 撰寫 M2a 完整實作計畫（5任務、29個測試），自我審查時發現並修正 2 個測試座標設計錯誤、1 個潛在 flaky test（改用 Math.random mock）
+- 開發者選擇 Subagent-Driven 執行方式，因 weekly limit 限制本階段先收工，執行留待下次
+
+**完成項目**：
+- 新增 [docs/superpowers/plans/2026-08-01-m2a-board-and-player-state.md](superpowers/plans/2026-08-01-m2a-board-and-player-state.md) M2a 實作計畫（已自我審查）
+- 新增 [data/rooms/starting-rooms.json](../data/rooms/starting-rooms.json) 起始房間資料
+- `turn-flow-and-action-points.md` 補上 Socket.IO 提問協定設計
+
+**遇到瓶頸**：
+- 無重大瓶頸；起始房間/樓層連接的設計缺口是在寫計畫過程中發現，及時跟開發者確認後解決，沒有卡住太久
+
+**開發者交代備忘事項**：
+- 下一階段開始先檢查 `rooms.json` 的 `doors` 欄位
+- 下一階段工作：呼叫 `subagent-driven-development` skill（先用 `using-git-worktrees` 建立獨立 worktree），依 M2a 計畫逐任務執行
