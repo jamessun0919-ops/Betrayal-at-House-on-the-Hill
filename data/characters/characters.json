@@ -1,0 +1,80 @@
+[
+  {
+    "id": "char_001",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  },
+  {
+    "id": "char_002",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  },
+  {
+    "id": "char_003",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  },
+  {
+    "id": "char_004",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  },
+  {
+    "id": "char_005",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  },
+  {
+    "id": "char_006",
+    "codename": "",
+    "gender": "",
+    "age": null,
+    "occupation": "",
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  }
+]

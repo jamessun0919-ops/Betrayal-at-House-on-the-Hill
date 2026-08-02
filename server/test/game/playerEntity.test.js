@@ -1,11 +1,13 @@
-const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo } = require('../../src/game/playerEntity');
+const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase } = require('../../src/game/playerEntity');
 
 function makeStats() {
   return {
-    might: { current: 3, max: 5, skullValue: 0 },
-    speed: { current: 4, max: 5, skullValue: 0 },
-    knowledge: { current: 2, max: 5, skullValue: 0 },
-    sanity: { current: 3, max: 5, skullValue: 0 },
+    might: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
+    // speed has a repeated entry (index 2 and 3 both = 4) to exercise the
+    // "index moves but the effective value doesn't change" mechanic.
+    speed: { track: [2, 3, 4, 4, 5, 6], baseIndex: 2, skullIndex: 0 },
+    knowledge: { track: [1, 1, 2, 3, 4], baseIndex: 1, skullIndex: 0 },
+    sanity: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
   };
 }
 
@@ -13,7 +15,7 @@ test('STATS lists the four attribute names', () => {
   expect(STATS).toEqual(['might', 'speed', 'knowledge', 'sanity']);
 });
 
-test('createPlayer builds a player with the given stats, position, and action points', () => {
+test('createPlayer builds a player with the given stat tracks, position, and action points', () => {
   const player = createPlayer({
     playerId: 'p1',
     name: 'Alice',
@@ -24,41 +26,84 @@ test('createPlayer builds a player with the given stats, position, and action po
     actionPoints: 0,
   });
   expect(player.playerId).toBe('p1');
-  expect(player.stats.might).toEqual({ current: 3, max: 5, skullValue: 0, overflow: 0 });
+  expect(player.stats.might).toEqual({
+    track: [1, 2, 3, 4, 5],
+    currentIndex: 2,
+    baseIndex: 2,
+    skullIndex: 0,
+    overflow: 0,
+  });
   expect(player.inventory).toEqual([]);
 });
 
-test('changeStat increases a stat up to its max', () => {
+test('getStatValue reads the track value at the current index', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(getStatValue(player, 'might')).toBe(3); // track[2] = 3
+});
+
+test('baseIndex stays fixed at the character sheet starting position even as currentIndex moves', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  changeStat(player, 'might', 2, false); // currentIndex moves, baseIndex must not
+  expect(player.stats.might.baseIndex).toBe(2);
+  expect(player.stats.might.currentIndex).toBe(4);
+});
+
+test('isBelowBase reflects whether the current index has dropped below the starting position', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(isBelowBase(player, 'might')).toBe(false); // at base
+  changeStat(player, 'might', -1, false);
+  expect(isBelowBase(player, 'might')).toBe(true); // below base
+  changeStat(player, 'might', 2, false);
+  expect(isBelowBase(player, 'might')).toBe(false); // above base
+});
+
+test('isBelowBase throws UNKNOWN_STAT for an invalid stat name', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(() => isBelowBase(player, 'agility')).toThrow('UNKNOWN_STAT');
+});
+
+test('changeStat moves the index up by delta levels', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   changeStat(player, 'might', 1, false);
-  expect(player.stats.might.current).toBe(4);
+  expect(player.stats.might.currentIndex).toBe(3);
+  expect(getStatValue(player, 'might')).toBe(4); // track[3] = 4
 });
 
-test('changeStat records overflow when increasing past max', () => {
+test('changeStat can move the index without changing the effective value, when the track repeats', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
-  changeStat(player, 'speed', 3, false); // current 4 + 3 = 7, max 5 -> current=5, overflow=2
-  expect(player.stats.speed.current).toBe(5);
+  // speed track [2,3,4,4,5,6], baseIndex 2 -> value 4
+  changeStat(player, 'speed', 1, false); // index 2 -> 3, both value 4
+  expect(player.stats.speed.currentIndex).toBe(3);
+  expect(getStatValue(player, 'speed')).toBe(4); // unchanged face value
+});
+
+test('changeStat records overflow when increasing past the last index', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  // speed track length 6 (indices 0-5), baseIndex 2, room to max = 3
+  changeStat(player, 'speed', 5, false); // 3 levels to reach index 5, 2 levels overflow
+  expect(player.stats.speed.currentIndex).toBe(5);
   expect(player.stats.speed.overflow).toBe(2);
+  expect(getStatValue(player, 'speed')).toBe(8); // track[5]=6 + overflow 2
 });
 
-test('changeStat consumes overflow before reducing current', () => {
+test('changeStat consumes overflow before reducing the index', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
-  changeStat(player, 'speed', 3, false); // current=5, overflow=2
-  changeStat(player, 'speed', -1, false); // consumes 1 from overflow
-  expect(player.stats.speed.current).toBe(5);
+  changeStat(player, 'speed', 5, false); // currentIndex=5, overflow=2
+  changeStat(player, 'speed', -1, false); // consumes 1 from overflow, index unchanged
+  expect(player.stats.speed.currentIndex).toBe(5);
   expect(player.stats.speed.overflow).toBe(1);
 });
 
-test('changeStat does not drop a stat to skull level before the haunt starts', () => {
+test('changeStat does not drop a stat below skullIndex+1 before the haunt starts', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   changeStat(player, 'knowledge', -10, false);
-  expect(player.stats.knowledge.current).toBe(1); // skullValue(0) + 1, floored
+  expect(player.stats.knowledge.currentIndex).toBe(1); // skullIndex(0) + 1, floored
 });
 
-test('changeStat allows a stat to reach skull level after the haunt starts', () => {
+test('changeStat allows a stat to reach skullIndex after the haunt starts', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   changeStat(player, 'knowledge', -10, true);
-  expect(player.stats.knowledge.current).toBe(0); // skullValue itself, floored
+  expect(player.stats.knowledge.currentIndex).toBe(0); // skullIndex itself, floored
 });
 
 test('changeStat throws UNKNOWN_STAT for an invalid stat name', () => {
@@ -82,9 +127,9 @@ test('changeStat throws INVALID_HAUNT_FLAG for a missing or non-boolean hauntSta
 
 test('resetActionPoints sets action points to the current speed value', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
-  changeStat(player, 'speed', 1, false); // speed 4 -> 5
+  changeStat(player, 'speed', 1, false); // index 2 -> 3, value stays 4 (repeated track entry)
   resetActionPoints(player);
-  expect(player.actionPoints).toBe(5);
+  expect(player.actionPoints).toBe(4);
 });
 
 test('movePlayerTo updates floor and coordinates', () => {
@@ -97,8 +142,8 @@ test('movePlayerTo updates floor and coordinates', () => {
 
 test('createPlayer throws MISSING_STAT_DEFINITION if a required stat is missing', () => {
   const incompleteStats = {
-    might: { current: 3, max: 5, skullValue: 0 },
-    speed: { current: 4, max: 5, skullValue: 0 },
+    might: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
+    speed: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
     // missing knowledge and sanity
   };
   expect(() => createPlayer({
@@ -112,12 +157,12 @@ test('createPlayer throws MISSING_STAT_DEFINITION if a required stat is missing'
   })).toThrow('MISSING_STAT_DEFINITION');
 });
 
-test('createPlayer throws MISSING_STAT_DEFINITION if a stat entry is missing a required sub-field', () => {
+test('createPlayer throws MISSING_STAT_DEFINITION if a stat entry has no valid track', () => {
   const malformedStats = {
-    might: {}, // missing current, max, skullValue
-    speed: { current: 4, max: 5, skullValue: 0 },
-    knowledge: { current: 2, max: 5, skullValue: 0 },
-    sanity: { current: 3, max: 5, skullValue: 0 },
+    might: {}, // missing track/baseIndex/skullIndex
+    speed: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
+    knowledge: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
+    sanity: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
   };
   expect(() => createPlayer({
     playerId: 'p1',
@@ -128,4 +173,46 @@ test('createPlayer throws MISSING_STAT_DEFINITION if a stat entry is missing a r
     stats: malformedStats,
     actionPoints: 0,
   })).toThrow('MISSING_STAT_DEFINITION');
+});
+
+test('createPlayer throws INVALID_STAT_TRACK if a track is not non-decreasing', () => {
+  const badStats = makeStats();
+  badStats.might = { track: [3, 2, 4], baseIndex: 0, skullIndex: 0 };
+  expect(() => createPlayer({
+    playerId: 'p1',
+    name: 'Alice',
+    floor: 'ground',
+    x: 0,
+    y: 0,
+    stats: badStats,
+    actionPoints: 0,
+  })).toThrow('INVALID_STAT_TRACK');
+});
+
+test('createPlayer throws INVALID_SKULL_INDEX if skullIndex is out of bounds', () => {
+  const badStats = makeStats();
+  badStats.might = { track: [1, 2, 3], baseIndex: 1, skullIndex: 5 };
+  expect(() => createPlayer({
+    playerId: 'p1',
+    name: 'Alice',
+    floor: 'ground',
+    x: 0,
+    y: 0,
+    stats: badStats,
+    actionPoints: 0,
+  })).toThrow('INVALID_SKULL_INDEX');
+});
+
+test('createPlayer throws INVALID_BASE_INDEX if baseIndex is out of bounds', () => {
+  const badStats = makeStats();
+  badStats.might = { track: [1, 2, 3], baseIndex: 9, skullIndex: 0 };
+  expect(() => createPlayer({
+    playerId: 'p1',
+    name: 'Alice',
+    floor: 'ground',
+    x: 0,
+    y: 0,
+    stats: badStats,
+    actionPoints: 0,
+  })).toThrow('INVALID_BASE_INDEX');
 });

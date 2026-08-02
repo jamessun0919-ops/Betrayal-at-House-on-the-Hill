@@ -9,10 +9,10 @@ const STARTING_ROOMS = [
 
 function makeStats() {
   return {
-    might: { current: 3, max: 5, skullValue: 0 },
-    speed: { current: 4, max: 5, skullValue: 0 },
-    knowledge: { current: 2, max: 5, skullValue: 0 },
-    sanity: { current: 3, max: 5, skullValue: 0 },
+    might: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
+    speed: { track: [2, 3, 4, 5, 6], baseIndex: 2, skullIndex: 0 },
+    knowledge: { track: [1, 2, 3, 4, 5], baseIndex: 1, skullIndex: 0 },
+    sanity: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
   };
 }
 
@@ -30,7 +30,7 @@ test('addPlayer places the new player at the entrance hall with action points se
   expect(player.floor).toBe('ground');
   expect(player.x).toBe(0);
   expect(player.y).toBe(0);
-  expect(player.actionPoints).toBe(4); // equals speed.current
+  expect(player.actionPoints).toBe(4); // equals speed track value at baseIndex
   expect(gameState.players.get('p1')).toBe(player);
 });
 
