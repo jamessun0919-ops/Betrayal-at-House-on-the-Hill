@@ -66,6 +66,20 @@ test('changeStat throws UNKNOWN_STAT for an invalid stat name', () => {
   expect(() => changeStat(player, 'agility', 1, false)).toThrow('UNKNOWN_STAT');
 });
 
+test('changeStat throws INVALID_STAT_DELTA for a non-integer delta', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(() => changeStat(player, 'might', '1', false)).toThrow('INVALID_STAT_DELTA');
+  expect(() => changeStat(player, 'might', NaN, false)).toThrow('INVALID_STAT_DELTA');
+  expect(() => changeStat(player, 'might', 1.5, false)).toThrow('INVALID_STAT_DELTA');
+});
+
+test('changeStat throws INVALID_HAUNT_FLAG for a missing or non-boolean hauntStarted', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(() => changeStat(player, 'might', 1, undefined)).toThrow('INVALID_HAUNT_FLAG');
+  expect(() => changeStat(player, 'might', 1, 'false')).toThrow('INVALID_HAUNT_FLAG');
+  expect(() => changeStat(player, 'might', 1, 0)).toThrow('INVALID_HAUNT_FLAG');
+});
+
 test('resetActionPoints sets action points to the current speed value', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   changeStat(player, 'speed', 1, false); // speed 4 -> 5
@@ -94,6 +108,24 @@ test('createPlayer throws MISSING_STAT_DEFINITION if a required stat is missing'
     x: 0,
     y: 0,
     stats: incompleteStats,
+    actionPoints: 0,
+  })).toThrow('MISSING_STAT_DEFINITION');
+});
+
+test('createPlayer throws MISSING_STAT_DEFINITION if a stat entry is missing a required sub-field', () => {
+  const malformedStats = {
+    might: {}, // missing current, max, skullValue
+    speed: { current: 4, max: 5, skullValue: 0 },
+    knowledge: { current: 2, max: 5, skullValue: 0 },
+    sanity: { current: 3, max: 5, skullValue: 0 },
+  };
+  expect(() => createPlayer({
+    playerId: 'p1',
+    name: 'Alice',
+    floor: 'ground',
+    x: 0,
+    y: 0,
+    stats: malformedStats,
     actionPoints: 0,
   })).toThrow('MISSING_STAT_DEFINITION');
 });

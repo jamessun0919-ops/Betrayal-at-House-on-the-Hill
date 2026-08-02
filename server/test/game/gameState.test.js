@@ -34,6 +34,16 @@ test('addPlayer places the new player at the entrance hall with action points se
   expect(gameState.players.get('p1')).toBe(player);
 });
 
+test('addPlayer throws DUPLICATE_PLAYER_ID when the playerId is already registered', () => {
+  const gameState = createGameState(STARTING_ROOMS);
+  addPlayer(gameState, { playerId: 'p1', name: 'Alice', stats: makeStats() });
+  expect(() =>
+    addPlayer(gameState, { playerId: 'p1', name: 'Bob', stats: makeStats() })
+  ).toThrow('DUPLICATE_PLAYER_ID');
+  // The original player must be untouched.
+  expect(getPlayer(gameState, 'p1').name).toBe('Alice');
+});
+
 test('getPlayer returns the player by id, or undefined if not found', () => {
   const gameState = createGameState(STARTING_ROOMS);
   addPlayer(gameState, { playerId: 'p1', name: 'Alice', stats: makeStats() });

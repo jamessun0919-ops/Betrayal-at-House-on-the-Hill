@@ -12,6 +12,28 @@ function shuffle(array) {
   return result;
 }
 
+// All distinct k-length combinations of `array` (order within each
+// combination preserved from `array`; array is small — at most 3 elements
+// in this module's usage — so a simple recursive generator is sufficient.
+function combinations(array, k) {
+  if (k === 0) return [[]];
+  if (k > array.length) return [];
+  const result = [];
+  function helper(start, combo) {
+    if (combo.length === k) {
+      result.push(combo.slice());
+      return;
+    }
+    for (let i = start; i < array.length; i++) {
+      combo.push(array[i]);
+      helper(i + 1, combo);
+      combo.pop();
+    }
+  }
+  helper(0, []);
+  return result;
+}
+
 function computeDoorLayout(doorCount, entrySide, getNeighborRequirement) {
   if (!Number.isInteger(doorCount) || doorCount < 1 || doorCount > 4) {
     throw new Error('INVALID_DOOR_COUNT');
@@ -24,12 +46,20 @@ function computeDoorLayout(doorCount, entrySide, getNeighborRequirement) {
   }
   const otherSides = SIDES.filter((side) => side !== entrySide);
 
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const shuffled = shuffle(otherSides);
-    const extraDoors = new Set(shuffled.slice(0, doorCount - 1));
+  // Exhaustively try every distinct way to pick the extra doors (at most 3
+  // possible sides, so at most 3 combinations), in random order, so a
+  // satisfiable layout is never missed just because a shuffle-with-replacement
+  // happened not to sample it within a fixed number of attempts.
+  const candidateCombos = shuffle(combinations(otherSides, doorCount - 1));
+
+  for (const combo of candidateCombos) {
+    const extraDoors = new Set(combo);
     const hasConflict = otherSides.some((side) => {
       const requirement = getNeighborRequirement(side);
       if (requirement === null) return false;
+      if (requirement !== 'door' && requirement !== 'wall') {
+        throw new Error('INVALID_NEIGHBOR_REQUIREMENT_VALUE');
+      }
       const wantsDoor = extraDoors.has(side);
       return (requirement === 'door') !== wantsDoor;
     });

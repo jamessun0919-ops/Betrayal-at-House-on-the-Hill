@@ -96,6 +96,16 @@ test('placeNewRoom throws INVALID_ROOM_ID when roomDefinition lacks an id', () =
   ).toThrow('INVALID_ROOM_ID');
 });
 
+test('placeNewRoom throws INVALID_FROM_COORD for a malformed fromCoord', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() =>
+    placeNewRoom(board, 'ground', { x: 'a', y: 0 }, 'north', { id: 'room_bad_coord', doors: 4 })
+  ).toThrow('INVALID_FROM_COORD');
+  expect(() =>
+    placeNewRoom(board, 'ground', { x: 0, y: NaN }, 'north', { id: 'room_bad_coord2', doors: 4 })
+  ).toThrow('INVALID_FROM_COORD');
+});
+
 test('createBoard throws MISSING_STARTING_ROOM when a required starting room is missing', () => {
   const incompleteRooms = [
     { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },

@@ -11,6 +11,9 @@ function createGameState(startingRooms) {
 }
 
 function addPlayer(gameState, { playerId, name, stats }) {
+  if (gameState.players.has(playerId)) {
+    throw new Error('DUPLICATE_PLAYER_ID');
+  }
   const player = createPlayer({
     playerId,
     name,

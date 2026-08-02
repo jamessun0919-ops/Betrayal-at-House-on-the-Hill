@@ -76,3 +76,37 @@ test('throws INVALID_NEIGHBOR_REQUIREMENT_FN when getNeighborRequirement is not 
   expect(() => computeDoorLayout(1, 'north', 'not a function')).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
   expect(() => computeDoorLayout(1, 'north', {})).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
 });
+
+test('throws INVALID_NEIGHBOR_REQUIREMENT_VALUE when getNeighborRequirement returns something other than door/wall/null', () => {
+  const getNeighborRequirement = (side) => (side === 'east' ? 'DOOR' : null);
+  expect(() => computeDoorLayout(2, 'north', getNeighborRequirement)).toThrow(
+    'INVALID_NEIGHBOR_REQUIREMENT_VALUE'
+  );
+
+  const getNeighborRequirementUndefined = (side) => (side === 'east' ? undefined : null);
+  expect(() => computeDoorLayout(2, 'north', getNeighborRequirementUndefined)).toThrow(
+    'INVALID_NEIGHBOR_REQUIREMENT_VALUE'
+  );
+});
+
+test('regression: exhaustively finds the single satisfiable layout every time (no spurious fallback)', () => {
+  // Only one of the three possible single-extra-door combinations for
+  // doorCount=2 is conflict-free: extraDoors={south}.
+  // - east must be a wall (picking east as the extra door always conflicts)
+  // - south must be a door (not picking south as the extra door always conflicts)
+  // - west has no requirement
+  // Previously, the shuffle-and-retry-up-to-4-times approach (sampling with
+  // replacement from 3 equally likely single-side picks) missed this valid
+  // layout roughly (2/3)^4 ~= 20% of the time. Exhaustive enumeration of all
+  // 3 combinations must find it 100% of the time.
+  const getNeighborRequirement = (side) => {
+    if (side === 'east') return 'wall';
+    if (side === 'south') return 'door';
+    return null;
+  };
+
+  for (let i = 0; i < 50; i++) {
+    const layout = computeDoorLayout(2, 'north', getNeighborRequirement);
+    expect(layout).toEqual(new Set(['north', 'south']));
+  }
+});

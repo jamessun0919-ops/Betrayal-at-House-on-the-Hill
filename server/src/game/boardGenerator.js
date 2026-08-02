@@ -65,6 +65,9 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
   if (!roomDefinition.id) {
     throw new Error('INVALID_ROOM_ID');
   }
+  if (!Number.isInteger(fromCoord.x) || !Number.isInteger(fromCoord.y)) {
+    throw new Error('INVALID_FROM_COORD');
+  }
   const grid = board[floor];
   const delta = DIRECTION_DELTA[direction];
   const newCoord = { x: fromCoord.x + delta.dx, y: fromCoord.y + delta.dy };

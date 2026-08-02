@@ -1,9 +1,10 @@
 const STATS = ['might', 'speed', 'knowledge', 'sanity'];
 
 function createPlayer({ playerId, name, floor, x, y, stats, actionPoints }) {
-  // Validate that all required stats are defined
+  // Validate that all required stats are defined with a complete shape
   for (const stat of STATS) {
-    if (!stats[stat]) {
+    const def = stats[stat];
+    if (!def || !Number.isInteger(def.current) || !Number.isInteger(def.max) || !Number.isInteger(def.skullValue)) {
       throw new Error('MISSING_STAT_DEFINITION');
     }
   }
@@ -35,6 +36,12 @@ function changeStat(player, stat, delta, hauntStarted) {
   if (!track) {
     throw new Error('UNKNOWN_STAT');
   }
+  if (!Number.isInteger(delta)) {
+    throw new Error('INVALID_STAT_DELTA');
+  }
+  if (typeof hauntStarted !== 'boolean') {
+    throw new Error('INVALID_HAUNT_FLAG');
+  }
   if (delta > 0) {
     const room = track.max - track.current;
     if (delta <= room) {
@@ -48,8 +55,8 @@ function changeStat(player, stat, delta, hauntStarted) {
     const fromOverflow = Math.min(track.overflow, amount);
     track.overflow -= fromOverflow;
     amount -= fromOverflow;
-    const floor = hauntStarted ? track.skullValue : track.skullValue + 1;
-    track.current = Math.max(track.current - amount, floor);
+    const minStat = hauntStarted ? track.skullValue : track.skullValue + 1;
+    track.current = Math.max(track.current - amount, minStat);
   }
 }
 
