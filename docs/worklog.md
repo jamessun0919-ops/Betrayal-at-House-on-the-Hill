@@ -196,3 +196,32 @@
 **開發者交代備忘事項**：
 - 下一階段工作：撰寫 M2b（提問協定＋回合流程）詳細實作計畫，要以 M2a 實際完成的程式碼介面（`gameState.js`/`playerEntity.js`/`boardGenerator.js`/`doorLayout.js` 的實際函式簽名，含審查後新增的驗證錯誤代碼）為基礎延伸，不用計畫文件裡假設的介面
 - M2b 撰寫計畫時需要明確設計「fallback 造成單向門」時的鄰接判定規則（最終審查發現但判定為 M2b 範疇，尚未決定）
+
+## 2026-08-02 第 2 次工作階段
+
+**當日工作內容**：
+- 討論 M2b（提問協定＋回合流程）設計，先確認「單向門」鄰接判定規則：兩間已探索房間之間能不能通行，改成雙方都要在共用邊列出門才算通行（AND 邏輯），已放置房間的 `doorSides` 資料本身不回頭竄改
+- 讀取 M2a 實際完成的程式碼介面（`gameState.js`/`playerEntity.js`/`boardGenerator.js`/`doorLayout.js`/`contentLoader.js`），作為 M2b 設計基礎
+- 討論角色屬性/開局分配時，發現實體遊戲的角色屬性其實是「刻度制」（一整排可能重複的數值，上升/下降一級是移動索引、不是數字加減），跟 M2a 原本假設的線性 current/max 模型不同；開發者確認並要求修正，回頭改寫 `server/src/game/playerEntity.js`（`track`/`currentIndex`/`baseIndex`/`skullIndex`），新增 `getStatValue`/`isBelowBase`（給藥膏/嗅鹽這類「低於基準值」卡片效果用）
+- 建立 `data/characters/` 角色資料範本（6 個佔位角色位置，欄位含代號/性別/年齡/職業/四屬性刻度），供開發者陸續填入真實角色卡內容，填寫前先用假數值跑
+- 逐項確認 M2b 架構決定：遊戲狀態存放（新增 `GameManager`，跟 `LobbyManager` 平行）、選角色互動流程（隨機順序、逐一選、確認才鎖定、30秒逾時隨機指定、其他人可隨時瀏覽角色資訊）、房間磚牌庫歸屬 M2b、牌庫抽完後的規則（開門選項消失、未連接的門視為牆、遊戲用現有版圖跑到結束）、回合順序（跟選角色順序分開各自骰）
+- 記錄 Phase 2 AI 玩家的預留設計（選角色順序排真人之後、回合順序仍完全隨機、AI 數量不可超過真人數量），寫進 spec 供之後參考
+- 確認實測時機：M2b 計畫最後加一個簡易除錯用測試頁面（非正式美術），讓開發者能在正式遊戲介面完成前就能點選驗證流程
+- 寫完 M2b 設計文件，自我審查後給開發者看過確認可以進入 `writing-plans`
+- 考量範圍過大（約10個任務），跟開發者確認拆成 M2b-1（純邏輯模組）+ M2b-2（Socket.IO整合+除錯頁面，待 M2b-1 完成後再依實際介面撰寫）
+- 撰寫 M2b-1 實作計畫（8 任務：contentLoader擴充/roomDeck/boardGenerator擴充/gameState擴充/promptState/characterSelection/gameManager/turnFlow），自我審查時發現「回合順序」這個設計文件裡有講但沒對應任務的缺口，補進 Task 7/Task 8
+- 開發者選定 Subagent-Driven 執行方式，本階段先收工，執行留待下次
+
+**完成項目**：
+- 修正 [server/src/game/playerEntity.js](../server/src/game/playerEntity.js) 為刻度制屬性模型（已通過測試、已提交）
+- 新增 [data/characters/](../data/characters/) 角色資料範本（6 個佔位角色）
+- 新增 [docs/superpowers/specs/2026-08-02-m2b-turn-flow-design.md](superpowers/specs/2026-08-02-m2b-turn-flow-design.md) M2b 設計文件
+- 新增 [docs/superpowers/plans/2026-08-02-m2b1-core-game-logic.md](superpowers/plans/2026-08-02-m2b1-core-game-logic.md) M2b-1 實作計畫（已自我審查，尚未執行）
+
+**遇到瓶頸**：
+- 角色屬性刻度制的發現算是本階段最大的意外——M2a 原本的線性屬性模型跟實體遊戲機制不符，回頭修正花了一些討論釐清精確語意（`baseIndex` 固定基準值 vs `currentIndex` 目前位置），但範圍侷限在 `playerEntity.js` 一個檔案，改起來不複雜
+
+**開發者交代備忘事項**：
+- 下一階段工作：用 `subagent-driven-development` 執行 M2b-1 計畫（跟 M2a 一樣先建獨立 worktree）
+- M2b-1 全部完成、通過 final review、合併回 `main` 後，才開始撰寫 M2b-2（Socket.IO 事件層整合＋除錯用測試頁面）的計畫，要以 M2b-1 實際完成的程式碼介面為基礎，不要用計畫文件裡假設的介面
+- `data/characters/characters.json` 的 6 個角色仍是佔位資料（`track` 是空陣列），等開發者陸續對照實體角色卡填寫；填之前不影響開發進度
