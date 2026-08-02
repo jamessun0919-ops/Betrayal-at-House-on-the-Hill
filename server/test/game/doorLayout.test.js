@@ -62,3 +62,17 @@ test('falls back to entry-only when no rotation can satisfy conflicting neighbor
   // regardless of what a neighbor wanted.
   expect(layout).toEqual(new Set(['north']));
 });
+
+test('throws INVALID_ENTRY_SIDE for an invalid entry side', () => {
+  expect(() => computeDoorLayout(1, 'northeast', noNeighbors())).toThrow('INVALID_ENTRY_SIDE');
+  expect(() => computeDoorLayout(1, 'North', noNeighbors())).toThrow('INVALID_ENTRY_SIDE');
+  expect(() => computeDoorLayout(1, undefined, noNeighbors())).toThrow('INVALID_ENTRY_SIDE');
+  expect(() => computeDoorLayout(1, 'invalid', noNeighbors())).toThrow('INVALID_ENTRY_SIDE');
+});
+
+test('throws INVALID_NEIGHBOR_REQUIREMENT_FN when getNeighborRequirement is not a function', () => {
+  expect(() => computeDoorLayout(1, 'north', undefined)).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
+  expect(() => computeDoorLayout(1, 'north', null)).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
+  expect(() => computeDoorLayout(1, 'north', 'not a function')).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
+  expect(() => computeDoorLayout(1, 'north', {})).toThrow('INVALID_NEIGHBOR_REQUIREMENT_FN');
+});

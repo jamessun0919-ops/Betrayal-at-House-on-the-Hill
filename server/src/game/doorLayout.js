@@ -16,6 +16,12 @@ function computeDoorLayout(doorCount, entrySide, getNeighborRequirement) {
   if (!Number.isInteger(doorCount) || doorCount < 1 || doorCount > 4) {
     throw new Error('INVALID_DOOR_COUNT');
   }
+  if (!SIDES.includes(entrySide)) {
+    throw new Error('INVALID_ENTRY_SIDE');
+  }
+  if (typeof getNeighborRequirement !== 'function') {
+    throw new Error('INVALID_NEIGHBOR_REQUIREMENT_FN');
+  }
   const otherSides = SIDES.filter((side) => side !== entrySide);
 
   for (let attempt = 0; attempt < 4; attempt++) {
