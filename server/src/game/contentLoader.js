@@ -4,8 +4,12 @@ const path = require('path');
 const DEFAULT_DATA_DIR = path.join(__dirname, '../../../data');
 
 function loadJsonFile(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf-8');
-  return JSON.parse(raw);
+  try {
+    const raw = fs.readFileSync(filePath, 'utf-8');
+    return JSON.parse(raw);
+  } catch (err) {
+    throw new Error('ROOM_DATA_LOAD_FAILED');
+  }
 }
 
 function loadRooms(dataDir = DEFAULT_DATA_DIR) {

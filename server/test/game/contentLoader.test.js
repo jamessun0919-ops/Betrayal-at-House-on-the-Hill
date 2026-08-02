@@ -35,5 +35,12 @@ test('loadStartingRooms reads and parses starting-rooms.json from the given data
 
 test('loadRooms throws a clear error when the file does not exist', () => {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'content-loader-empty-'));
-  expect(() => loadRooms(dataDir)).toThrow();
+  expect(() => loadRooms(dataDir)).toThrow('ROOM_DATA_LOAD_FAILED');
+});
+
+test('loadRooms throws ROOM_DATA_LOAD_FAILED when the file contains malformed JSON', () => {
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'content-loader-bad-json-'));
+  fs.mkdirSync(path.join(dataDir, 'rooms'));
+  fs.writeFileSync(path.join(dataDir, 'rooms', 'rooms.json'), '{not valid json');
+  expect(() => loadRooms(dataDir)).toThrow('ROOM_DATA_LOAD_FAILED');
 });
