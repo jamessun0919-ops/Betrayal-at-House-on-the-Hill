@@ -173,3 +173,26 @@
 **開發者交代備忘事項**：
 - 下一階段開始先檢查 `rooms.json` 的 `doors` 欄位
 - 下一階段工作：呼叫 `subagent-driven-development` skill（先用 `using-git-worktrees` 建立獨立 worktree），依 M2a 計畫逐任務執行
+
+## 2026-08-02 第 1 次工作階段
+
+**當日工作內容**：
+- 檢查 `rooms.json` 的 `doors` 欄位，開發者確認已補上；驗證時發現一筆全形數字語法錯誤（禮拜堂 `"doors": ２`），修正後 31 筆全部有效
+- 建立獨立 worktree（`worktree-m2a-board-and-player-state`），依 M2a 計畫用 `subagent-driven-development` skill 逐任務執行：Task 1 contentLoader.js、Task 2 doorLayout.js、Task 3 boardGenerator.js、Task 4 playerEntity.js、Task 5 gameState.js
+- 每個任務都出現同一類落差：計畫附的參考程式碼在 Global Constraints 要求的「不合法輸入一律拋出自訂 UPPER_SNAKE_CASE 錯誤」上有缺口；Task 1 時與開發者確認以補齊自訂錯誤為準，後續任務套用同一原則直接修正，不重複詢問
+- 最終整分支審查（opus）發現 4 個 Important 級問題：doorLayout.js 門朝向搜尋演算法有約 20% 機率漏掉本可成立的門配置（改成窮舉修正）、playerEntity.js changeStat 未驗證 delta/hauntStarted（改用非整數會靜默損毀屬性資料）、doorLayout.js 對 getNeighborRequirement 回傳值未做白名單檢查、另外 2 項從 Minor 升級為 Important（boardGenerator.js 座標未驗證、gameState.js 重複 playerId 會靜默覆蓋玩家）；另一項「fallback 造成單向門」的發現判定為 M2b（移動邏輯）範疇的設計問題，記錄下來留給 M2b 處理，不在 M2a 修
+- 修正輪＋ scoped re-review 後全部乾淨（70/70 測試通過），合併回 main（fast-forward）
+- 合併後發現主目錄還有一筆先前未提交的工作目錄變更（開發者手動填寫的 31 筆房間 `doors` 數值，因為是直接編輯檔案、沒走 git commit），與開發者確認後另外提交
+- 清理已合併的 worktree 與分支（M2a 分支＋順手清掉 M1 時期殘留未刪的舊分支），push 到 main
+
+**完成項目**：
+- 新增 `server/src/game/{contentLoader,doorLayout,boardGenerator,playerEntity,gameState}.js` 及對應測試（共 70 個測試，含 M1 既有 26 個）
+- `data/rooms/rooms.json`：31 筆房間 `doors` 欄位補齊並提交
+- M2a 里程碑完整合併進 main（commit fa7f493..559884d）
+
+**遇到瓶頸**：
+- 無重大瓶頸；「輸入驗證缺口」這類問題在多個任務重複出現，因為已有開發者第一次的明確裁定可套用同一原則，沒有逐次打斷詢問
+
+**開發者交代備忘事項**：
+- 下一階段工作：撰寫 M2b（提問協定＋回合流程）詳細實作計畫，要以 M2a 實際完成的程式碼介面（`gameState.js`/`playerEntity.js`/`boardGenerator.js`/`doorLayout.js` 的實際函式簽名，含審查後新增的驗證錯誤代碼）為基礎延伸，不用計畫文件裡假設的介面
+- M2b 撰寫計畫時需要明確設計「fallback 造成單向門」時的鄰接判定規則（最終審查發現但判定為 M2b 範疇，尚未決定）
