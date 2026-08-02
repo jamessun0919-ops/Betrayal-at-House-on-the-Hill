@@ -26,6 +26,10 @@ function createBoard(startingRooms) {
   const grandStaircase = startingRooms.find((r) => r.id === 'room_grand_staircase');
   const upperLanding = startingRooms.find((r) => r.id === 'room_upper_landing');
 
+  if (!entranceHall || !foyer || !grandStaircase || !upperLanding) {
+    throw new Error('MISSING_STARTING_ROOM');
+  }
+
   placeFixedRoom(ground, entranceHall.id, 0, 0);
   placeFixedRoom(ground, foyer.id, 4, 0);
   placeFixedRoom(ground, grandStaircase.id, -4, 0);
@@ -51,6 +55,15 @@ function makeNeighborRequirementReader(grid, coord) {
 function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
   if (!Number.isInteger(roomDefinition.doors) || roomDefinition.doors < 1 || roomDefinition.doors > 4) {
     throw new Error('INVALID_ROOM_DOORS');
+  }
+  if (!DIRECTION_DELTA[direction]) {
+    throw new Error('INVALID_DIRECTION');
+  }
+  if (floor !== 'ground' && floor !== 'upper') {
+    throw new Error('INVALID_FLOOR');
+  }
+  if (!roomDefinition.id) {
+    throw new Error('INVALID_ROOM_ID');
   }
   const grid = board[floor];
   const delta = DIRECTION_DELTA[direction];

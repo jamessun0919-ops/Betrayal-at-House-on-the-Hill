@@ -74,3 +74,33 @@ test('placeNewRoom throws ROOM_ALREADY_PLACED when the target coordinate is occu
     placeNewRoom(board, 'ground', { x: 0, y: -2 }, 'south', { id: 'room_dup2', doors: 4 })
   ).toThrow('ROOM_ALREADY_PLACED'); // also lands at (0,-1), now occupied
 });
+
+test('placeNewRoom throws INVALID_DIRECTION for invalid direction', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() =>
+    placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'northwest', { id: 'room_bad_dir', doors: 4 })
+  ).toThrow('INVALID_DIRECTION');
+});
+
+test('placeNewRoom throws INVALID_FLOOR for invalid floor', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() =>
+    placeNewRoom(board, 'basement', { x: 0, y: 0 }, 'north', { id: 'room_bad_floor', doors: 4 })
+  ).toThrow('INVALID_FLOOR');
+});
+
+test('placeNewRoom throws INVALID_ROOM_ID when roomDefinition lacks an id', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() =>
+    placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'north', { doors: 4 })
+  ).toThrow('INVALID_ROOM_ID');
+});
+
+test('createBoard throws MISSING_STARTING_ROOM when a required starting room is missing', () => {
+  const incompleteRooms = [
+    { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
+    { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+    // Missing room_grand_staircase and room_upper_landing
+  ];
+  expect(() => createBoard(incompleteRooms)).toThrow('MISSING_STARTING_ROOM');
+});
