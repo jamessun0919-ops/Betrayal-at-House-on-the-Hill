@@ -225,3 +225,31 @@
 - 下一階段工作：用 `subagent-driven-development` 執行 M2b-1 計畫（跟 M2a 一樣先建獨立 worktree）
 - M2b-1 全部完成、通過 final review、合併回 `main` 後，才開始撰寫 M2b-2（Socket.IO 事件層整合＋除錯用測試頁面）的計畫，要以 M2b-1 實際完成的程式碼介面為基礎，不要用計畫文件裡假設的介面
 - `data/characters/characters.json` 的 6 個角色仍是佔位資料（`track` 是空陣列），等開發者陸續對照實體角色卡填寫；填之前不影響開發進度
+
+## 2026-08-03 第 1 次工作階段
+
+**當日工作內容**：
+- 依 Handover 指示，建立獨立 worktree，用 `subagent-driven-development` 執行 M2b-1 計畫（8 個任務：contentLoader.loadCharacters、roomDeck.js、boardGenerator.canMoveBetween、gameState 擴充、promptState.js、characterSelection.js、gameManager.js、turnFlow.js）
+- Task 6（characterSelection.js）、Task 7（gameManager.js）審查各發現 1-2 個 Important 級輸入驗證/測試覆蓋缺口，套用先前已確立的原則直接修正，不重複詢問
+- Task 8（turnFlow.js）實作過程中，實作者自行發現計畫測試碼本身有邏輯錯誤（`INVALID_MOVE_DIRECTION` 測試情境設定錯誤：往西移動其實是合法的回大門廳移動，而且開門會讓行動力歸零，根本測不到目標錯誤路徑），停下來分析根本原因後跟開發者確認修正方向，重新設計測試情境（改用往北、模擬下一回合重設行動力）
+- Task 8 過程中一個 subagent 因外部用量限制中途失敗（沒有寫入任何檔案異動），改派全新 subagent 接手同一輪修正，未受影響
+- Task 8 審查發現 2 個 Important 問題（行動力/方向合法性檢查順序顛倒、缺少「鄰居門不同意」的負向情境測試），修正並通過複審
+- 全部 8 個任務完成後，派最終整分支審查（opus），發現 3 個 Important 問題：(1) 房間磚牌庫完全沒實作樓層維度（`floor` 欄位被忽略，玩家永遠上不了二樓）；(2) `advanceTurn` 沒有重設下一位玩家的行動力，職責無人認領；(3) `turnFlow` 完全沒有「是否輪到你」的檢查。前兩項判定為計畫/設計文件本身的架構缺口，跟開發者確認方向後才動工；第三項是可直接套用既有慣例的修正
+- 開發者裁定：樓層維度現在就補（單一牌庫、抽到不符樓層放回牌庫最底重抽）；`advanceTurn` 直接併入行動力重設；樓梯移動設計成不耗行動力的免費動作
+- 派一次較大範圍的修正輪（重新設計 `roomDeck.js` 的抽牌模型、`turnFlow.js` 新增樓梯移動與 turn ownership 檢查），複審通過（160/160 測試），合併回 main
+
+**完成項目**：
+- M2b-1 里程碑完整合併進 main（commit range `2aa45df..0dd7b22`）
+- 新增 `server/src/game/{roomDeck,promptState,characterSelection,gameManager,turnFlow}.js` 及對應測試
+- `contentLoader.js`/`boardGenerator.js`/`gameState.js` 擴充（角色資料載入、移動鄰接判定、房間磚牌庫與序列化）
+- 房間磚牌庫改為樓層感知（ground/upper/any），新增樓梯移動（免費動作）、回合行動力自動重設、回合歸屬權驗證
+- Jest 全過（13 suites / 160 tests，含 M1/M2a 既有測試）
+
+**遇到瓶頸**：
+- Task 8 的測試設計錯誤是本次自己發現、自己分析根因後跟開發者確認方向解決，沒有卡太久，但過程說明了「非顯而易見錯誤要先停下分析」這條規則實際運作的樣子
+- 最終審查發現的樓層/行動力重設兩個架構缺口，是計畫與更早的設計文件都沒處理到的，回頭補花了額外一輪較大範圍的修正，但範圍侷限、複審一次過
+
+**開發者交代備忘事項**：
+- 下一階段工作：撰寫 M2b-2（Socket.IO 事件層整合＋除錯用測試頁面）計畫，要以 M2b-1 實際完成的程式碼介面（`gameManager`/`promptState`/`characterSelection`/`turnFlow`/`roomDeck`/`gameState` 的實際函式簽名，含本次新增的樓層感知/樓梯/回合歸屬邏輯）為基礎延伸
+- 最終審查提到但本次未處理的架構問題：選角色階段的 `characterSelection` state 與 `promptState` 容器目前沒有任何模組持有（`gameManager` 只管已建立的 `gameState`），這是 M2b-2 必須先解的架構問題，要寫進 M2b-2 設計討論
+- `serializeGameState` 目前不含 pending prompt 資訊，M2b-2 廣播時需要一併考慮
