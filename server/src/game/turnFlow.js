@@ -38,13 +38,13 @@ function getAvailableDirections(gameState, playerId) {
 
 function moveToRoom(gameState, playerId, direction) {
   const player = requirePlayer(gameState, playerId);
+  if (player.actionPoints < 1) {
+    throw new Error('NOT_ENOUGH_ACTION_POINTS');
+  }
   const available = getAvailableDirections(gameState, playerId);
   const choice = available.find((a) => a.direction === direction);
   if (!choice) {
     throw new Error('INVALID_MOVE_DIRECTION');
-  }
-  if (player.actionPoints < 1) {
-    throw new Error('NOT_ENOUGH_ACTION_POINTS');
   }
   const delta = DIRECTION_DELTA[direction];
   const targetCoord = { x: player.x + delta.dx, y: player.y + delta.dy };

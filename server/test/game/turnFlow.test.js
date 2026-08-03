@@ -109,6 +109,24 @@ test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS when the player has 0 action po
   expect(() => moveToRoom(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
 });
 
+test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS before checking direction validity', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_only', doors: 4 }]);
+  // Move east to exhaust the deck and set AP to 0
+  moveToRoom(gameState, 'p1', 'east');
+  // AP is now 0, and we're at (1,0). North is unexplored and deck is empty (invalid direction).
+  // The check for NOT_ENOUGH_ACTION_POINTS should fire before INVALID_MOVE_DIRECTION.
+  expect(() => moveToRoom(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
+});
+
+test('getAvailableDirections omits directions where neighbor room exists but has no door facing back', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  // Manually place an explored room north of the entrance hall, but with no door facing south (back toward player).
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'west'] });
+  const available = getAvailableDirections(gameState, 'p1');
+  // North should NOT be in the available directions because the neighbor lacks a south-facing door.
+  expect(available.find((a) => a.direction === 'north')).toBeUndefined();
+});
+
 test('selectAction deducts 1 action point and returns a pending marker', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   const startingAP = player.actionPoints;
