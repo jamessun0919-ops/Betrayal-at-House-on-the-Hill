@@ -1,8 +1,8 @@
 const { SIDES } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
-const { drawRoom, isRoomDeckEmpty } = require('./roomDeck');
+const { drawRoom, hasRoomForFloor } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
-const { movePlayerTo } = require('./playerEntity');
+const { movePlayerTo, resetActionPoints } = require('./playerEntity');
 
 const ACTION_TYPES = ['item', 'attack', 'room_action'];
 
@@ -29,7 +29,7 @@ function getAvailableDirections(gameState, playerId) {
       if (canMoveBetween(gameState.board, player.floor, { x: player.x, y: player.y }, direction)) {
         results.push({ direction, kind: 'move' });
       }
-    } else if (!isRoomDeckEmpty(gameState.roomDeck)) {
+    } else if (hasRoomForFloor(gameState.roomDeck, player.floor)) {
       results.push({ direction, kind: 'open_door' });
     }
   }
@@ -38,6 +38,9 @@ function getAvailableDirections(gameState, playerId) {
 
 function moveToRoom(gameState, playerId, direction) {
   const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
   if (player.actionPoints < 1) {
     throw new Error('NOT_ENOUGH_ACTION_POINTS');
   }
@@ -55,7 +58,7 @@ function moveToRoom(gameState, playerId, direction) {
     return { kind: 'move', x: targetCoord.x, y: targetCoord.y };
   }
 
-  const roomDefinition = drawRoom(gameState.roomDeck);
+  const roomDefinition = drawRoom(gameState.roomDeck, player.floor);
   const placedRoom = placeNewRoom(
     gameState.board,
     player.floor,
@@ -80,6 +83,9 @@ function moveToRoom(gameState, playerId, direction) {
 
 function selectAction(gameState, playerId, actionType) {
   const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
   if (!ACTION_TYPES.includes(actionType)) {
     throw new Error('INVALID_ACTION_TYPE');
   }
@@ -111,7 +117,46 @@ function getCurrentTurnPlayerId(gameState) {
 function advanceTurn(gameState) {
   requireTurnOrder(gameState);
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;
-  return gameState.turnOrder[gameState.currentPlayerIndex];
+  const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
+  const nextPlayer = getPlayer(gameState, nextPlayerId);
+  resetActionPoints(nextPlayer);
+  return nextPlayerId;
+}
+
+function canUseStairs(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  const grid = gameState.board[player.floor];
+  const room = grid.get(coordKey(player.x, player.y));
+  if (!room) return false;
+  const { stairsLink } = gameState.board;
+  if (player.floor === 'ground') {
+    return room.roomId === stairsLink.groundRoomId;
+  }
+  return room.roomId === stairsLink.upperRoomId;
+}
+
+function useStairs(gameState, playerId) {
+  requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  if (!canUseStairs(gameState, playerId)) {
+    throw new Error('STAIRS_NOT_AVAILABLE');
+  }
+  const player = requirePlayer(gameState, playerId);
+  const targetFloor = player.floor === 'ground' ? 'upper' : 'ground';
+  const targetRoomId =
+    player.floor === 'ground' ? gameState.board.stairsLink.upperRoomId : gameState.board.stairsLink.groundRoomId;
+  const targetGrid = gameState.board[targetFloor];
+  let targetRoom;
+  for (const room of targetGrid.values()) {
+    if (room.roomId === targetRoomId) {
+      targetRoom = room;
+      break;
+    }
+  }
+  movePlayerTo(player, targetFloor, targetRoom.x, targetRoom.y);
+  return { kind: 'stairs', floor: targetFloor, x: targetRoom.x, y: targetRoom.y };
 }
 
 module.exports = {
@@ -121,4 +166,6 @@ module.exports = {
   isTurnOver,
   getCurrentTurnPlayerId,
   advanceTurn,
+  canUseStairs,
+  useStairs,
 };
