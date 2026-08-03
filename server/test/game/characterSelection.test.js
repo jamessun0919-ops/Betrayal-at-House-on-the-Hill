@@ -102,3 +102,19 @@ test('assignRandomCharacter locks a currently-available character for the given 
   expect(getAssignments(state).get(picker)).toBe(assigned);
   expect(state.lockedCharacterIds.has(assigned)).toBe(true);
 });
+
+test('assignRandomCharacter advances the turn after locking a character', () => {
+  const state = createCharacterSelectionState(['p1', 'p2'], makeCharacters(2));
+  const firstPicker = getCurrentPicker(state);
+  assignRandomCharacter(state, firstPicker);
+  expect(getCurrentPicker(state)).not.toBe(firstPicker);
+  expect(getCurrentPicker(state)).toBe(state.order[1]);
+});
+
+test('assignRandomCharacter throws CHARACTER_SELECT_NOT_YOUR_TURN for the wrong player', () => {
+  const state = createCharacterSelectionState(['p1', 'p2'], makeCharacters(2));
+  const notPicker = state.order[1];
+  expect(() =>
+    assignRandomCharacter(state, notPicker)
+  ).toThrow('CHARACTER_SELECT_NOT_YOUR_TURN');
+});

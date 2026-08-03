@@ -59,6 +59,10 @@ function confirmCharacterChoice(state, { playerId, characterId }) {
 }
 
 function assignRandomCharacter(state, playerId) {
+  const currentPicker = getCurrentPicker(state);
+  if (playerId !== currentPicker) {
+    throw new Error('CHARACTER_SELECT_NOT_YOUR_TURN');
+  }
   const available = getAvailableCharacterIds(state);
   if (available.length === 0) {
     throw new Error('NO_CHARACTERS_AVAILABLE');
