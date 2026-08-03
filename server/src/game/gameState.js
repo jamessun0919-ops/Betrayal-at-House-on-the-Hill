@@ -1,12 +1,14 @@
 const { createBoard } = require('./boardGenerator');
 const { createPlayer, resetActionPoints } = require('./playerEntity');
+const { createRoomDeck, isRoomDeckEmpty, getRemainingCount } = require('./roomDeck');
 
-function createGameState(startingRooms) {
+function createGameState(startingRooms, rooms) {
   return {
     board: createBoard(startingRooms),
     players: new Map(),
     hauntStarted: false,
     omenCount: 0,
+    roomDeck: createRoomDeck(rooms),
   };
 }
 
@@ -32,4 +34,25 @@ function getPlayer(gameState, playerId) {
   return gameState.players.get(playerId);
 }
 
-module.exports = { createGameState, addPlayer, getPlayer };
+function serializeGameState(gameState) {
+  return {
+    board: {
+      ground: Array.from(gameState.board.ground.values()),
+      upper: Array.from(gameState.board.upper.values()),
+      stairsLink: gameState.board.stairsLink,
+    },
+    players: Array.from(gameState.players.values()),
+    hauntStarted: gameState.hauntStarted,
+    omenCount: gameState.omenCount,
+    roomDeck: {
+      remainingCount: getRemainingCount(gameState.roomDeck),
+      isEmpty: isRoomDeckEmpty(gameState.roomDeck),
+    },
+    // Set by GameManager.startGame (Task 7) once character selection is
+    // done; null before that so this function stays safe to call any time.
+    turnOrder: gameState.turnOrder || null,
+    currentPlayerIndex: gameState.currentPlayerIndex ?? null,
+  };
+}
+
+module.exports = { createGameState, addPlayer, getPlayer, serializeGameState };
