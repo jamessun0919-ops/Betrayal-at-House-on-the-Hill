@@ -92,10 +92,7 @@ test('moveToRoom sets pendingCardDraw to null when the room has no draw type', (
 });
 
 test('moveToRoom throws INVALID_MOVE_DIRECTION for a direction not currently available', () => {
-  const { gameState } = makeGameStateWithPlayer([]);
-  // No drawable rooms at all and no explored neighbor -> every direction invalid.
-  // (createGameState requires a non-empty rooms array, so use a deck that's
-  // already been fully drawn instead of an empty one.)
+  // No drawable rooms left and no explored neighbor -> every direction invalid.
   const { gameState: gs2 } = (() => {
     const gameState2 = createGameState(STARTING_ROOMS, [{ id: 'room_only', doors: 4 }]);
     addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
