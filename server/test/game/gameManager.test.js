@@ -84,3 +84,25 @@ test('endGame removes the game and is a no-op for an unknown roomCode', () => {
   expect(getGameState(manager, 'ROOM1')).toBeUndefined();
   expect(() => endGame(manager, 'NEVER_STARTED')).not.toThrow();
 });
+
+test('UNKNOWN_CHARACTER throws and does not leak partial game into manager; subsequent valid startGame succeeds for same roomCode', () => {
+  const manager = createGameManager();
+  const args = baseStartArgs({
+    players: [{ playerId: 'p1', name: 'Alice', characterId: 'not_a_real_character' }],
+  });
+  expect(() => startGame(manager, 'ROOM1', args)).toThrow('UNKNOWN_CHARACTER');
+  expect(getGameState(manager, 'ROOM1')).toBeUndefined();
+  // Subsequent valid startGame for the same roomCode should succeed
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs());
+  expect(gameState).toBeDefined();
+  expect(gameState.players.size).toBe(2);
+});
+
+test('GAME_ALREADY_STARTED throws and original gameState remains unmodified and accessible', () => {
+  const manager = createGameManager();
+  const gameState1 = startGame(manager, 'ROOM1', baseStartArgs());
+  expect(() => startGame(manager, 'ROOM1', baseStartArgs())).toThrow('GAME_ALREADY_STARTED');
+  const gameState2 = getGameState(manager, 'ROOM1');
+  expect(gameState2).toBe(gameState1);
+  expect(gameState2.players.size).toBe(2);
+});
