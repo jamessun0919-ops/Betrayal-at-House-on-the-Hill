@@ -1,4 +1,5 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
+const { resetActionPoints } = require('../../src/game/playerEntity');
 const {
   getAvailableDirections,
   moveToRoom,
@@ -92,14 +93,13 @@ test('moveToRoom sets pendingCardDraw to null when the room has no draw type', (
 });
 
 test('moveToRoom throws INVALID_MOVE_DIRECTION for a direction not currently available', () => {
-  // No drawable rooms left and no explored neighbor -> every direction invalid.
-  const { gameState: gs2 } = (() => {
-    const gameState2 = createGameState(STARTING_ROOMS, [{ id: 'room_only', doors: 4 }]);
-    addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
-    moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck
-    return { gameState: gameState2 };
-  })();
-  expect(() => moveToRoom(gs2, 'p1', 'west')).toThrow('INVALID_MOVE_DIRECTION');
+  const gameState2 = createGameState(STARTING_ROOMS, [{ id: 'room_only', doors: 4 }]);
+  const player2 = addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
+  moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,0), AP=0
+  resetActionPoints(player2); // simulate starting a new turn
+  // North of (1,0) is unexplored and the deck is empty, so it's neither a
+  // valid move (no room there) nor a valid door-open (no cards left).
+  expect(() => moveToRoom(gameState2, 'p1', 'north')).toThrow('INVALID_MOVE_DIRECTION');
 });
 
 test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS when the player has 0 action points', () => {
