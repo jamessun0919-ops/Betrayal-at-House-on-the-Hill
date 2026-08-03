@@ -8,7 +8,7 @@ function loadJsonFile(filePath) {
     const raw = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(raw);
   } catch (err) {
-    throw new Error('ROOM_DATA_LOAD_FAILED');
+    throw new Error('CONTENT_DATA_LOAD_FAILED');
   }
 }
 
@@ -20,4 +20,8 @@ function loadStartingRooms(dataDir = DEFAULT_DATA_DIR) {
   return loadJsonFile(path.join(dataDir, 'rooms', 'starting-rooms.json'));
 }
 
-module.exports = { loadRooms, loadStartingRooms, DEFAULT_DATA_DIR };
+function loadCharacters(dataDir = DEFAULT_DATA_DIR) {
+  return loadJsonFile(path.join(dataDir, 'characters', 'characters.json'));
+}
+
+module.exports = { loadRooms, loadStartingRooms, loadCharacters, DEFAULT_DATA_DIR };
