@@ -13,24 +13,41 @@ function createRoomDeck(rooms) {
   if (!Array.isArray(rooms) || rooms.length === 0) {
     throw new Error('INVALID_ROOM_LIST');
   }
-  return { cards: shuffle(rooms), drawnCount: 0 };
+  return { cards: shuffle(rooms) };
 }
 
 function isRoomDeckEmpty(deck) {
-  return deck.drawnCount >= deck.cards.length;
+  return deck.cards.length === 0;
 }
 
 function getRemainingCount(deck) {
-  return deck.cards.length - deck.drawnCount;
+  return deck.cards.length;
 }
 
-function drawRoom(deck) {
+function hasRoomForFloor(deck, floor) {
+  if (floor !== 'ground' && floor !== 'upper') {
+    throw new Error('INVALID_FLOOR');
+  }
+  return deck.cards.some((room) => room.floor === floor || room.floor === 'any');
+}
+
+function drawRoom(deck, floor) {
+  if (floor !== 'ground' && floor !== 'upper') {
+    throw new Error('INVALID_FLOOR');
+  }
   if (isRoomDeckEmpty(deck)) {
     throw new Error('ROOM_DECK_EMPTY');
   }
-  const room = deck.cards[deck.drawnCount];
-  deck.drawnCount += 1;
-  return room;
+  const attempts = deck.cards.length;
+  for (let i = 0; i < attempts; i++) {
+    const room = deck.cards.shift();
+    if (room.floor === floor || room.floor === 'any') {
+      return room;
+    }
+    deck.cards.push(room); // put back at bottom, try the next card
+  }
+  // Cycled through every remaining card and none matched this floor.
+  throw new Error('ROOM_DECK_EMPTY');
 }
 
-module.exports = { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount };
+module.exports = { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor };

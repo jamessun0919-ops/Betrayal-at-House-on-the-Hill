@@ -31,7 +31,6 @@ test('createGameState builds a board, an empty player map, and a room deck', () 
   expect(gameState.omenCount).toBe(0);
   expect(gameState.board.ground.get('0,0').roomId).toBe('room_entrance_hall');
   expect(gameState.roomDeck.cards).toHaveLength(3);
-  expect(gameState.roomDeck.drawnCount).toBe(0);
 });
 
 test('addPlayer places the new player at the entrance hall with action points set', () => {
