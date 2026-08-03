@@ -1,4 +1,4 @@
-const { createBoard, placeNewRoom, coordKey } = require('../../src/game/boardGenerator');
+const { createBoard, placeNewRoom, coordKey, canMoveBetween } = require('../../src/game/boardGenerator');
 
 const STARTING_ROOMS = [
   { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
@@ -113,4 +113,44 @@ test('createBoard throws MISSING_STARTING_ROOM when a required starting room is 
     // Missing room_grand_staircase and room_upper_landing
   ];
   expect(() => createBoard(incompleteRooms)).toThrow('MISSING_STARTING_ROOM');
+});
+
+test('canMoveBetween returns true when both rooms agree there is a door on the shared side', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // entrance hall (0,0) has doors on all 4 sides (fixed starting room).
+  // Place a room to its north with doors:4 -> it will also have a door facing south (entry side).
+  placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'north', { id: 'room_a', doors: 4 });
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(true);
+});
+
+test('canMoveBetween returns false when the neighbor has no door facing back (one-way mismatch)', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Manually place a neighbor at (0,-1) whose doorSides do NOT include 'south'
+  // (i.e. it does not have a door facing back toward the entrance hall).
+  board.ground.set(coordKey(0, -1), { roomId: 'room_b', x: 0, y: -1, doorSides: ['north'] });
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(false);
+});
+
+test('canMoveBetween returns false when the origin room itself has no door on that side', () => {
+  const board = createBoard(STARTING_ROOMS);
+  board.ground.set(coordKey(0, 0), { roomId: 'room_entrance_hall', x: 0, y: 0, doorSides: ['east'] });
+  board.ground.set(coordKey(0, -1), { roomId: 'room_b', x: 0, y: -1, doorSides: ['north', 'south'] });
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(false);
+});
+
+test('canMoveBetween returns false when the target coordinate is unexplored', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(false);
+});
+
+test('canMoveBetween throws ROOM_NOT_FOUND when there is no room at fromCoord', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() => canMoveBetween(board, 'ground', { x: 99, y: 99 }, 'north')).toThrow('ROOM_NOT_FOUND');
+});
+
+test('canMoveBetween throws INVALID_DIRECTION/INVALID_FLOOR/INVALID_FROM_COORD for malformed input', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() => canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'sideways')).toThrow('INVALID_DIRECTION');
+  expect(() => canMoveBetween(board, 'basement', { x: 0, y: 0 }, 'north')).toThrow('INVALID_FLOOR');
+  expect(() => canMoveBetween(board, 'ground', { x: 'a', y: 0 }, 'north')).toThrow('INVALID_FROM_COORD');
 });

@@ -90,4 +90,32 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
   return placedRoom;
 }
 
-module.exports = { createBoard, placeNewRoom, coordKey };
+function canMoveBetween(board, floor, fromCoord, direction) {
+  if (!DIRECTION_DELTA[direction]) {
+    throw new Error('INVALID_DIRECTION');
+  }
+  if (floor !== 'ground' && floor !== 'upper') {
+    throw new Error('INVALID_FLOOR');
+  }
+  if (!Number.isInteger(fromCoord.x) || !Number.isInteger(fromCoord.y)) {
+    throw new Error('INVALID_FROM_COORD');
+  }
+  const grid = board[floor];
+  const fromRoom = grid.get(coordKey(fromCoord.x, fromCoord.y));
+  if (!fromRoom) {
+    throw new Error('ROOM_NOT_FOUND');
+  }
+  if (!fromRoom.doorSides.includes(direction)) {
+    return false;
+  }
+  const delta = DIRECTION_DELTA[direction];
+  const toCoord = { x: fromCoord.x + delta.dx, y: fromCoord.y + delta.dy };
+  const toRoom = grid.get(coordKey(toCoord.x, toCoord.y));
+  if (!toRoom) {
+    return false;
+  }
+  const facingSide = OPPOSITE_SIDE[direction];
+  return toRoom.doorSides.includes(facingSide);
+}
+
+module.exports = { createBoard, placeNewRoom, coordKey, canMoveBetween, DIRECTION_DELTA };
