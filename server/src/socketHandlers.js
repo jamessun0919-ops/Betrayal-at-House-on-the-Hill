@@ -49,6 +49,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (socket.data.roomCode) {
           return ack({ error: 'ALREADY_IN_ROOM' });
         }
+        if (getCharacterSelection(characterSelectionManager, roomCode) || getGameState(gameManager, roomCode)) {
+          return ack({ error: 'ROOM_IN_PROGRESS' });
+        }
         const { playerId } = lobbyManager.joinRoom(roomCode, playerName, socket.id);
         socket.data.roomCode = roomCode;
         socket.data.playerId = playerId;
@@ -71,6 +74,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!lobbyManager.isHost(roomCode, playerId)) {
           return ack({ error: 'NOT_HOST' });
         }
+        if (getGameState(gameManager, roomCode)) {
+          return ack({ error: 'GAME_ALREADY_STARTED' });
+        }
         const players = lobbyManager.getPlayers(roomCode);
         if (players.length < 2) {
           return ack({ error: 'TOO_FEW_PLAYERS' });
@@ -84,8 +90,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           players.map((p) => p.playerId),
           content.characters
         );
-        ack({});
         advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+        ack({});
       } catch (err) {
         console.error('game:startCharacterSelect error', err);
         ack({ error: err.message || 'BAD_REQUEST' });
@@ -110,9 +116,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const result = respondToPrompt(entry.promptState, { promptId, playerId, optionId });
         clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
         confirmCharacterChoice(entry.characterSelectionState, { playerId, characterId: optionId });
-        ack({});
         io.to(roomCode).emit('game:promptResolved', result);
         advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+        ack({});
       } catch (err) {
         console.error('game:promptRespond error', err);
         ack({ error: err.message || 'BAD_REQUEST' });
@@ -254,33 +260,38 @@ function advanceTurnIfOver(gameState, playerId) {
 }
 
 function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, promptId, playerId, characterSelectTimeoutMs, characterSelectTimeouts) {
-  const entry = getCharacterSelection(characterSelectionManager, roomCode);
-  if (!entry) return;
-  characterSelectTimeouts.delete(roomCode);
-  const characterId = assignRandomCharacter(entry.characterSelectionState, playerId);
-  const result = resolvePromptTimeout(entry.promptState, { promptId, defaultOptionId: characterId });
-  if (result) {
+  try {
+    const entry = getCharacterSelection(characterSelectionManager, roomCode);
+    if (!entry) return;
+    characterSelectTimeouts.delete(roomCode);
+    const characterId = assignRandomCharacter(entry.characterSelectionState, playerId);
+    const result = resolvePromptTimeout(entry.promptState, { promptId, defaultOptionId: characterId });
+    if (!result) {
+      return;
+    }
     io.to(roomCode).emit('game:promptResolved', result);
+    advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+  } catch (err) {
+    console.error('character select timeout error', err);
   }
-  advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
 }
 
 function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
-  const lobbyPlayers = lobbyManager.getPlayers(roomCode);
+  const lobbyPlayersById = new Map(lobbyManager.getPlayers(roomCode).map((p) => [p.playerId, p]));
   const assignments = getAssignments(entry.characterSelectionState);
-  const players = lobbyPlayers.map((p) => ({
-    playerId: p.playerId,
-    name: p.name,
-    characterId: assignments.get(p.playerId),
+  const players = entry.characterSelectionState.order.map((playerId) => ({
+    playerId,
+    name: lobbyPlayersById.has(playerId) ? lobbyPlayersById.get(playerId).name : playerId,
+    characterId: assignments.get(playerId),
   }));
-  endSelection(characterSelectionManager, roomCode);
   const gameState = startGame(gameManager, roomCode, {
     startingRooms: content.startingRooms,
     rooms: content.rooms,
     characters: content.characters,
     players,
   });
+  endSelection(characterSelectionManager, roomCode);
   io.to(roomCode).emit('game:started', serializeGameState(gameState));
 }
 

@@ -389,6 +389,34 @@ test('game:startCharacterSelect rejects when there are more players than charact
   httpServer.close();
 });
 
+test('lobby:join is rejected with ROOM_IN_PROGRESS once character selection has started for that room', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+
+  const startResult = await new Promise((resolve) => {
+    clientA.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(startResult.error).toBeUndefined();
+
+  const clientC = ioClient(url);
+  const joinResult = await new Promise((resolve) => {
+    clientC.emit('lobby:join', { roomCode, playerName: 'Carol' }, resolve);
+  });
+  expect(joinResult.error).toBe('ROOM_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  clientC.close();
+  httpServer.close();
+});
+
 test('character selection timeout auto-assigns a character and continues the flow', async () => {
   const { httpServer, port } = await startTestServer(makeContent(), { characterSelectTimeoutMs: 50 });
   const url = `http://localhost:${port}`;
@@ -498,6 +526,19 @@ async function setUpStartedGame() {
 
   return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
 }
+
+test('a repeated game:startCharacterSelect is rejected with GAME_ALREADY_STARTED once a game has already started for that room', async () => {
+  const { httpServer, clientA, clientB } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => {
+    clientA.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(result.error).toBe('GAME_ALREADY_STARTED');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
 
 test('game:move to open a door places a room, zeroes AP, and broadcasts game:stateUpdate', async () => {
   const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
