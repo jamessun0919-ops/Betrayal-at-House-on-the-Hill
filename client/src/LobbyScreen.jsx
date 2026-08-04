@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { createSocket } from './socket';
+import DebugGameScreen from './DebugGameScreen';
 
 const ERROR_MESSAGES = {
   ROOM_NOT_FOUND: '找不到這個房號，請確認後再試一次',
@@ -16,9 +17,11 @@ export default function LobbyScreen() {
   const [name, setName] = useState('');
   const [joinCode, setJoinCode] = useState('');
   const [roomCode, setRoomCode] = useState(null);
+  const [playerId, setPlayerId] = useState(null);
   const [players, setPlayers] = useState([]);
   const [error, setError] = useState('');
   const [disconnected, setDisconnected] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   useEffect(() => {
     const socket = createSocket();
@@ -35,6 +38,7 @@ export default function LobbyScreen() {
         return;
       }
       setRoomCode(res.roomCode);
+      setPlayerId(res.playerId);
       setError('');
     });
   }
@@ -46,8 +50,13 @@ export default function LobbyScreen() {
         return;
       }
       setRoomCode(res.roomCode);
+      setPlayerId(res.playerId);
       setError('');
     });
+  }
+
+  if (roomCode && showDebug) {
+    return <DebugGameScreen socket={socketRef.current} roomCode={roomCode} playerId={playerId} />;
   }
 
   if (roomCode) {
@@ -63,6 +72,7 @@ export default function LobbyScreen() {
             <li key={p.playerId}>{p.name}</li>
           ))}
         </ul>
+        <button onClick={() => setShowDebug(true)}>進入除錯測試模式</button>
       </div>
     );
   }
