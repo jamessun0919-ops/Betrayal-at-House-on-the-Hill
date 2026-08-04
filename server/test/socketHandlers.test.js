@@ -2,14 +2,44 @@ const ioClient = require('socket.io-client');
 const { createServer } = require('../src/createServer');
 const { LobbyManager } = require('../src/lobbyManager');
 const { registerSocketHandlers } = require('../src/socketHandlers');
+const { createGameManager } = require('../src/game/gameManager');
+const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
 
-function startTestServer() {
+function makeContent(overrides = {}) {
+  return {
+    characters: [
+      { id: 'char_001', codename: 'Alice-character', stats: makeStats() },
+      { id: 'char_002', codename: 'Bob-character', stats: makeStats() },
+    ],
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+    ...overrides,
+  };
+}
+
+function makeStats() {
+  return {
+    might: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
+    speed: { track: [2, 3, 4, 5, 6], baseIndex: 2, skullIndex: 0 },
+    knowledge: { track: [1, 2, 3, 4, 5], baseIndex: 1, skullIndex: 0 },
+    sanity: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
+  };
+}
+
+function startTestServer(content, options) {
   const { httpServer, io } = createServer();
   const lobbyManager = new LobbyManager();
-  registerSocketHandlers(io, lobbyManager);
+  const gameManager = createGameManager();
+  const characterSelectionManager = createCharacterSelectionManager();
+  registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, content || makeContent(), options);
   return new Promise((resolve) => {
     httpServer.listen(0, () => {
-      resolve({ httpServer, port: httpServer.address().port });
+      resolve({ httpServer, port: httpServer.address().port, lobbyManager, gameManager, characterSelectionManager });
     });
   });
 }
@@ -244,5 +274,144 @@ test('disconnecting removes the player and broadcasts the updated list', async (
   expect(update.players.map((p) => p.name)).toEqual(['Alice']);
 
   clientA.close();
+  httpServer.close();
+});
+
+test('game:startCharacterSelect full flow: host triggers, both players get prompted in turn, game starts', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => {
+    clientA.emit('lobby:create', { playerName: 'Alice' }, resolve);
+  });
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  const joined = await new Promise((resolve) => {
+    clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve);
+  });
+  const bobId = joined.playerId;
+
+  // Non-host (Bob) cannot start selection.
+  const rejected = await new Promise((resolve) => {
+    clientB.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(rejected.error).toBe('NOT_HOST');
+
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
+  const startResult = await new Promise((resolve) => {
+    clientA.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(startResult.error).toBeUndefined();
+
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
+  expect(['char_001', 'char_002']).toContain(prompt1.options[0]);
+  const firstPickerId = prompt1.targetPlayerId;
+  const firstPickerClient = firstPickerId === aliceId ? clientA : clientB;
+  const secondPickerClient = firstPickerId === aliceId ? clientB : clientA;
+
+  const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  const gameStarted = new Promise((resolve) => clientA.once('game:started', resolve));
+
+  const respondResult = await new Promise((resolve) => {
+    firstPickerClient.emit(
+      'game:promptRespond',
+      { promptId: prompt1.promptId, optionId: prompt1.options[0] },
+      resolve
+    );
+  });
+  expect(respondResult.error).toBeUndefined();
+
+  const prompt2 = await secondPrompt;
+  expect(prompt2.options).toHaveLength(1); // only one character left
+
+  await new Promise((resolve) => {
+    secondPickerClient.emit(
+      'game:promptRespond',
+      { promptId: prompt2.promptId, optionId: prompt2.options[0] },
+      resolve
+    );
+  });
+
+  const startedPayload = await gameStarted;
+  expect(startedPayload.players).toHaveLength(2);
+  expect(startedPayload.turnOrder.slice().sort()).toEqual([aliceId, bobId].sort());
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:startCharacterSelect rejects when fewer than 2 players are in the room', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const client = ioClient(url);
+  await new Promise((resolve) => {
+    client.emit('lobby:create', { playerName: 'Alice' }, resolve);
+  });
+
+  const result = await new Promise((resolve) => {
+    client.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(result.error).toBe('TOO_FEW_PLAYERS');
+
+  client.close();
+  httpServer.close();
+});
+
+test('game:startCharacterSelect rejects when there are more players than characters', async () => {
+  const content = {
+    characters: [{ id: 'char_001', codename: 'Solo', stats: makeStats() }],
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
+    startingRooms: makeContent().startingRooms,
+  };
+  const { httpServer, port } = await startTestServer(content);
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const clientB = ioClient(url);
+  await new Promise((resolve) =>
+    clientB.emit('lobby:join', { roomCode: created.roomCode, playerName: 'Bob' }, resolve)
+  );
+
+  const result = await new Promise((resolve) => {
+    clientA.emit('game:startCharacterSelect', {}, resolve);
+  });
+  expect(result.error).toBe('TOO_MANY_PLAYERS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('character selection timeout auto-assigns a character and continues the flow', async () => {
+  const { httpServer, port } = await startTestServer(makeContent(), { characterSelectTimeoutMs: 50 });
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+
+  const resolvedPromise = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const secondPromptPromise = new Promise((resolve) => {
+    clientA.on('game:prompt', (p) => {
+      if (p !== undefined) resolve(p);
+    });
+  });
+
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+
+  const resolved = await resolvedPromise;
+  expect(resolved.wasTimeout).toBe(true);
+
+  clientA.close();
+  clientB.close();
   httpServer.close();
 });
