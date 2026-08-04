@@ -415,3 +415,46 @@ test('character selection timeout auto-assigns a character and continues the flo
   clientB.close();
   httpServer.close();
 });
+
+test('a real response before the deadline cancels the scheduled timeout so it cannot later double-resolve the prompt', async () => {
+  const { httpServer, port } = await startTestServer(makeContent(), { characterSelectTimeoutMs: 100 });
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+
+  const resolvedEvents = [];
+  clientA.on('game:promptResolved', (payload) => resolvedEvents.push(payload));
+
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
+
+  const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
+
+  await new Promise((resolve) => {
+    firstPickerClient.emit(
+      'game:promptRespond',
+      { promptId: prompt1.promptId, optionId: prompt1.options[0] },
+      resolve
+    );
+  });
+
+  // Wait past where the original 100ms deadline for prompt1 would have fired, to prove
+  // the scheduled timeout was actually cancelled by the real response and can't later
+  // double-resolve the same prompt.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  const resolvedForPrompt1 = resolvedEvents.filter((r) => r.promptId === prompt1.promptId);
+  expect(resolvedForPrompt1).toHaveLength(1);
+  expect(resolvedForPrompt1[0].wasTimeout).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

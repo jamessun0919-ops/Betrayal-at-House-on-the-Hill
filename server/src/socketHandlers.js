@@ -12,14 +12,14 @@ const {
   getAssignments,
 } = require('./game/characterSelection');
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
-const { startGame, getGameState } = require('./game/gameManager');
+const { startGame } = require('./game/gameManager');
 const { serializeGameState } = require('./game/gameState');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
-const characterSelectTimeouts = new Map(); // roomCode -> Timeout handle
 
 function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, content, options = {}) {
   const characterSelectTimeoutMs = options.characterSelectTimeoutMs || DEFAULT_CHARACTER_SELECT_TIMEOUT_MS;
+  const characterSelectTimeouts = new Map(); // roomCode -> Timeout handle
 
   io.on('connection', (socket) => {
     socket.on('lobby:create', (payload, callback) => {
@@ -84,7 +84,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           content.characters
         );
         ack({});
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
       } catch (err) {
         console.error('game:startCharacterSelect error', err);
         ack({ error: err.message || 'BAD_REQUEST' });
@@ -107,11 +107,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         // (M2b-2 doesn't add turn-flow prompts yet) — respondToPrompt's own
         // promptId/target-player checks are what actually guard correctness.
         const result = respondToPrompt(entry.promptState, { promptId, playerId, optionId });
-        clearCharacterSelectTimeout(roomCode);
+        clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
         confirmCharacterChoice(entry.characterSelectionState, { playerId, characterId: optionId });
         ack({});
         io.to(roomCode).emit('game:promptResolved', result);
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
       } catch (err) {
         console.error('game:promptRespond error', err);
         ack({ error: err.message || 'BAD_REQUEST' });
@@ -128,7 +128,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
   });
 }
 
-function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs) {
+function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   if (isCharacterSelectionComplete(entry.characterSelectionState)) {
     finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode);
@@ -156,13 +156,14 @@ function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelec
       roomCode,
       prompt.promptId,
       picker,
-      characterSelectTimeoutMs
+      characterSelectTimeoutMs,
+      characterSelectTimeouts
     );
   }, characterSelectTimeoutMs);
   characterSelectTimeouts.set(roomCode, handle);
 }
 
-function clearCharacterSelectTimeout(roomCode) {
+function clearCharacterSelectTimeout(roomCode, characterSelectTimeouts) {
   const handle = characterSelectTimeouts.get(roomCode);
   if (handle) {
     clearTimeout(handle);
@@ -170,7 +171,7 @@ function clearCharacterSelectTimeout(roomCode) {
   }
 }
 
-function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, promptId, playerId, characterSelectTimeoutMs) {
+function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, promptId, playerId, characterSelectTimeoutMs, characterSelectTimeouts) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   if (!entry) return;
   characterSelectTimeouts.delete(roomCode);
@@ -179,7 +180,7 @@ function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSe
   if (result) {
     io.to(roomCode).emit('game:promptResolved', result);
   }
-  advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs);
+  advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
 }
 
 function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode) {
