@@ -624,13 +624,22 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
   });
   expect(rejected.error).toBe('NOT_HOST');
 
-  const firstPrompt = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  // game:prompt is a room-wide broadcast — both clients' sockets receive it
+  // independently. Wait for BOTH to confirm receipt of prompt #1 before
+  // attaching a fresh .once listener for "the next prompt" on whichever
+  // client turns out to be the second picker below. A single-client wait
+  // here raced against the other client's still-in-flight delivery of this
+  // same broadcast (confirmed during this milestone's implementation via
+  // repeated diagnostic runs) and made this test fail deterministically
+  // whenever Alice was the first picker.
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
   const startResult = await new Promise((resolve) => {
     clientA.emit('game:startCharacterSelect', {}, resolve);
   });
   expect(startResult.error).toBeUndefined();
 
-  const prompt1 = await firstPrompt;
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
   expect(['char_001', 'char_002']).toContain(prompt1.options[0]);
   const firstPickerId = prompt1.targetPlayerId;
   const firstPickerClient = firstPickerId === aliceId ? clientA : clientB;
@@ -1049,9 +1058,13 @@ async function setUpStartedGame() {
   const bobId = joined.playerId;
 
   const started = new Promise((resolve) => clientA.once('game:started', resolve));
-  const firstPrompt = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  // Same room-wide-broadcast race as the "full flow" test above: wait for
+  // BOTH clients to receive prompt #1 before treating a later fresh .once
+  // on either client as scoped to "the next prompt only."
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
   await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
-  const prompt1 = await firstPrompt;
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
   const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
   const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
 
@@ -1693,3 +1706,7 @@ git commit -m "feat(m2b2): add debug test screen for character selection and tur
 - 房主離開後的房主轉移機制（本次不處理，房主離開就跟其他玩家一樣走既有 `leaveRoom` 邏輯）
 - 正式遊戲介面美術：M2b-2 只有除錯用測試頁面
 - `data/characters/characters.json` 真實角色資料尚未填寫（仍是 6 個空白刻度的佔位角色），本計畫測試全部使用自建 fixture，不受影響；等開發者填完真實資料後，`index.js` 讀到的就會是真實內容，不需要改程式碼
+
+## 執行時發現並修正的計畫錯誤（記錄供後續參考）
+
+- **`game:prompt` 廣播的 listener 競態**：Task 3「full flow」測試與 Task 4 的 `setUpStartedGame()` 輔助函式，原本都只用 `clientA.once('game:prompt', resolve)` 等第一次提問廣播——但 `game:prompt` 是廣播給整個房間，兩個 client 各自的連線都會獨立收到；如果 `clientA` 不是第二位被詢問的玩家，之後在 `clientB` 上新掛的 `.once('game:prompt', ...)` 可能會誤接到還在傳送中的「第一次」廣播，錯當成第二次提問，造成 `PROMPT_MISMATCH`（依先選到的人是誰而定，具決定性、不是隨機的 flaky）。修正方式是同時對兩個 client 掛 `.once`、用 `Promise.all` 等兩邊都確認收到第一次廣播後才繼續（本文件上方兩處程式碼已經是修正後的版本）。這個問題純粹在測試碼，`socketHandlers.js`／`promptState.js`／`characterSelection.js` 的實際邏輯經過反覆診斷驗證都是正確的，完全沒有修改。之後如果任何計畫要沿用「等待房間廣播事件」這種測試寫法，記得套用「兩邊都等到才繼續」的原則，不要只等單一 client。
