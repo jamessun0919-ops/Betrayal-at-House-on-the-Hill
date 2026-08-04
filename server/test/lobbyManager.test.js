@@ -73,3 +73,17 @@ test('joinRoom rejects an invalid name', () => {
   const { roomCode } = manager.createRoom('Alice', 'socket-1');
   expect(() => manager.joinRoom(roomCode, '   ', 'socket-2')).toThrow('INVALID_NAME');
 });
+
+test('isHost returns true only for the player who created the room', () => {
+  const manager = new LobbyManager();
+  const { roomCode, playerId: hostId } = manager.createRoom('Alice', 'socket-1');
+  const { playerId: bobId } = manager.joinRoom(roomCode, 'Bob', 'socket-2');
+
+  expect(manager.isHost(roomCode, hostId)).toBe(true);
+  expect(manager.isHost(roomCode, bobId)).toBe(false);
+});
+
+test('isHost returns false for an unknown room code', () => {
+  const manager = new LobbyManager();
+  expect(manager.isHost('ZZZZ', 'anyone')).toBe(false);
+});

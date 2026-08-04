@@ -39,6 +39,7 @@ class LobbyManager {
     const playerId = generatePlayerId();
     this.rooms.set(roomCode, {
       players: new Map([[playerId, { name, socketId: hostSocketId }]]),
+      hostPlayerId: playerId,
     });
     return { roomCode, playerId };
   }
@@ -77,6 +78,12 @@ class LobbyManager {
       if (room.players.has(playerId)) return roomCode;
     }
     return null;
+  }
+
+  isHost(roomCode, playerId) {
+    const room = this.rooms.get(roomCode);
+    if (!room) return false;
+    return room.hostPlayerId === playerId;
   }
 }
 
