@@ -458,3 +458,123 @@ test('a real response before the deadline cancels the scheduled timeout so it ca
   clientB.close();
   httpServer.close();
 });
+
+async function setUpStartedGame() {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  const joined = await new Promise((resolve) =>
+    clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve)
+  );
+  const bobId = joined.playerId;
+
+  const started = new Promise((resolve) => clientA.once('game:started', resolve));
+  const firstPrompt = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  const prompt1 = await firstPrompt;
+  const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
+  const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
+
+  const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  await new Promise((resolve) =>
+    firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
+  );
+  const prompt2 = await secondPrompt;
+  await new Promise((resolve) =>
+    secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
+  );
+
+  const startedPayload = await started;
+  const currentPlayerId = startedPayload.turnOrder[startedPayload.currentPlayerIndex];
+  const currentClient = currentPlayerId === aliceId ? clientA : clientB;
+  const otherClient = currentPlayerId === aliceId ? clientB : clientA;
+
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
+}
+
+test('game:move to open a door places a room, zeroes AP, and broadcasts game:stateUpdate', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:move', { direction: 'east' }, resolve);
+  });
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('open_door');
+
+  const update = await updatePromise;
+  const movedPlayer = update.players.find((p) => p.x === 1 && p.y === 0);
+  expect(movedPlayer).toBeTruthy();
+  expect(movedPlayer.actionPoints).toBe(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move rejects a caller who is not the current turn player', async () => {
+  const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => {
+    otherClient.emit('game:move', { direction: 'east' }, resolve);
+  });
+  expect(result.error).toBe('NOT_YOUR_TURN');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction spends 1 action point, broadcasts game:pendingAction, and updates state', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const pendingActionPromise = new Promise((resolve) => currentClient.once('game:pendingAction', resolve));
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:selectAction', { actionType: 'item' }, resolve);
+  });
+  expect(result.error).toBeUndefined();
+  expect(result).toEqual({ kind: 'item', pending: true });
+
+  const pendingAction = await pendingActionPromise;
+  expect(pendingAction.actionType).toBe('item');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:useStairs is rejected when the player is not standing at the stairs link', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:useStairs', {}, resolve);
+  });
+  expect(result.error).toBe('STAIRS_NOT_AVAILABLE');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('when a move exhausts action points, the turn automatically advances to the next player', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // zeroes AP
+  const update = await updatePromise;
+
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  // The new current player's action points must have been reset (advanceTurn's job).
+  const newCurrentPlayer = update.players.find((p) => p.playerId === update.turnOrder[update.currentPlayerIndex]);
+  expect(newCurrentPlayer.actionPoints).toBeGreaterThan(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

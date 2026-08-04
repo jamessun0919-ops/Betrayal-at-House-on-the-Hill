@@ -12,8 +12,9 @@ const {
   getAssignments,
 } = require('./game/characterSelection');
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
-const { startGame } = require('./game/gameManager');
-const { serializeGameState } = require('./game/gameState');
+const { startGame, getGameState } = require('./game/gameManager');
+const { serializeGameState, getPlayer } = require('./game/gameState');
+const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
@@ -118,6 +119,80 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
+    socket.on('game:move', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        const { direction } = payload || {};
+        const result = moveToRoom(gameState, playerId, direction);
+        ack(result);
+        if (result.pendingCardDraw) {
+          io.to(roomCode).emit('game:pendingCardDraw', {
+            playerId,
+            roomId: result.roomId,
+            deck: result.pendingCardDraw.deck,
+          });
+        }
+        advanceTurnIfOver(gameState, playerId);
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:move error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
+    socket.on('game:selectAction', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        const { actionType } = payload || {};
+        const result = selectAction(gameState, playerId, actionType);
+        ack(result);
+        if (result.pending) {
+          io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
+        }
+        advanceTurnIfOver(gameState, playerId);
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:selectAction error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
+    socket.on('game:useStairs', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        const result = useStairs(gameState, playerId);
+        ack(result);
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:useStairs error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
     socket.on('disconnect', () => {
       const { roomCode, playerId } = socket.data;
       if (roomCode && playerId) {
@@ -168,6 +243,13 @@ function clearCharacterSelectTimeout(roomCode, characterSelectTimeouts) {
   if (handle) {
     clearTimeout(handle);
     characterSelectTimeouts.delete(roomCode);
+  }
+}
+
+function advanceTurnIfOver(gameState, playerId) {
+  const player = getPlayer(gameState, playerId);
+  if (isTurnOver(player)) {
+    advanceTurn(gameState);
   }
 }
 
