@@ -475,9 +475,10 @@ async function setUpStartedGame() {
   const bobId = joined.playerId;
 
   const started = new Promise((resolve) => clientA.once('game:started', resolve));
-  const firstPrompt = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
   await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
-  const prompt1 = await firstPrompt;
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
   const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
   const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
 
