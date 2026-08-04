@@ -253,3 +253,33 @@
 - 下一階段工作：撰寫 M2b-2（Socket.IO 事件層整合＋除錯用測試頁面）計畫，要以 M2b-1 實際完成的程式碼介面（`gameManager`/`promptState`/`characterSelection`/`turnFlow`/`roomDeck`/`gameState` 的實際函式簽名，含本次新增的樓層感知/樓梯/回合歸屬邏輯）為基礎延伸
 - 最終審查提到但本次未處理的架構問題：選角色階段的 `characterSelection` state 與 `promptState` 容器目前沒有任何模組持有（`gameManager` 只管已建立的 `gameState`），這是 M2b-2 必須先解的架構問題，要寫進 M2b-2 設計討論
 - `serializeGameState` 目前不含 pending prompt 資訊，M2b-2 廣播時需要一併考慮
+
+## 2026-08-04 第 1 次工作階段
+
+**當日工作內容**：
+- 討論並確認 M2b-2 架構決策：選角色階段狀態改用獨立、用完即丟的 `characterSelectionManager.js`（開發者修正 agent 原本傾向擴充 `GameManager` 的提案）；`promptState` 未來若給回合流程用，在 `gameState` 上開全新獨立欄位，不跟選角色階段共用；房主手動觸發選角、`socketHandlers.js` 直接持有 `setTimeout`、除錯頁面用 client 內簡易 React 元件、回合動作先接直接事件不套兩層計時提問、`game:pendingCardDraw`/`game:pendingAction` 做成獨立廣播提早準備接口
+- 撰寫並執行 M2b-2 實作計畫（5 任務：LobbyManager host 追蹤、characterSelectionManager.js、角色選擇 Socket 事件、回合流程 Socket 事件、除錯測試頁面），`subagent-driven-development` 逐任務執行
+- Task 3/Task 4 各自發現同一類測試競態錯誤（`game:prompt` 廣播的 `.once` 監聽器競態），套用先前 M1 已有先例直接修正；Task 4 一個 subagent 因誤解背景通知機制而卡住，接續說明後恢復正常；Task 4 審查一度因外部 API 用量限制中斷，重新派審通過
+- 最終整分支審查發現 2 個 Critical（`handleCharacterSelectTimeout` 無 try/catch 會讓整個 process 當掉；`finishCharacterSelection` 用即時大廳名單而非凍結的選角順序，會造成永久卡住或悄悄少人開局），根因都是缺少「選角開始後」的階段防護。開發者確認新增 `ROOM_IN_PROGRESS`/`GAME_ALREADY_STARTED` 規則，修正並複審通過後合併進 `main`
+- 依開發者指示，回頭修正 M2b-2 計畫文件本身內嵌的測試競態程式碼樣本，新增「執行時發現並修正的計畫錯誤」章節
+- 清理 worktree 時處理 Windows 殘留 jest 程序、主目錄 `client/` 缺少 `node_modules` 的建置失敗，皆診斷後解決
+- 用 `brainstorming` 技能開始 M2c（卡牌牌庫＋效果解析器）設計討論，重新讀取卡牌機制參考文件與三份卡片資料最終內容作為基礎，逐項確認：框架範圍（先建完整的擲骰修改器/持續性標記/多階梯框架，onAttack/onDamageTaken 留給 M3）、pendingPrompt 狀態放獨立的 `effectResolverManager`（不動 `gameState`）、抽卡改成隨 `game:move` 自動觸發解析、事件/道具/預兆牌庫抽空時比照房間磚牌庫「跳過、視為無事發生」（不做棄牌堆重洗）、36 張卡片的 effects 內容由 agent 依參考文件草擬、開發者審核修正
+- 提出 M2c 模組切分（`cardDeck.js`/`effectPipeline.js`/`modifiers.js`/`effectResolver.js`/`effectResolverManager.js`）、宣告式效果 JSON 語法（`dice_check`/`stat_change`/`grant_item`/`lose_item`/`persistent_modifier`/`peek_and_reorder`/`choice`）、新增 Socket 事件（`game:cardDrawn`/`game:effectPendingChoice`/`game:effectPromptRespond`/`game:effectResolved`）、任務拆分建議（M2c-1 純邏輯／M2c-2 socket 整合／M2c-3 卡牌內容），開發者確認拆分建議，指示完整設計文件留到下階段撰寫
+
+**完成項目**：
+- **M2b-2 完整合併進 `main`**：`server/src/lobbyManager.js`（host 追蹤）、`server/src/game/characterSelectionManager.js`（新）、`server/src/index.js`/`server/src/socketHandlers.js`（大幅擴充：角色選擇與回合流程 Socket 事件、`ROOM_IN_PROGRESS`/`GAME_ALREADY_STARTED` 防護）、`client/src/DebugGameScreen.jsx`（新）、`client/src/LobbyScreen.jsx`（除錯模式入口）
+- 修正並提交 [docs/superpowers/plans/2026-08-04-m2b2-socket-integration.md](superpowers/plans/2026-08-04-m2b2-socket-integration.md) 計畫文件本身的測試競態程式碼樣本
+- M2c 設計討論的所有決策已記錄（尚未寫成 spec 文件，留待下階段）
+
+**遇到瓶頸**：
+- Task 4 一個 subagent 誤以為 Bash 指令執行完會有背景通知，只改測試沒做實作就停手，靠檢查 git 狀態診斷後接續說明解決
+- Task 4 審查中途遇到 API 用量限制中斷，重新派審即可，未影響已完成的實作
+- 骰子面值 agent 記錯（誤記成 0/0/0/1/1/2），開發者當場更正為 0/0/1/1/2/2，已寫入本次討論記錄，尚未落成程式碼
+
+**開發者交代備忘事項**：
+- 下一階段工作：把本次 M2c 討論的所有決策整理寫成完整設計 spec 文件（`docs/superpowers/specs/`），自我審查後給開發者確認，才進入 `writing-plans`
+- 骰子面值務必用 **0/0/1/1/2/2**，不是 0/0/0/1/1/2
+- M2c 任務拆分已定案：M2c-1（純邏輯：`cardDeck.js`/`effectPipeline.js`/`modifiers.js`/`effectResolver.js`）→ M2c-2（Socket 整合：`effectResolverManager.js`＋`socketHandlers.js` 接線＋除錯頁面擴充）→ M2c-3（36 張卡片實際 effects 內容，agent 草擬、開發者審核）
+- `ROOM_IN_PROGRESS` 錯誤碼在 `client/src/LobbyScreen.jsx` 的 `ERROR_MESSAGES` 還沒有中文翻譯（目前顯示通用「發生未知錯誤」），非阻塞，開發者尚未決定何時處理</new_string>
+</invoke>
+
