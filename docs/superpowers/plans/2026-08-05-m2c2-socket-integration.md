@@ -622,13 +622,24 @@ async function setUpStartedGameWithContent(content) {
   const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
 
   const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  // Wait for BOTH clients to actually receive each game:promptResolved broadcast
+  // before proceeding -- otherwise, under load, a still-in-flight broadcast from
+  // character selection can be caught by a caller's own later .once('game:promptResolved', ...)
+  // listener instead of the event it's actually waiting for (same race class fixed
+  // in M2b-2 Task 3/Task 4 for game:prompt).
+  const firstRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const firstRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
   );
+  await Promise.all([firstRespondedA, firstRespondedB]);
   const prompt2 = await secondPrompt;
+  const secondRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const secondRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
   );
+  await Promise.all([secondRespondedA, secondRespondedB]);
 
   const startedPayload = await started;
   const currentPlayerId = startedPayload.turnOrder[startedPayload.currentPlayerIndex];
@@ -640,6 +651,14 @@ async function setUpStartedGameWithContent(content) {
 ```
 
 **注意**：`setUpStartedGameWithContent` 是把既有的 `setUpStartedGame()`（無參數版本，內部固定呼叫 `startTestServer()`）改寫成接受自訂 `content` 的版本，兩者流程完全一樣。既有的 `setUpStartedGame()` 定義維持不動（後面既有測試還在用它）。
+
+## 執行時發現並修正的計畫錯誤
+
+Task 6 執行完後，單獨跑 `test/socketHandlers.test.js` 全數通過，但跑 `npx jest`（全部 19 個測試檔一起跑）時「an effect choice that times out auto-resolves with the default option」偶發失敗（`resolved.wasTimeout` 是 `false` 而非 `true`）。
+
+**根因**：`setUpStartedGame()`／`setUpStartedGameWithContent()` 兩個 helper 在選角色階段呼叫 `game:promptRespond` 時，只等待該次呼叫自己的 ack callback，從未等待 `game:promptResolved` 這個廣播事件真的送達兩個 client。在系統負載較高時（跑滿 19 個測試檔），這個廣播可能還在飛行中，此時呼叫端（例如本檔案 Task 6 新增的逾時測試）自己註冊的 `currentClient.once('game:promptResolved', ...)` 就可能誤收到這個殘留廣播，而不是真正要等的那一次——跟 M2b-2 Task 3/Task 4 的 `game:prompt` 監聽器競態是同一類問題。
+
+**修法**：本文件上方 Task 5 的 `setUpStartedGameWithContent` 程式碼樣本，以及既有 `setUpStartedGame()`（未列在本文件內，見 `server/test/socketHandlers.test.js` 現有內容）都已經改成：呼叫 `game:promptRespond` 前先用 `Promise.all` 註冊兩個 client 各自的 `game:promptResolved` `.once` 監聽器，呼叫後 `await Promise.all([...])` 確保兩邊都真的收到廣播才繼續——套用跟 `game:prompt` 完全相同的先例，不需要新的設計決策。之後若重新從本計畫推導程式碼，請直接採用上面 Task 5 已經更新過的版本。
 
 - [ ] **Step 2: 執行測試確認失敗**
 
