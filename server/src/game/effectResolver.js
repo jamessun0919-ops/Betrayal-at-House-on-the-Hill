@@ -98,14 +98,14 @@ function resolveChoiceOption(options, optionId) {
   return option.effects;
 }
 
-const HANDLERS = {
+const HANDLERS = Object.assign(Object.create(null), {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
   dice_check: (gameState, promptState, playerId, effect, context) => handleDiceCheck(gameState, promptState, playerId, effect, context),
   choice: (gameState, promptState, playerId, effect, context) => handleChoice(gameState, promptState, playerId, effect, context),
-};
+});
 
 function resolveEffects(gameState, promptState, playerId, effects, context = {}) {
   if (!Array.isArray(effects)) {

@@ -59,6 +59,11 @@ test('applyModifiers throws INVALID_MODIFIER_LIST for a non-array modifiers argu
   expect(() => applyModifiers(5, undefined, 'onBeforeRoll')).toThrow('INVALID_MODIFIER_LIST');
 });
 
+test('applyModifiers throws INVALID_MODIFIER_EFFECTS when a modifier entry has no valid effects array', () => {
+  expect(() => applyModifiers(5, [{ effects: undefined }], 'onBeforeRoll')).toThrow('INVALID_MODIFIER_EFFECTS');
+  expect(() => applyModifiers(5, [{}], 'onBeforeRoll')).toThrow('INVALID_MODIFIER_EFFECTS');
+});
+
 test('evaluateTiers picks the first tier whose min/max range contains the roll (inclusive)', () => {
   const tiers = [
     { min: 5, max: 8, effects: ['high'] },

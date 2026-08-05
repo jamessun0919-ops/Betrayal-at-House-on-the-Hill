@@ -6,7 +6,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
   const [characterSelectState, setCharacterSelectState] = useState(null);
   const [gameState, setGameState] = useState(null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
-  const [lastPendingCardDraw, setLastPendingCardDraw] = useState(null);
   const [lastPendingAction, setLastPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
   const [lastCardDrawn, setLastCardDrawn] = useState(null);
@@ -31,9 +30,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     function onStateUpdate(data) {
       setGameState(data);
     }
-    function onPendingCardDraw(data) {
-      setLastPendingCardDraw(data);
-    }
     function onPendingAction(data) {
       setLastPendingAction(data);
     }
@@ -53,7 +49,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     socket.on('game:characterSelectUpdate', onCharacterSelectUpdate);
     socket.on('game:started', onStarted);
     socket.on('game:stateUpdate', onStateUpdate);
-    socket.on('game:pendingCardDraw', onPendingCardDraw);
     socket.on('game:pendingAction', onPendingAction);
     socket.on('game:cardDrawn', onCardDrawn);
     socket.on('game:effectPendingChoice', onEffectPendingChoice);
@@ -65,7 +60,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
       socket.off('game:characterSelectUpdate', onCharacterSelectUpdate);
       socket.off('game:started', onStarted);
       socket.off('game:stateUpdate', onStateUpdate);
-      socket.off('game:pendingCardDraw', onPendingCardDraw);
       socket.off('game:pendingAction', onPendingAction);
       socket.off('game:cardDrawn', onCardDrawn);
       socket.off('game:effectPendingChoice', onEffectPendingChoice);
@@ -163,7 +157,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
           <button onClick={handleUseStairs}>樓梯（免費）</button>
           <h3>最新遊戲狀態</h3>
           <pre>{JSON.stringify(gameState, null, 2)}</pre>
-          {lastPendingCardDraw && <p>待抽卡：{JSON.stringify(lastPendingCardDraw)}</p>}
           {lastPendingAction && <p>待處理動作：{JSON.stringify(lastPendingAction)}</p>}
           {lastCardDrawn && <p>抽到的卡：{JSON.stringify(lastCardDrawn)}</p>}
           {lastEffectResolved && <p>效果已解析完成：{JSON.stringify(lastEffectResolved)}</p>}

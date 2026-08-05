@@ -18,6 +18,9 @@ function applyModifiers(value, modifiers, hookType, context = {}) {
   }
   let result = value;
   for (const modifier of modifiers) {
+    if (!Array.isArray(modifier.effects)) {
+      throw new Error('INVALID_MODIFIER_EFFECTS');
+    }
     for (const effect of modifier.effects) {
       if (effect.hookType !== hookType) continue;
       if (effect.checkContext && effect.checkContext !== context.checkContext) continue;
