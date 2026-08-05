@@ -1351,3 +1351,94 @@ test('game:selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when the cu
   clientB.close();
   httpServer.close();
 });
+
+test('drawing an omen card increments omenCount and broadcasts a haunt check', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_002', name: '書', effects: [{ type: 'stat_change', stat: 'knowledge', delta: 1 }] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const hauntCheckPromise = new Promise((resolve) => currentClient.once('game:hauntCheck', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const hauntCheck = await hauntCheckPromise;
+  expect(hauntCheck.omenCount).toBe(1);
+  expect(typeof hauntCheck.rollSum).toBe('number');
+
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState.omenCount).toBe(1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a haunt check summing over 5 sets hauntStarted and broadcasts game:hauntStarted', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_001', name: '測試預兆', effects: [] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  gameState.omenCount = 2; // this draw brings it to 3 -> 3 dice rolled
+
+  // Force every die to roll its maximum face (2): 3 dice * 2 = 6 > 5, guaranteed trigger.
+  jest.spyOn(Math, 'random').mockReturnValue(0.99);
+
+  const hauntStartedPromise = new Promise((resolve) => currentClient.once('game:hauntStarted', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const hauntStarted = await hauntStartedPromise;
+  expect(hauntStarted.omenCount).toBe(3);
+  expect(hauntStarted.rollSum).toBe(6);
+  expect(gameState.hauntStarted).toBe(true);
+
+  jest.restoreAllMocks();
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a haunt check that does not exceed 5 does not set hauntStarted', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_001', name: '測試預兆', effects: [] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  // Force every die to roll its minimum face (0): omenCount=1 -> 1 die -> sum 0, well under 5.
+  jest.spyOn(Math, 'random').mockReturnValue(0);
+
+  let hauntStartedFired = false;
+  currentClient.on('game:hauntStarted', () => {
+    hauntStartedFired = true;
+  });
+
+  const hauntCheckPromise = new Promise((resolve) => currentClient.once('game:hauntCheck', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const hauntCheck = await hauntCheckPromise;
+
+  expect(hauntCheck.rollSum).toBe(0);
+  expect(hauntStartedFired).toBe(false);
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState.hauntStarted).toBe(false);
+
+  jest.restoreAllMocks();
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

@@ -18,6 +18,7 @@ const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
+const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
 const { removeItem } = require('./game/playerEntity');
 
@@ -381,6 +382,17 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   }
   const card = drawCard(deck);
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name });
+
+  if (deckType === 'omen' && !gameState.hauntStarted) {
+    gameState.omenCount += 1;
+    const rollSum = rollDice(gameState.omenCount);
+    io.to(roomCode).emit('game:hauntCheck', { omenCount: gameState.omenCount, rollSum });
+    if (rollSum > 5) {
+      gameState.hauntStarted = true;
+      io.to(roomCode).emit('game:hauntStarted', { omenCount: gameState.omenCount, rollSum });
+    }
+  }
+
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, { now: Date.now() });
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts);
