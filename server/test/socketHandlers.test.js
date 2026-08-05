@@ -1079,3 +1079,110 @@ test('game:move into a room with an unknown drawType does not crash the room and
   clientB.close();
   httpServer.close();
 });
+
+// C1's fix (defer advanceTurnIfOver until a pending effect choice actually
+// resolves) lives entirely behind the generic `deckType` parameter in
+// resolveCardDraw/DECK_FIELD_BY_TYPE -- it is not item-deck-specific. The
+// tests above only exercised drawType: 'item'; these two prove the same
+// full loop (choice opens -> turn stays put -> respond -> turn advances)
+// for the event and omen decks too, per the developer's explicit request
+// to verify this empirically rather than trust the code-path reading alone.
+test('an event-deck card requiring a choice defers the turn the same way an item-deck card does', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_002',
+        name: '測試選擇事件',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  const firstUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+  const firstUpdate = await firstUpdatePromise;
+  expect(firstUpdate.turnOrder[firstUpdate.currentPlayerIndex]).toBe(currentPlayerId);
+
+  const blockedMove = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
+  expect(blockedMove.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  const advancedUpdatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+  const advancedUpdate = await advancedUpdatePromise;
+  expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('an omen-deck card requiring a choice defers the turn the same way an item-deck card does', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{
+        id: 'omen_002',
+        name: '測試選擇預兆',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  const firstUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+  const firstUpdate = await firstUpdatePromise;
+  expect(firstUpdate.turnOrder[firstUpdate.currentPlayerIndex]).toBe(currentPlayerId);
+
+  const blockedSelectAction = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item' }, resolve));
+  expect(blockedSelectAction.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  const advancedUpdatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+  const advancedUpdate = await advancedUpdatePromise;
+  expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
