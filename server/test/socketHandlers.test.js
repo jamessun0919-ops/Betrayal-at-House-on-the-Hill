@@ -522,13 +522,24 @@ async function setUpStartedGame() {
   const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
 
   const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  // Wait for BOTH clients to actually receive each game:promptResolved broadcast
+  // before proceeding -- otherwise, under load, a still-in-flight broadcast from
+  // character selection can be caught by a caller's own later .once('game:promptResolved', ...)
+  // listener instead of the event it's actually waiting for (same race class fixed
+  // in M2b-2 Task 3/Task 4 for game:prompt).
+  const firstRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const firstRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
   );
+  await Promise.all([firstRespondedA, firstRespondedB]);
   const prompt2 = await secondPrompt;
+  const secondRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const secondRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
   );
+  await Promise.all([secondRespondedA, secondRespondedB]);
 
   const startedPayload = await started;
   const currentPlayerId = startedPayload.turnOrder[startedPayload.currentPlayerIndex];
@@ -740,13 +751,24 @@ async function setUpStartedGameWithContent(content) {
   const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
 
   const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  // Wait for BOTH clients to actually receive each game:promptResolved broadcast
+  // before proceeding -- otherwise, under load, a still-in-flight broadcast from
+  // character selection can be caught by a caller's own later .once('game:promptResolved', ...)
+  // listener instead of the event it's actually waiting for (same race class fixed
+  // in M2b-2 Task 3/Task 4 for game:prompt).
+  const firstRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const firstRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
   );
+  await Promise.all([firstRespondedA, firstRespondedB]);
   const prompt2 = await secondPrompt;
+  const secondRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const secondRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
     secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
   );
+  await Promise.all([secondRespondedA, secondRespondedB]);
 
   const startedPayload = await started;
   const currentPlayerId = startedPayload.turnOrder[startedPayload.currentPlayerIndex];
