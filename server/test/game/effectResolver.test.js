@@ -29,7 +29,7 @@ test('resolveEffects applies a stat_change delta', () => {
   const result = resolveEffects(gameState, createPromptState(), 'p1', [
     { type: 'stat_change', stat: 'might', delta: 1 },
   ]);
-  expect(result).toEqual({ pending: false });
+  expect(result).toEqual({ pending: false, appliedCount: 1 });
   expect(gameState.players.get('p1').stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
 });
 
@@ -256,7 +256,50 @@ test('full round trip: choice pauses, respondToPrompt + resolveChoiceOption + re
   const chosenEffects = resolveChoiceOption(paused.options, response.chosenOptionId);
   const finalResult = resolveEffects(gameState, promptState, 'p1', chosenEffects);
 
-  expect(finalResult).toEqual({ pending: false });
+  expect(finalResult).toEqual({ pending: false, appliedCount: 1 });
   expect(gameState.players.get('p1').stats.speed.currentIndex).toBe(1); // baseIndex 2 - 1
   expect(gameState.players.get('p1').stats.might.currentIndex).toBe(2); // untouched
+});
+
+test('resolveEffects appliedCount counts each top-level effect processed', () => {
+  const gameState = makeGameStateWithPlayer();
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', delta: 1 },
+    { type: 'stat_change', stat: 'speed', delta: -1 },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 2 });
+});
+
+test('resolveEffects appliedCount propagates from a dice_check tier that actually applied effects', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2, sum with 1 die = 2
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 1,
+      tiers: [
+        { min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }, { type: 'stat_change', stat: 'speed', delta: 1 }] },
+      ],
+    },
+  ], { rng });
+  expect(result).toEqual({ pending: false, appliedCount: 2 });
+});
+
+test('resolveEffects appliedCount is 0 when the matched dice_check tier has no effects (e.g. a failed check)', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0); // every die -> face 0, sum = 0
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 1,
+      tiers: [{ min: 0, max: 8, effects: [] }],
+    },
+  ], { rng });
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('resolveEffects appliedCount is 0 for an empty effects array', () => {
+  const gameState = makeGameStateWithPlayer();
+  const result = resolveEffects(gameState, createPromptState(), 'p1', []);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
 });
