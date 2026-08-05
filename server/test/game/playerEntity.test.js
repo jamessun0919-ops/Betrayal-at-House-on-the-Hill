@@ -1,4 +1,4 @@
-const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase } = require('../../src/game/playerEntity');
+const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem } = require('../../src/game/playerEntity');
 
 function makeStats() {
   return {
@@ -215,4 +215,37 @@ test('createPlayer throws INVALID_BASE_INDEX if baseIndex is out of bounds', () 
     stats: badStats,
     actionPoints: 0,
   })).toThrow('INVALID_BASE_INDEX');
+});
+
+test('addItem pushes the item onto the player inventory', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_001', name: '左輪手槍' });
+  expect(player.inventory).toEqual([{ id: 'item_001', name: '左輪手槍' }]);
+});
+
+test('addItem appends without disturbing existing items', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_001' });
+  addItem(player, { id: 'item_002' });
+  expect(player.inventory.map((i) => i.id)).toEqual(['item_001', 'item_002']);
+});
+
+test('addItem throws INVALID_ITEM for an item missing an id', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(() => addItem(player, { name: '沒有id' })).toThrow('INVALID_ITEM');
+  expect(() => addItem(player, null)).toThrow('INVALID_ITEM');
+});
+
+test('removeItem removes and returns the matching item', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_001', name: '左輪手槍' });
+  addItem(player, { id: 'item_002', name: '斧頭' });
+  const removed = removeItem(player, 'item_001');
+  expect(removed).toEqual({ id: 'item_001', name: '左輪手槍' });
+  expect(player.inventory.map((i) => i.id)).toEqual(['item_002']);
+});
+
+test('removeItem throws ITEM_NOT_FOUND when no inventory item matches', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(() => removeItem(player, 'not_held')).toThrow('ITEM_NOT_FOUND');
 });
