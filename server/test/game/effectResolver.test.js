@@ -206,6 +206,18 @@ test('resolveEffects choice creates a pending prompt and returns the full option
   expect(result.options).toEqual(options);
 });
 
+test('resolveEffects choice result includes description, deadline, and defaultOptionId for the caller to schedule a real timeout', () => {
+  const gameState = makeGameStateWithPlayer();
+  const promptState = createPromptState();
+  const options = [{ optionId: 'opt_might', effects: [] }];
+  const result = resolveEffects(gameState, promptState, 'p1', [
+    { type: 'choice', description: '選擇要下降哪項', options, timeoutMs: 20000, defaultOptionId: 'opt_might' },
+  ], { now: 1000 });
+  expect(result.description).toBe('選擇要下降哪項');
+  expect(result.deadline).toBe(21000); // now(1000) + timeoutMs(20000)
+  expect(result.defaultOptionId).toBe('opt_might');
+});
+
 test('resolveEffects choice stops before any effects listed after it in the same array', () => {
   const gameState = makeGameStateWithPlayer();
   const promptState = createPromptState();

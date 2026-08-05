@@ -80,7 +80,14 @@ function handleChoice(gameState, promptState, playerId, effect, context) {
     timeoutMs: effect.timeoutMs,
     now: context.now,
   });
-  return { pending: true, promptId: prompt.promptId, options: effect.options };
+  return {
+    pending: true,
+    promptId: prompt.promptId,
+    description: prompt.description,
+    deadline: prompt.deadline,
+    defaultOptionId: effect.defaultOptionId,
+    options: effect.options,
+  };
 }
 
 function resolveChoiceOption(options, optionId) {
