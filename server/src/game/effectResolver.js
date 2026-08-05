@@ -1,7 +1,9 @@
 const { getPlayer } = require('./gameState');
-const { changeStat, addItem, removeItem } = require('./playerEntity');
+const { changeStat, addItem, removeItem, getStatValue } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
 const { coordKey } = require('./boardGenerator');
+const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
+const { createPrompt } = require('./promptState');
 
 function requirePlayer(gameState, playerId) {
   const player = getPlayer(gameState, playerId);
@@ -52,11 +54,50 @@ function handlePersistentModifier(gameState, playerId, effect) {
   return { pending: false };
 }
 
+function handleDiceCheck(gameState, promptState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  const room = getRoomForPlayer(gameState, player);
+  const modifiers = [...(player.modifiers || []), ...(room.modifiers || [])];
+
+  const baseCount = effect.stat !== undefined ? getStatValue(player, effect.stat) : effect.diceCount;
+  if (!Number.isInteger(baseCount) || baseCount < 0) {
+    throw new Error('INVALID_DICE_CHECK_COUNT');
+  }
+
+  const adjustedCount = applyModifiers(baseCount, modifiers, 'onBeforeRoll', context);
+  const rolled = rollDice(adjustedCount, context.rng);
+  const finalSum = applyModifiers(rolled, modifiers, 'onAfterRoll', context);
+  const tier = evaluateTiers(finalSum, effect.tiers);
+  return resolveEffects(gameState, promptState, playerId, tier.effects, context);
+}
+
+function handleChoice(gameState, promptState, playerId, effect, context) {
+  const prompt = createPrompt(promptState, {
+    type: 'effect_choice',
+    targetPlayerId: playerId,
+    description: effect.description,
+    options: effect.options.map((o) => o.optionId),
+    timeoutMs: effect.timeoutMs,
+    now: context.now,
+  });
+  return { pending: true, promptId: prompt.promptId, options: effect.options };
+}
+
+function resolveChoiceOption(options, optionId) {
+  const option = options.find((o) => o.optionId === optionId);
+  if (!option) {
+    throw new Error('INVALID_CHOICE_OPTION');
+  }
+  return option.effects;
+}
+
 const HANDLERS = {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
+  dice_check: (gameState, promptState, playerId, effect, context) => handleDiceCheck(gameState, promptState, playerId, effect, context),
+  choice: (gameState, promptState, playerId, effect, context) => handleChoice(gameState, promptState, playerId, effect, context),
 };
 
 function resolveEffects(gameState, promptState, playerId, effects, context = {}) {
@@ -77,4 +118,4 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   return { pending: false };
 }
 
-module.exports = { resolveEffects };
+module.exports = { resolveEffects, resolveChoiceOption };
