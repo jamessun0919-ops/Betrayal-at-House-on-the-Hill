@@ -280,6 +280,34 @@
 - 下一階段工作：把本次 M2c 討論的所有決策整理寫成完整設計 spec 文件（`docs/superpowers/specs/`），自我審查後給開發者確認，才進入 `writing-plans`
 - 骰子面值務必用 **0/0/1/1/2/2**，不是 0/0/0/1/1/2
 - M2c 任務拆分已定案：M2c-1（純邏輯：`cardDeck.js`/`effectPipeline.js`/`modifiers.js`/`effectResolver.js`）→ M2c-2（Socket 整合：`effectResolverManager.js`＋`socketHandlers.js` 接線＋除錯頁面擴充）→ M2c-3（36 張卡片實際 effects 內容，agent 草擬、開發者審核）
-- `ROOM_IN_PROGRESS` 錯誤碼在 `client/src/LobbyScreen.jsx` 的 `ERROR_MESSAGES` 還沒有中文翻譯（目前顯示通用「發生未知錯誤」），非阻塞，開發者尚未決定何時處理</new_string>
-</invoke>
+- `ROOM_IN_PROGRESS` 錯誤碼在 `client/src/LobbyScreen.jsx` 的 `ERROR_MESSAGES` 還沒有中文翻譯（目前顯示通用「發生未知錯誤」），非阻塞，開發者尚未決定何時處理
+
+## 2026-08-05 第 1 次工作階段
+
+**當日工作內容**：
+- 撰寫 M2c-1（純邏輯模組）實作計畫並 inline execution 完成全部 7 任務：`cardDeck.js`、`effectPipeline.js`（骰面 0/0/1/1/2/2）、`modifiers.js`、`effectResolver.js`（`stat_change`/`grant_item`/`lose_item`/`persistent_modifier`/`dice_check`/`choice`）、`playerEntity.js` 新增 `addItem`/`removeItem`，合併進 `main`
+- 撰寫 M2c-2（Socket 整合）實作計畫並 inline execution 完成全部 7 任務：`effectResolverManager.js`、卡牌牌庫接上 `gameState`/`gameManager`、`game:move` 自動抽卡解析、`game:effectPromptRespond`＋真實逾時計時器、除錯頁面顯示效果結果
+- M2c-2 完成後派獨立整分支審查，發現 1 個 Critical（`game:move` 抽卡後若效果卡在 `choice` 提問未解決，仍無條件呼叫 `advanceTurnIfOver`，導致下一位玩家撞上 `promptState` 單一提問限制拋錯、連帶跳過收尾動作，房間永久卡死）與 1 個 Important（未知 `drawType` 拋出未分類 `TypeError` 而非專案慣例錯誤，同樣觸發死鎖路徑）。依開發者確認的通用模式修復：任何會推進狀態的新動作先檢查未解決選擇並拒絕、觸發選擇的動作本身延後推進狀態、效果解析呼叫包 try/catch。修復後另外補寫 event/omen 牌庫的實測回歸測試（不只驗證 item 牌庫），並在 Handover 新增「除錯注意事項」章節記錄這個通用慣例
+- 依開發者提出的完整人工測試流程（建房→鎖門→選角→回合迴圈→邪祟考驗），逐項盤點 M2 收尾前的缺口，確認：邪祟觸發規則（每抽一張預兆牌，`omenCount` 遞增後骰等量骰子，總和 >5 觸發）、20 秒兩層計時提問 UI 延後到 M2 完整測試跑完後再補、新增 M2d（簡易使用者介面）里程碑、執行順序 M2c-3→M2c-4→M2c-5→M2d
+- 討論物品可否對他人使用的欄位設計，開發者中途修正方向：不是單純布林值，而是三選一的 `category` 欄位（武器/消耗品/一般），並要求檢查預兆卡是否也有武器屬性、事件/預兆卡是否需要消耗品屬性。確認規則：消耗品「生效後」（不是「使用後」）才移除，魔術方塊等考驗類道具若未通過視為未生效、不觸發消耗品規則
+- 撰寫並提交 M2c-4/M2c-5（道具/操作動作接線＋邪祟考驗機制）設計 spec 與 6 任務實作計畫，計畫自我審查時抓到 Task 5/Task 6 殘留的錯誤測試草稿並清除
+- 開新 worktree（分支 `worktree-m2c4-m2c5-action-and-haunt`），inline execution 依序完成 6 任務：卡片 JSON 補 `category`/`canTargetOthers` 欄位、`effectResolver.js` 新增 `appliedCount` 回傳值、`turnFlow.js` 的 `selectAction` 接上道具/操作真實邏輯、`socketHandlers.js` 的 `cardId`→`sourceId` 改名＋`consumeItemIfApplied` 參數傳遞、`game:selectAction` 接上真實道具/操作效果解析、`resolveCardDraw` 加入邪祟考驗機制
+- 執行期間排查一個環境問題：`server/test/socketHandlers.test.js` 測試本身秒退但 Jest 進程不會自然結束（既有的非同步 handle 未關閉問題，非本次改動造成），確認 `--forceExit` 可解，記入 Handover 除錯注意事項
+- Task 5 執行中發現計畫裡「room_action 成功案例」測試情境跟既有規則矛盾（開新房間會讓行動力歸零並立刻結束回合，同一回合不可能再有行動力觸發操作），停下跟開發者確認後，改用直接操作 `gameState` 模擬「下一回合已站在房間裡」的情境修正測試
+- 發現並清除 `docs/worklog.md` 前一次工作階段結尾殘留的工具呼叫外洩文字（`</new_string>`/`</invoke>` 兩處），屬於文件污染非本次改動造成
+
+**完成項目**：
+- **M2c-1、M2c-2 皆已合併進 `main`**（含 M2c-2 獨立審查抓到並修復的 Critical bug）
+- [docs/superpowers/specs/2026-08-05-m2c4-m2c5-action-and-haunt-design.md](superpowers/specs/2026-08-05-m2c4-m2c5-action-and-haunt-design.md)、[docs/superpowers/plans/2026-08-05-m2c4-m2c5-action-and-haunt.md](superpowers/plans/2026-08-05-m2c4-m2c5-action-and-haunt.md) 已撰寫並提交
+- **M2c-4/M2c-5 全部 6 任務已完成，在分支 `worktree-m2c4-m2c5-action-and-haunt` 上，測試全綠（288/288），尚未合併回 `main`、尚未經過獨立審查**
+- Handover.md 新增「除錯注意事項」章節（async-choice-resolution 慣例、Jest 未正常結束環境問題）
+
+**遇到瓶頸**：
+- （已解決）Jest 執行 `server/test/socketHandlers.test.js` 後進程不自然結束，導致指令逾時／背景執行殘留大量重複行程鏈，反覆診斷後確認是測試檔案既有的非同步 handle 洩漏問題，跟本次程式改動無關；往後對這個檔案跑測試要加 `--forceExit`
+- （已解決）M2c-4 計畫裡 room_action 測試情境跟既有規則矛盾，與開發者確認後修正測試設計，非程式邏輯問題
+
+**開發者交代備忘事項**：
+- 下一階段工作**優先**：M2c-4/M2c-5 分支尚未經過獨立審查，需要先跑 `/code-review ultra`（或等效審查流程）確認沒問題，再決定是否合併回 `main`
+- 分支已推送至 GitHub 備份，worktree 保留供審查後續修正使用
+- M2c-3（36 張卡片＋房間操作 effects 內容）、M2d（簡易使用者介面）仍在排隊，待 M2c-4/M2c-5 審查與合併後接續
 
