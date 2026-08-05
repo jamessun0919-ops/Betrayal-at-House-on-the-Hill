@@ -18,6 +18,7 @@ const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
 const { hasCards, drawCard } = require('./game/cardDeck');
+const { removeItem } = require('./game/playerEntity');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
@@ -237,13 +238,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'NO_ACTIVE_EFFECT_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, cardId, options } = resolverEntry.pendingChoice;
+        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied } = resolverEntry.pendingChoice;
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
         const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
         const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now() });
-        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, cardId, nextResult, effectChoiceTimeouts);
+        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
         if (!resolveOutcome.pending) {
           advanceTurnIfOver(gameState, choicePlayerId);
         }
@@ -341,7 +342,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
 // now or wait until the choice this call may have just opened gets resolved
 // (see M2c-2 final review, Critical C1: advancing the turn while a choice is
 // still pending let a second card draw collide with the first).
-function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, cardId, effectResult, effectChoiceTimeouts) {
+function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   if (effectResult.pending) {
     resolverEntry.pendingChoice = {
@@ -349,7 +350,8 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       options: effectResult.options,
       defaultOptionId: effectResult.defaultOptionId,
       playerId,
-      cardId,
+      sourceId,
+      consumeItemIfApplied,
     };
     io.to(roomCode).emit('game:effectPendingChoice', {
       playerId,
@@ -365,7 +367,11 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return { pending: true };
   }
   resolverEntry.pendingChoice = null;
-  io.to(roomCode).emit('game:effectResolved', { playerId, cardId });
+  if (consumeItemIfApplied && effectResult.appliedCount > 0) {
+    const player = getPlayer(gameState, playerId);
+    removeItem(player, sourceId);
+  }
+  io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
   return { pending: false };
 }
 
@@ -382,7 +388,7 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     const resolverEntry = getResolver(effectResolverManager, roomCode);
     if (!resolverEntry || !resolverEntry.pendingChoice) return;
     effectChoiceTimeouts.delete(roomCode);
-    const { playerId, cardId, options, defaultOptionId } = resolverEntry.pendingChoice;
+    const { playerId, sourceId, options, defaultOptionId, consumeItemIfApplied } = resolverEntry.pendingChoice;
     const result = resolvePromptTimeout(resolverEntry.promptState, { promptId, defaultOptionId });
     if (!result) {
       return;
@@ -390,7 +396,7 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     io.to(roomCode).emit('game:promptResolved', result);
     const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
     const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now() });
-    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, cardId, nextResult, effectChoiceTimeouts);
+    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
     if (!resolveOutcome.pending) {
       advanceTurnIfOver(gameState, playerId);
     }

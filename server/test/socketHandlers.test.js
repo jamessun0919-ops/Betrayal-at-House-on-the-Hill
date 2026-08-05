@@ -666,7 +666,7 @@ test('game:move into a room with a populated item deck draws a card and resolves
   expect(cardDrawn.cardId).toBe('item_001');
 
   const effectResolved = await effectResolvedPromise;
-  expect(effectResolved.cardId).toBe('item_001');
+  expect(effectResolved.sourceId).toBe('item_001');
 
   clientA.close();
   clientB.close();
