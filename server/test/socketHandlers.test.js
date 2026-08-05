@@ -598,15 +598,18 @@ test('game:move rejects a caller who is not the current turn player', async () =
 test('game:selectAction spends 1 action point, broadcasts game:pendingAction, and updates state', async () => {
   const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
 
+  // 'attack' is the only actionType still a stub (item/room_action get real
+  // logic in M2c-4) -- this test's original intent was "still a stub", not
+  // "specifically item".
   const pendingActionPromise = new Promise((resolve) => currentClient.once('game:pendingAction', resolve));
   const result = await new Promise((resolve) => {
-    currentClient.emit('game:selectAction', { actionType: 'item' }, resolve);
+    currentClient.emit('game:selectAction', { actionType: 'attack' }, resolve);
   });
   expect(result.error).toBeUndefined();
-  expect(result).toEqual({ kind: 'item', pending: true });
+  expect(result).toEqual({ kind: 'attack', pending: true });
 
   const pendingAction = await pendingActionPromise;
-  expect(pendingAction.actionType).toBe('item');
+  expect(pendingAction.actionType).toBe('attack');
 
   clientA.close();
   clientB.close();

@@ -81,7 +81,7 @@ function moveToRoom(gameState, playerId, direction) {
   };
 }
 
-function selectAction(gameState, playerId, actionType) {
+function selectAction(gameState, playerId, actionType, options = {}) {
   const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
     throw new Error('NOT_YOUR_TURN');
@@ -92,10 +92,38 @@ function selectAction(gameState, playerId, actionType) {
   if (player.actionPoints < 1) {
     throw new Error('NOT_ENOUGH_ACTION_POINTS');
   }
+
+  if (actionType === 'item') {
+    const { itemId, targetPlayerId } = options;
+    if (!player.inventory.some((item) => item.id === itemId)) {
+      throw new Error('ITEM_NOT_HELD');
+    }
+    const effectTargetId = targetPlayerId || playerId;
+    if (effectTargetId !== playerId && !options.itemCanTargetOthers) {
+      throw new Error('ITEM_CANNOT_TARGET_OTHERS');
+    }
+    const targetPlayer = requirePlayer(gameState, effectTargetId);
+    if (
+      targetPlayer.floor !== player.floor ||
+      targetPlayer.x !== player.x ||
+      targetPlayer.y !== player.y
+    ) {
+      throw new Error('TARGET_NOT_IN_ROOM');
+    }
+    player.actionPoints -= 1;
+    return { kind: 'item', itemId, targetPlayerId: effectTargetId };
+  }
+
+  if (actionType === 'room_action') {
+    if (!options.hasRoomAction) {
+      throw new Error('NO_ROOM_ACTION_AVAILABLE');
+    }
+    player.actionPoints -= 1;
+    return { kind: 'room_action' };
+  }
+
   player.actionPoints -= 1;
-  // M2b only tracks that this action slot was spent. Actual item/attack/room
-  // mechanics are resolved by M2c (card effects) and M3 (combat) — this
-  // "pending" marker is the hook point for those milestones.
+  // "attack" is still a stub — M3 (combat) resolves it.
   return { kind: actionType, pending: true };
 }
 
