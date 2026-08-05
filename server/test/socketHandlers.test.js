@@ -4,6 +4,7 @@ const { LobbyManager } = require('../src/lobbyManager');
 const { registerSocketHandlers } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
+const { createEffectResolverManager } = require('../src/game/effectResolverManager');
 
 function makeContent(overrides = {}) {
   return {
@@ -18,6 +19,7 @@ function makeContent(overrides = {}) {
       { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
+    cards: { events: [], items: [], omens: [] },
     ...overrides,
   };
 }
@@ -36,10 +38,19 @@ function startTestServer(content, options) {
   const lobbyManager = new LobbyManager();
   const gameManager = createGameManager();
   const characterSelectionManager = createCharacterSelectionManager();
-  registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, content || makeContent(), options);
+  const effectResolverManager = createEffectResolverManager();
+  registerSocketHandlers(
+    io,
+    lobbyManager,
+    gameManager,
+    characterSelectionManager,
+    effectResolverManager,
+    content || makeContent(),
+    options
+  );
   return new Promise((resolve) => {
     httpServer.listen(0, () => {
-      resolve({ httpServer, port: httpServer.address().port, lobbyManager, gameManager, characterSelectionManager });
+      resolve({ httpServer, port: httpServer.address().port, lobbyManager, gameManager, characterSelectionManager, effectResolverManager });
     });
   });
 }
@@ -620,3 +631,127 @@ test('when a move exhausts action points, the turn automatically advances to the
   clientB.close();
   httpServer.close();
 });
+
+test('game:move into a room with a populated item deck draws a card and resolves its non-choice effects', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{ id: 'item_001', name: '測試道具', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.deckType).toBe('item');
+  expect(cardDrawn.cardId).toBe('item_001');
+
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.cardId).toBe('item_001');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into a room whose deck is empty draws nothing and does not crash', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: { events: [], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  let cardDrawnFired = false;
+  currentClient.on('game:cardDrawn', () => {
+    cardDrawnFired = true;
+  });
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(result.error).toBeUndefined();
+  await updatePromise;
+  expect(cardDrawnFired).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into a room whose card effects include a choice broadcasts game:effectPendingChoice instead of resolving immediately', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+  expect(pendingChoice.description).toBe('選擇要下降哪項');
+  expect(pendingChoice.options).toHaveLength(2);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+async function setUpStartedGameWithContent(content) {
+  const { httpServer, port } = await startTestServer(content);
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  const joined = await new Promise((resolve) =>
+    clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve)
+  );
+  const bobId = joined.playerId;
+
+  const started = new Promise((resolve) => clientA.once('game:started', resolve));
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
+  const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
+  const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
+
+  const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  await new Promise((resolve) =>
+    firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
+  );
+  const prompt2 = await secondPrompt;
+  await new Promise((resolve) =>
+    secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
+  );
+
+  const startedPayload = await started;
+  const currentPlayerId = startedPayload.turnOrder[startedPayload.currentPlayerIndex];
+  const currentClient = currentPlayerId === aliceId ? clientA : clientB;
+  const otherClient = currentPlayerId === aliceId ? clientB : clientA;
+
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
+}

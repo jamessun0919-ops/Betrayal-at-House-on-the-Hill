@@ -15,10 +15,15 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
+const { startResolver, getResolver } = require('./game/effectResolverManager');
+const { resolveEffects } = require('./game/effectResolver');
+const { hasCards, drawCard } = require('./game/cardDeck');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
-function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, content, options = {}) {
+const DECK_FIELD_BY_TYPE = { item: 'itemDeck', event: 'eventDeck', omen: 'omenDeck' };
+
+function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, options = {}) {
   const characterSelectTimeoutMs = options.characterSelectTimeoutMs || DEFAULT_CHARACTER_SELECT_TIMEOUT_MS;
   const characterSelectTimeouts = new Map(); // roomCode -> Timeout handle
 
@@ -90,7 +95,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           players.map((p) => p.playerId),
           content.characters
         );
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
         ack({});
       } catch (err) {
         console.error('game:startCharacterSelect error', err);
@@ -117,7 +122,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
         confirmCharacterChoice(entry.characterSelectionState, { playerId, characterId: optionId });
         io.to(roomCode).emit('game:promptResolved', result);
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
         ack({});
       } catch (err) {
         console.error('game:promptRespond error', err);
@@ -140,11 +145,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const result = moveToRoom(gameState, playerId, direction);
         ack(result);
         if (result.pendingCardDraw) {
-          io.to(roomCode).emit('game:pendingCardDraw', {
-            playerId,
-            roomId: result.roomId,
-            deck: result.pendingCardDraw.deck,
-          });
+          resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck);
         }
         advanceTurnIfOver(gameState, playerId);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
@@ -209,10 +210,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
   });
 }
 
-function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts) {
+function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   if (isCharacterSelectionComplete(entry.characterSelectionState)) {
-    finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode);
+    finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode);
     return;
   }
   const picker = getCurrentPicker(entry.characterSelectionState);
@@ -233,6 +234,7 @@ function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelec
       lobbyManager,
       gameManager,
       characterSelectionManager,
+      effectResolverManager,
       content,
       roomCode,
       prompt.promptId,
@@ -259,7 +261,35 @@ function advanceTurnIfOver(gameState, playerId) {
   }
 }
 
-function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, promptId, playerId, characterSelectTimeoutMs, characterSelectTimeouts) {
+function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType) {
+  const deck = gameState[DECK_FIELD_BY_TYPE[deckType]];
+  if (!hasCards(deck)) {
+    return;
+  }
+  const card = drawCard(deck);
+  io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name });
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, { now: Date.now() });
+  if (effectResult.pending) {
+    resolverEntry.pendingChoice = {
+      promptId: effectResult.promptId,
+      options: effectResult.options,
+      defaultOptionId: effectResult.defaultOptionId,
+      playerId,
+      cardId: card.id,
+    };
+    io.to(roomCode).emit('game:effectPendingChoice', {
+      playerId,
+      promptId: effectResult.promptId,
+      description: effectResult.description,
+      options: effectResult.options,
+    });
+  } else {
+    io.to(roomCode).emit('game:effectResolved', { playerId, cardId: card.id });
+  }
+}
+
+function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, promptId, playerId, characterSelectTimeoutMs, characterSelectTimeouts) {
   try {
     const entry = getCharacterSelection(characterSelectionManager, roomCode);
     if (!entry) return;
@@ -270,13 +300,13 @@ function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSe
       return;
     }
     io.to(roomCode).emit('game:promptResolved', result);
-    advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
+    advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts);
   } catch (err) {
     console.error('character select timeout error', err);
   }
 }
 
-function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, content, roomCode) {
+function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   const lobbyPlayersById = new Map(lobbyManager.getPlayers(roomCode).map((p) => [p.playerId, p]));
   const assignments = getAssignments(entry.characterSelectionState);
@@ -288,9 +318,11 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   const gameState = startGame(gameManager, roomCode, {
     startingRooms: content.startingRooms,
     rooms: content.rooms,
+    cards: content.cards,
     characters: content.characters,
     players,
   });
+  startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
   io.to(roomCode).emit('game:started', serializeGameState(gameState));
 }
