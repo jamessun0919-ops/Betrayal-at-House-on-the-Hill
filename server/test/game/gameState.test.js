@@ -102,3 +102,34 @@ test('serializeGameState includes turnOrder/currentPlayerIndex when GameManager 
   expect(serialized.turnOrder).toEqual(['p1', 'p2']);
   expect(serialized.currentPlayerIndex).toBe(1);
 });
+
+test('createGameState builds empty event/item/omen decks when no cards argument is given', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms());
+  expect(gameState.eventDeck.cards).toEqual([]);
+  expect(gameState.itemDeck.cards).toEqual([]);
+  expect(gameState.omenDeck.cards).toEqual([]);
+});
+
+test('createGameState builds event/item/omen decks from the given cards', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {
+    events: [{ id: 'event_001' }],
+    items: [{ id: 'item_001' }, { id: 'item_002' }],
+    omens: [{ id: 'omen_001' }],
+  });
+  expect(gameState.eventDeck.cards).toHaveLength(1);
+  expect(gameState.itemDeck.cards).toHaveLength(2);
+  expect(gameState.omenDeck.cards).toHaveLength(1);
+});
+
+test('serializeGameState exposes remainingCount/isEmpty for the event/item/omen decks, not their contents', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {
+    events: [{ id: 'event_001' }],
+    items: [],
+    omens: [{ id: 'omen_001' }, { id: 'omen_002' }],
+  });
+  const serialized = serializeGameState(gameState);
+  expect(serialized.eventDeck).toEqual({ remainingCount: 1, isEmpty: false });
+  expect(serialized.itemDeck).toEqual({ remainingCount: 0, isEmpty: true });
+  expect(serialized.omenDeck).toEqual({ remainingCount: 2, isEmpty: false });
+  expect(serialized.eventDeck.cards).toBeUndefined();
+});

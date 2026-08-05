@@ -1,14 +1,18 @@
 const { createBoard } = require('./boardGenerator');
 const { createPlayer, resetActionPoints } = require('./playerEntity');
 const { createRoomDeck, isRoomDeckEmpty, getRemainingCount } = require('./roomDeck');
+const { createCardDeck, hasCards, getRemainingCount: getCardRemainingCount } = require('./cardDeck');
 
-function createGameState(startingRooms, rooms) {
+function createGameState(startingRooms, rooms, cards = {}) {
   return {
     board: createBoard(startingRooms),
     players: new Map(),
     hauntStarted: false,
     omenCount: 0,
     roomDeck: createRoomDeck(rooms),
+    eventDeck: createCardDeck(cards.events || []),
+    itemDeck: createCardDeck(cards.items || []),
+    omenDeck: createCardDeck(cards.omens || []),
   };
 }
 
@@ -47,6 +51,18 @@ function serializeGameState(gameState) {
     roomDeck: {
       remainingCount: getRemainingCount(gameState.roomDeck),
       isEmpty: isRoomDeckEmpty(gameState.roomDeck),
+    },
+    eventDeck: {
+      remainingCount: getCardRemainingCount(gameState.eventDeck),
+      isEmpty: !hasCards(gameState.eventDeck),
+    },
+    itemDeck: {
+      remainingCount: getCardRemainingCount(gameState.itemDeck),
+      isEmpty: !hasCards(gameState.itemDeck),
+    },
+    omenDeck: {
+      remainingCount: getCardRemainingCount(gameState.omenDeck),
+      isEmpty: !hasCards(gameState.omenDeck),
     },
     // Set by GameManager.startGame (Task 7) once character selection is
     // done; null before that so this function stays safe to call any time.
