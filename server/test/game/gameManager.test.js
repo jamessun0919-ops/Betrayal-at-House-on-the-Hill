@@ -106,3 +106,19 @@ test('GAME_ALREADY_STARTED throws and original gameState remains unmodified and 
   expect(gameState2).toBe(gameState1);
   expect(gameState2.players.size).toBe(2);
 });
+
+test('startGame passes cards through to createGameState so the decks are populated', () => {
+  const manager = createGameManager();
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({
+    cards: { events: [{ id: 'event_001' }], items: [], omens: [] },
+  }));
+  expect(gameState.eventDeck.cards).toHaveLength(1);
+});
+
+test('startGame builds empty card decks when cards is omitted', () => {
+  const manager = createGameManager();
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs());
+  expect(gameState.eventDeck.cards).toEqual([]);
+  expect(gameState.itemDeck.cards).toEqual([]);
+  expect(gameState.omenDeck.cards).toEqual([]);
+});
