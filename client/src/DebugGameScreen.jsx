@@ -9,6 +9,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
   const [lastPendingCardDraw, setLastPendingCardDraw] = useState(null);
   const [lastPendingAction, setLastPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
+  const [lastCardDrawn, setLastCardDrawn] = useState(null);
+  const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
+  const [lastEffectResolved, setLastEffectResolved] = useState(null);
 
   useEffect(() => {
     function onPrompt(data) {
@@ -34,6 +37,16 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     function onPendingAction(data) {
       setLastPendingAction(data);
     }
+    function onCardDrawn(data) {
+      setLastCardDrawn(data);
+    }
+    function onEffectPendingChoice(data) {
+      setPendingEffectChoice(data);
+    }
+    function onEffectResolved(data) {
+      setLastEffectResolved(data);
+      setPendingEffectChoice(null);
+    }
 
     socket.on('game:prompt', onPrompt);
     socket.on('game:promptResolved', onPromptResolved);
@@ -42,6 +55,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     socket.on('game:stateUpdate', onStateUpdate);
     socket.on('game:pendingCardDraw', onPendingCardDraw);
     socket.on('game:pendingAction', onPendingAction);
+    socket.on('game:cardDrawn', onCardDrawn);
+    socket.on('game:effectPendingChoice', onEffectPendingChoice);
+    socket.on('game:effectResolved', onEffectResolved);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -51,6 +67,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
       socket.off('game:stateUpdate', onStateUpdate);
       socket.off('game:pendingCardDraw', onPendingCardDraw);
       socket.off('game:pendingAction', onPendingAction);
+      socket.off('game:cardDrawn', onCardDrawn);
+      socket.off('game:effectPendingChoice', onEffectPendingChoice);
+      socket.off('game:effectResolved', onEffectResolved);
     };
   }, [socket]);
 
@@ -81,6 +100,13 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
 
   function handleUseStairs() {
     socket.emit('game:useStairs', {}, (res) => {
+      if (res && res.error) setActionError(res.error);
+    });
+  }
+
+  function handleEffectChoiceRespond(optionId) {
+    if (!pendingEffectChoice) return;
+    socket.emit('game:effectPromptRespond', { promptId: pendingEffectChoice.promptId, optionId }, (res) => {
       if (res && res.error) setActionError(res.error);
     });
   }
@@ -139,6 +165,21 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
           <pre>{JSON.stringify(gameState, null, 2)}</pre>
           {lastPendingCardDraw && <p>待抽卡：{JSON.stringify(lastPendingCardDraw)}</p>}
           {lastPendingAction && <p>待處理動作：{JSON.stringify(lastPendingAction)}</p>}
+          {lastCardDrawn && <p>抽到的卡：{JSON.stringify(lastCardDrawn)}</p>}
+          {lastEffectResolved && <p>效果已解析完成：{JSON.stringify(lastEffectResolved)}</p>}
+          {pendingEffectChoice && (
+            <div>
+              <p>效果選擇中：{pendingEffectChoice.description}</p>
+              <ul>
+                {pendingEffectChoice.options.map((o) => (
+                  <li key={o.optionId}>
+                    {o.label || o.optionId}
+                    <button onClick={() => handleEffectChoiceRespond(o.optionId)}>選這個</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
     </div>
