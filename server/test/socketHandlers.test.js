@@ -5,6 +5,8 @@ const { registerSocketHandlers } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
 const { createEffectResolverManager } = require('../src/game/effectResolverManager');
+const { getGameState } = require('../src/game/gameManager');
+const { getPlayer } = require('../src/game/gameState');
 
 function makeContent(overrides = {}) {
   return {
@@ -499,7 +501,7 @@ test('a real response before the deadline cancels the scheduled timeout so it ca
 });
 
 async function setUpStartedGame() {
-  const { httpServer, port } = await startTestServer();
+  const { httpServer, port, gameManager } = await startTestServer();
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
@@ -546,7 +548,7 @@ async function setUpStartedGame() {
   const currentClient = currentPlayerId === aliceId ? clientA : clientB;
   const otherClient = currentPlayerId === aliceId ? clientB : clientA;
 
-  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager };
 }
 
 test('a repeated game:startCharacterSelect is rejected with GAME_ALREADY_STARTED once a game has already started for that room', async () => {
@@ -731,7 +733,7 @@ test('game:move into a room whose card effects include a choice broadcasts game:
 });
 
 async function setUpStartedGameWithContent(content) {
-  const { httpServer, port } = await startTestServer(content);
+  const { httpServer, port, gameManager } = await startTestServer(content);
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
@@ -778,7 +780,7 @@ async function setUpStartedGameWithContent(content) {
   const currentClient = currentPlayerId === aliceId ? clientA : clientB;
   const otherClient = currentPlayerId === aliceId ? clientB : clientA;
 
-  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager };
 }
 
 test('game:effectPromptRespond resolves the pending choice and applies the chosen effects', async () => {
@@ -1184,6 +1186,166 @@ test('an omen-deck card requiring a choice defers the turn the same way an item-
   });
   const advancedUpdate = await advancedUpdatePromise;
   expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: uses a held consumable item on self and removes it from inventory after it applies', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_003',
+        name: '治療藥膏',
+        effects: [{ type: 'stat_change', stat: 'might', delta: 1 }],
+        category: 'consumable',
+        canTargetOthers: true,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_003' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve);
+  });
+  expect(result.error).toBeUndefined();
+  expect(result).toEqual({ kind: 'item', itemId: 'item_003', targetPlayerId: currentPlayerId });
+
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.sourceId).toBe('item_003');
+  expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]); // consumable removed after applying
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: throws ITEM_NOT_HELD when the player does not have the item', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'not_held' }, resolve);
+  });
+  expect(result.error).toBe('ITEM_NOT_HELD');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: a general-category item is not removed from inventory after use', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_006',
+        name: '詭異人偶',
+        effects: [{ type: 'stat_change', stat: 'might', delta: 1 }],
+        category: 'general',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_006' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_006' }, resolve));
+  await effectResolvedPromise;
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_006' }]); // still held
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: a consumable item that fails its check is not removed (matches 魔術方塊 rules)', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_009',
+        name: '魔術方塊',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 1,
+          tiers: [{ min: 0, max: 8, effects: [] }], // always "fails" -> no effects applied
+        }],
+        category: 'consumable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_009' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_009' }, resolve));
+  await effectResolvedPromise;
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_009' }]); // check "failed" -> not consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: resolves the current room\'s effects', async () => {
+  const content = makeContent({
+    rooms: [{
+      id: 'room_new',
+      doors: 4,
+      floor: 'ground',
+      effects: [{ type: 'stat_change', stat: 'might', delta: 1 }],
+    }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  // Opening the door to room_new zeroes AP and ends the turn immediately
+  // (confirmed rule: entering a brand-new room never leaves AP for further
+  // actions the same turn -- a room's "operation" waits until the player's
+  // next turn). Simulate that next turn having come back around to this
+  // player, already standing in the now-open room_new with fresh AP.
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPlayerIndex = gameState.turnOrder.indexOf(currentPlayerId);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  expect(result).toEqual({ kind: 'room_action' });
+
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.sourceId).toBe('room_new');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when the current room has no effects', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+  // Default starting room (entrance hall) has no `effects` field.
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBe('NO_ROOM_ACTION_AVAILABLE');
 
   clientA.close();
   clientB.close();

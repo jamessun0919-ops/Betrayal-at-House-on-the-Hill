@@ -15,6 +15,7 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
+const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
 const { hasCards, drawCard } = require('./game/cardDeck');
@@ -185,13 +186,53 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        const { actionType } = payload || {};
-        const result = selectAction(gameState, playerId, actionType);
+        const { actionType, itemId, targetPlayerId } = payload || {};
+        const selectOptions = { itemId, targetPlayerId };
+        let sourceEffects = null;
+        let sourceId = null;
+        let consumeItemIfApplied = false;
+
+        if (actionType === 'item') {
+          const itemContent = content.cards.items.find((i) => i.id === itemId);
+          selectOptions.itemCanTargetOthers = Boolean(itemContent && itemContent.canTargetOthers);
+          sourceEffects = itemContent ? itemContent.effects : [];
+          sourceId = itemId;
+          consumeItemIfApplied = Boolean(itemContent && itemContent.category === 'consumable');
+        }
+
+        if (actionType === 'room_action') {
+          const currentPlayer = getPlayer(gameState, playerId);
+          const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));
+          const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
+          sourceEffects =
+            roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
+              ? roomDefinition.effects
+              : null;
+          selectOptions.hasRoomAction = Boolean(sourceEffects);
+          sourceId = placedRoom.roomId;
+        }
+
+        const result = selectAction(gameState, playerId, actionType, selectOptions);
         ack(result);
-        if (result.pending) {
+
+        let stillResolving = false;
+        if (sourceEffects) {
+          try {
+            const resolverEntry = getResolver(effectResolverManager, roomCode);
+            const targetForEffects = result.targetPlayerId || playerId;
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
+            stillResolving = outcome.pending;
+          } catch (err) {
+            console.error('selectAction effect resolution error', err);
+          }
+        } else if (result.pending) {
           io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
         }
-        advanceTurnIfOver(gameState, playerId);
+
+        if (!stillResolving) {
+          advanceTurnIfOver(gameState, playerId);
+        }
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:selectAction error', err);
@@ -320,6 +361,13 @@ function advanceTurnIfOver(gameState, playerId) {
 function hasPendingEffectChoice(effectResolverManager, roomCode) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   return Boolean(resolverEntry && resolverEntry.pendingChoice);
+}
+
+function findRoomDefinition(content, roomId) {
+  return (
+    content.rooms.find((r) => r.id === roomId) ||
+    content.startingRooms.find((r) => r.id === roomId)
+  );
 }
 
 function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts) {
