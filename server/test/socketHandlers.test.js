@@ -879,3 +879,203 @@ test('an effect choice that times out auto-resolves with the default option', as
   clientB.close();
   httpServer.close();
 }, 2000);
+
+test('game:move that opens a room whose card requires a choice does not advance the turn, and further actions are blocked until resolved', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await pendingChoicePromise;
+  const update = await updatePromise;
+
+  // AP was zeroed by opening the door, but the turn must not have advanced
+  // while the card effect is still waiting on a player choice.
+  expect(update.turnOrder[update.currentPlayerIndex]).toBe(currentPlayerId);
+
+  const secondMove = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
+  expect(secondMove.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  const selectActionResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item' }, resolve));
+  expect(selectActionResult.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  const useStairsResult = await new Promise((resolve) => currentClient.emit('game:useStairs', {}, resolve));
+  expect(useStairsResult.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('the turn advances only after a pending effect choice is resolved via game:effectPromptRespond', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const updatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+
+  const update = await updatePromise;
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('the turn advances only after a pending effect choice times out', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 50,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const updatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const update = await updatePromise;
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 2000);
+
+test('a real effectPromptRespond before the deadline cancels the scheduled timeout so it cannot later double-resolve the choice', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 100,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const resolvedEvents = [];
+  currentClient.on('game:promptResolved', (payload) => resolvedEvents.push(payload));
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+
+  // Wait past where the original 100ms deadline would have fired, to prove the
+  // scheduled timeout was actually cancelled and cannot later double-resolve.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  const resolvedForPrompt = resolvedEvents.filter((r) => r.promptId === pendingChoice.promptId);
+  expect(resolvedForPrompt).toHaveLength(1);
+  expect(resolvedForPrompt[0].wasTimeout).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into a room with an unknown drawType does not crash the room and still advances state', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'unknown_deck_type' }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(result.error).toBeUndefined(); // moveToRoom itself succeeded
+
+  const update = await updatePromise;
+  // Despite the resolveCardDraw failure (UNKNOWN_DECK_TYPE), the turn still
+  // advances and the room stays in sync -- see M2c-2 final review Important I3.
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
