@@ -25,6 +25,24 @@
 - **角色資料範本**：[data/characters/characters.json](data/characters/characters.json)（6 個佔位角色位置）＋ [README](data/characters/README.md)，開發者尚未填寫真實內容
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`——技術棧/規模都跟本專案不符，已確認不採用
 
+## 除錯注意事項 (Debug Notes — 審查發現的問題與後續慣例)
+
+**這一節記錄審查發現過的架構性錯誤，以及由此確立的通用慣例。任何開工前都應該先讀這一節，避免同類錯誤重複發生。**
+
+**通用介面約定（往後所有里程碑都要遵守，不是 M2c-2 專屬）**：
+任何會讓某個動作的效果解析「暫停等待玩家選擇」的流程（卡片 `choice` 效果、預兆/事件卡效果、未來 M3 戰鬥的傷害分配選擇等），在該選擇被實際解決（玩家回應，或逾時採用預設值）之前，**不可以呼叫任何會推進遊戲狀態的動作**（例如換下一位玩家的回合）。已確立的實作模式（見 `server/src/socketHandlers.js` 的 `hasPendingEffectChoice`/`EFFECT_CHOICE_IN_PROGRESS`）：
+1. 任何會推進狀態的新動作，執行前先檢查該房間是否有未解決的選擇，有的話直接拒絕（回傳 `XXX_IN_PROGRESS` 類錯誤），不要讓新動作跟未解決的選擇擦身而過
+2. 觸發選擇的原始動作本身**先不要**呼叫推進狀態的函式；改成把「推進狀態」延後到選擇真正解決（玩家回應、或逾時採用預設值）的那個 callback 裡才呼叫
+3. 解析效果的呼叫要包一層 try/catch，避免任何一次效果解析拋錯就連帶讓「推進狀態」跟「廣播最新狀態」這兩件事被跳過
+
+**M2c-2 最終獨立審查發現的實際案例（供未來同類流程參考）**：
+- **Critical（已修復，`986fb64`）**：`game:move` 抽卡後，效果卡在 `choice` 提問未解決時，仍然無條件呼叫 `advanceTurnIfOver` 把回合交給下一位玩家。下一位玩家若立刻又抽到一張需要選擇的卡，會撞上 `promptState` 的「同時只能有一個待處理提問」限制而拋錯，例外進而讓收尾動作（推進回合、廣播狀態）整個被跳過——房間永久卡死，無法自我恢復。已用上述通用模式修復，並補了 item／event／omen 三種牌庫各自的實測回歸測試（`8d91e40`），不是只驗證 item 牌庫就假設其他兩種也對。
+- **Important（已修復）**：未知的 `drawType`（房間資料打字錯誤等）原本會讓效果解析拋出未分類的原始 `TypeError`，而非專案慣例的 `UPPER_SNAKE_CASE Error`，且同樣會觸發上面的死鎖路徑——現在拋 `UNKNOWN_DECK_TYPE`，並且被 try/catch 保護，不會讓房間卡死。
+- **已知、目前尚未觸發但要記住的風險區域**：
+  - `turnFlow.js` 的 `selectAction` 目前只是殼子（`{kind, pending:true}`），還沒有真的呼叫 `resolveEffects`，所以現在沒有活著的 bug。**等未來里程碑把道具/攻擊/房間操作的真實邏輯接上 `selectAction` 時，如果那個實作會產生需要玩家選擇的效果，必須套用上面同一套模式**，不能重新設計一套
+  - **M3 戰鬥階段的傷害分配**（依 [card-mechanics-reference.md](docs/superpowers/specs/2026-08-01-card-mechanics-reference.md)：肉體傷害在 might/speed 間自由分配、精神傷害在 knowledge/sanity 間自由分配，逾時預設平均分配）是同一種「需要玩家做選擇才能繼續」的模式，M3 設計戰鬥系統時要直接沿用這套機制，不要重新發明
+- **Important（記錄為 M2c-3 才會浮現的缺口，不是這次的實作偏差）**：`modifiers.js` 的 `checkRemoveConditions`（buff/debuff 移除判斷）目前在 `src/` 裡完全沒有呼叫點，只有測試用到。等 M2c-3 真的填入 `persistent_modifier` 卡片內容，任何持續性標記都會變成永久 buff，除非在那之前先接上呼叫點
+
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
 無設計層面阻塞。M2b（M2b-1+M2b-2）已完整合併進 `main`。M2c 的架構討論已經跟開發者逐項確認完畢（見下），但**設計 spec 文件本身還沒寫**——這是下一階段的第一件事，不是新的設計討論。
 
