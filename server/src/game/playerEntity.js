@@ -115,4 +115,29 @@ function movePlayerTo(player, floor, x, y) {
   player.y = y;
 }
 
-module.exports = { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase };
+function addItem(player, item) {
+  if (!item || typeof item.id !== 'string' || item.id.length === 0) {
+    throw new Error('INVALID_ITEM');
+  }
+  player.inventory.push(item);
+}
+
+function removeItem(player, itemId) {
+  const index = player.inventory.findIndex((item) => item.id === itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_FOUND');
+  }
+  return player.inventory.splice(index, 1)[0];
+}
+
+module.exports = {
+  STATS,
+  createPlayer,
+  changeStat,
+  resetActionPoints,
+  movePlayerTo,
+  getStatValue,
+  isBelowBase,
+  addItem,
+  removeItem,
+};

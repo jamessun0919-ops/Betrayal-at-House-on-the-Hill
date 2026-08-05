@@ -24,4 +24,24 @@ function loadCharacters(dataDir = DEFAULT_DATA_DIR) {
   return loadJsonFile(path.join(dataDir, 'characters', 'characters.json'));
 }
 
-module.exports = { loadRooms, loadStartingRooms, loadCharacters, DEFAULT_DATA_DIR };
+function loadEventCards(dataDir = DEFAULT_DATA_DIR) {
+  return loadJsonFile(path.join(dataDir, 'cards', 'event-cards.json'));
+}
+
+function loadItemCards(dataDir = DEFAULT_DATA_DIR) {
+  return loadJsonFile(path.join(dataDir, 'cards', 'item-cards.json'));
+}
+
+function loadOmenCards(dataDir = DEFAULT_DATA_DIR) {
+  return loadJsonFile(path.join(dataDir, 'cards', 'omen-cards.json'));
+}
+
+module.exports = {
+  loadRooms,
+  loadStartingRooms,
+  loadCharacters,
+  loadEventCards,
+  loadItemCards,
+  loadOmenCards,
+  DEFAULT_DATA_DIR,
+};
