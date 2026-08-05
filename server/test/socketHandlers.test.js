@@ -755,3 +755,105 @@ async function setUpStartedGameWithContent(content) {
 
   return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload };
 }
+
+test('game:effectPromptRespond resolves the pending choice and applies the chosen effects', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const respondResult = await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+  expect(respondResult.error).toBeUndefined();
+
+  await effectResolvedPromise;
+  const update = await updatePromise;
+  const me = update.players.find((p) => p.playerId === currentPlayerId);
+  expect(me.stats.speed.currentIndex).toBe(me.stats.speed.baseIndex - 1);
+  expect(me.stats.might.currentIndex).toBe(me.stats.might.baseIndex); // untouched
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:effectPromptRespond rejects when there is no pending effect choice for the room', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: 'not_real', optionId: 'anything' }, resolve);
+  });
+  expect(result.error).toBe('NO_ACTIVE_EFFECT_CHOICE');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('an effect choice that times out auto-resolves with the default option', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 50,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const promptResolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  const stateUpdatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      const me = data.players.find((p) => p.playerId === currentPlayerId);
+      if (me.stats.might.currentIndex < me.stats.might.baseIndex) resolve(data);
+    });
+  });
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const resolved = await promptResolvedPromise;
+  expect(resolved.wasTimeout).toBe(true);
+  expect(resolved.chosenOptionId).toBe('opt_might');
+  await stateUpdatePromise; // proves the default option's effects were actually applied
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 2000);
