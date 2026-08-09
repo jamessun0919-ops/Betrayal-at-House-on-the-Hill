@@ -67,7 +67,7 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
     throw new Error('INVALID_DICE_CHECK_COUNT');
   }
 
-  const adjustedCount = applyModifiers(baseCount, modifiers, 'onBeforeRoll', context);
+  const adjustedCount = Math.max(1, Math.min(8, applyModifiers(baseCount, modifiers, 'onBeforeRoll', context)));
   const rolled = rollDice(adjustedCount, context.rng);
   const finalSum = applyModifiers(rolled, modifiers, 'onAfterRoll', context);
   const tier = evaluateTiers(finalSum, effect.tiers);

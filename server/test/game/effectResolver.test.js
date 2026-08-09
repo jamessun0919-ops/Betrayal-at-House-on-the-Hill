@@ -244,6 +244,28 @@ test('resolveEffects dice_check applies onBeforeRoll/onAfterRoll modifiers from 
   expect(gameState.players.get('p1').stats.might.currentIndex).toBe(3);
 });
 
+test('resolveEffects dice_check clamps an onBeforeRoll-reduced dice count to a minimum of 1', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.modifiers = [{ effects: [{ hookType: 'onBeforeRoll', delta: -1 }] }]; // e.g. 滴答聲
+  const rng = jest.fn().mockReturnValue(0);
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'dice_check', diceCount: 1, tiers: [{ min: 0, max: 8, effects: [] }] }, // would go to 0 without the clamp
+  ], { rng });
+  expect(rng).toHaveBeenCalledTimes(1); // clamped to 1 die, not 0
+});
+
+test('resolveEffects dice_check clamps an onBeforeRoll-increased dice count to a maximum of 8', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.modifiers = [{ effects: [{ hookType: 'onBeforeRoll', delta: 5 }] }]; // e.g. 祈禱聲
+  const rng = jest.fn().mockReturnValue(0);
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'dice_check', diceCount: 6, tiers: [{ min: 0, max: 8, effects: [] }] }, // would go to 11 without the clamp
+  ], { rng });
+  expect(rng).toHaveBeenCalledTimes(8); // clamped to 8 dice, not 11
+});
+
 test('resolveEffects dice_check throws INVALID_DICE_CHECK_COUNT when neither stat nor diceCount is usable', () => {
   const gameState = makeGameStateWithPlayer();
   expect(() =>
