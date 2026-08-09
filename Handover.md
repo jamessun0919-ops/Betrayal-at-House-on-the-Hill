@@ -1,6 +1,6 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-09（第 1 次工作階段）
+最後更新：2026-08-09（第 1 次工作階段，M2c-3 進行中）
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -17,7 +17,7 @@
     - **M2c-1（純邏輯模組）—— 已完成並合併進 `main`**：[計畫](docs/superpowers/plans/2026-08-05-m2c1-card-effect-core-logic.md)，7 任務全數完成（inline execution）——`cardDeck.js`、`effectPipeline.js`（自訂骰面 **0/0/1/1/2/2**）、`modifiers.js`、`effectResolver.js`（`stat_change`/`grant_item`/`lose_item`/`persistent_modifier`/`dice_check`/`choice`；`peek_and_reorder` 故意留 `UNSUPPORTED_EFFECT_TYPE`，等有實際卡片需求再補）、`playerEntity.js` 新增 `addItem`/`removeItem`
     - **M2c-2（Socket 整合）—— 已完成並合併進 `main`**：[計畫](docs/superpowers/plans/2026-08-05-m2c2-socket-integration.md)，7 任務全數完成（inline execution）＋獨立整分支審查（見下方「除錯注意事項」）——`effectResolverManager.js`（`{promptState, pendingChoice}`，生命週期跟 `gameState` 一致）、`gameState.js`/`gameManager.js` 擴充事件/道具/預兆牌庫、`socketHandlers.js` 的 `game:move` 自動抽卡解析、`game:effectPromptRespond`＋真實逾時計時器、除錯頁面顯示。**移除**了 M2b-2 的 `game:pendingCardDraw` 廣播，改用 `game:cardDrawn`/`game:effectResolved`/`game:effectPendingChoice`
     - **M2c-4/M2c-5（道具/操作動作接線＋邪祟考驗機制）—— 已完成、已通過獨立審查（含 1 輪修正）、已合併進 `main`**：[spec](docs/superpowers/specs/2026-08-05-m2c4-m2c5-action-and-haunt-design.md)、[計畫](docs/superpowers/plans/2026-08-05-m2c4-m2c5-action-and-haunt.md)——`item-cards.json`/`omen-cards.json` 補 `category`（武器/消耗品/一般）/`canTargetOthers` 欄位（開發者已對照實體卡片全數確認正確，無需修改）、`effectResolver.js` 新增 `appliedCount` 回傳值、`turnFlow.js` 的 `selectAction` 接上道具/操作真實邏輯、`socketHandlers.js` 的 `cardId`→`sourceId` 改名（`game:cardDrawn` 例外保留 `cardId`）＋`consumeItemIfApplied` 參數、`game:selectAction` 接上真實效果解析、`resolveCardDraw` 加入邪祟考驗。測試全綠（290/290）
-    - **M2c-3（36 張卡片＋房間操作類 effects 內容）—— 尚未開始**（範圍已擴充，見下方）
+    - **M2c-3（36 張卡片＋房間操作類 effects 內容）—— 進行中，第一批已草擬並驗證，等開發者審核**：agent 依 `card-mechanics-reference.md` 逐卡分類，跟開發者確認 4 個機制缺口的處理方向後，草擬了 19 張卡片/房間的 `effects` 內容——`item_003`（治療藥膏）/`item_004`（嗅鹽）/`item_009`（魔術方塊）、`omen_002`（書）/`omen_005`（女孩）/`omen_006`（聖符）/`omen_007`（瘋漢）/`omen_009`（徽章，維持無效果）、`event_001`（腐敗惡臭）/`event_005`（不起眼的櫃子）/`event_006`（滴答聲）/`event_007`（祈禱聲）/`event_009`（挑釁的幻覺）/`event_010`（電話鈴聲）、`room_vault`（保險庫）。已用一次性腳本載入真實內容、多組骰值/選項分支實際跑過 `resolveEffects` 驗證無誤才提交。`omen-cards.json` 全部 13 張已補上 `needsCustomLogic` 欄位（原本完全沒有這個欄位）。過程中新增 `draw_card` 效果類型（隨機抽 N 張卡，`grant_item` 只能指定特定卡片做不到），並修好 3 個既有缺口：`restoreToBase` 會誤降已達基本值以上的數值、`dice_check` 的骰數調整沒有 `[1,8]` 上下限、`persistent_modifier` 的 `removeWhen` 被誤設為強制欄位（改成可選，省略＝永久不解除）。其餘卡片維持 `needsCustomLogic:true`（M3 傷害/攻擊系統、`peek_and_reorder`、反應式擲骰道具等機制缺口，詳見下方除錯注意事項），是下一步待處理的範圍
 - **角色資料範本**：[data/characters/characters.json](data/characters/characters.json)（6 個佔位角色位置），開發者尚未填寫真實內容
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`——技術棧/規模都跟本專案不符
 
@@ -42,18 +42,27 @@
 **M2c-4/M2c-5 獨立審查發現的實際案例（已修復，`7eca839`，供未來同類流程參考）**：
 - **Important**：`handleEffectResolveResult` 裡 `consumeItemIfApplied` 觸發的 `removeItem` 呼叫原本沒有包 try/catch。如果某個消耗品道具的 `effects` 本身也包含一個指向自己的 `lose_item`（例如魔術方塊卡面文字「魔術方塊消失」，若照字面直接加一個 `lose_item` 效果），該道具會被移除兩次，第二次 `removeItem` 拋 `ITEM_NOT_FOUND`。這個拋錯在 `game:selectAction` 的同步路徑剛好有外層 try/catch擋住，但在 `game:effectPromptRespond`／逾時這兩條非同步路徑沒有，會導致「推進回合」跟「廣播 `game:stateUpdate`」被跳過——**跟 M2c-2 的 C1 是同一類問題，透過一個新增的呼叫點（`removeItem`）重新出現**。已修復：`removeItem` 包一層 try/catch，「已經不存在」視為良性 no-op。**寫 M2c-3 內容時要注意**：`category:"consumable"` 的道具，`effects` 不應該再額外寫一個指向自己的 `lose_item`（移除交給 `consumeItemIfApplied` 自動處理，不用、也不該在 effects 裡重複寫）
 
+**M2c-3 盤點期間發現的架構缺口（已跟開發者確認方向，記錄供 M3 或未來小任務參考）**：
+- **傷害系統完全沒有實作，且不只是 M3 combat 需要，好幾張 M2 階段就會抽到的事件/預兆卡也需要**（駭人尖叫、蜘蛛失敗分支、濕滑的地板、天花板塌陷、噬咬）。**開發者已定案的設計**：多點傷害＝跳出 N 次單點選擇視窗（N＝傷害總點數），每次讓玩家選「力量或速度」（肉體傷害）／「知識或意志」（精神傷害）其中一項扣 1 點，且每次視窗都要顯示兩個候選屬性**當下**的級別與實際數值（角色屬性是刻度制，降級不代表數值一定下降，且邪祟後降到最低級別＝死亡，玩家需要真實數據才能判斷）。**逾時規則**：只要其中一點逾時（不管第幾點），從那一點開始（含當次）剩下的全部點數，改用 8/1 規則書原案「儘量平均分配，無法平分則給數值較高的屬性」批次處理，不再繼續逐點跳窗。需要新增：(1) 新效果類型 `damage`（`damageType`+`amount`，`amount` 可能是固定數字或卡片內部先擲一次獨立骰子決定）；(2) `effectResolverManager` 的 `pendingChoice` 要能記住「連續提示鏈」的進度（第幾點/還剩幾點/傷害類型），不是只記一個待解決選擇；(3) 提示廣播要能即時查詢並附上兩個候選屬性的當下級別+數值，不是卡片作者預先寫死的選項。**確認放在 M3 實作**（駭人尖叫等目前卡在這個缺口的卡片，`needsCustomLogic:true` 空著等 M3）
+- **房間「結束回合被動加成」跟「離開房間前考驗」都沒有觸發點**：`rooms.json` 裡禮拜堂/圖書室/食品儲藏室/健身房已經有 `effects`（`onceOnlyPerPlayer:true`），塔橋/雜亂的房間/藤蔓糾纏的溫室的文字是「離開房間前要考驗」——這兩種都不是「進房自動觸發」也不是「玩家主動操作」，目前完全沒有對應的觸發點，`onceOnlyPerPlayer` 欄位在程式碼裡也完全沒被讀取。**開發者已確認**：這是需要新增程式碼的獨立小任務，不算在 M2c-3 內容撰寫範圍內，有空再處理，不影響其他內容撰寫
+- **`draw_card` 效果的已知限制**：目前只有透過同步流程（`game:selectAction`/`game:move` 的 ack 回呼，或 `game:effectPromptRespond` 的 ack）才能私下通知玩家抽到什麼卡（`game:cardsDrawn` 私人事件）；如果未來卡片把 `draw_card` 放在**逾時自動觸發**的選擇路徑裡（`handleEffectChoiceTimeout`），目前沒有機制可以私訊——因為那條路徑是伺服器計時器觸發、沒有對應的 socket 可用。目前沒有任何卡片用到這個路徑，遇到了再回頭補
+- **保險庫（`room_vault`）的效果本體已經可以用 `dice_check`+`draw_card` 表達，但「開一次後永久變空房間」的一次性標記還沒有追蹤機制**（跟上面「房間結束回合/離開考驗」是同一類缺口）——`needsCustomLogic` 先保持 `true`，效果內容已經寫好可用，等追蹤機制做出來就完整了
+
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-無設計層面阻塞。M2c-4/M2c-5 已通過獨立審查（1 個 Important 已修復）並合併進 `main`，`item-cards.json`/`omen-cards.json` 的 `category`/`canTargetOthers` 值也已經開發者對照實體卡片確認無誤。**唯一待辦**：本次工作用的 worktree（`.claude/worktrees/m2c4-m2c5-action-and-haunt`，分支 `worktree-m2c4-m2c5-action-and-haunt`）目前被鎖定為進行中 session 的作業目錄，無法在該 session 內移除——下次開新 session 時，如果確認已經不在該 worktree 裡工作，記得執行 `git worktree remove` 清掉並刪除本地分支（遠端分支/內容都已經安全合併進 `main`，這只是收尾清潔，不影響任何功能）。
+無設計層面阻塞。M2c-3 第一批內容（19 張卡片/房間）已草擬並用真實內容跑過驗證，**開發者正在審核，審核完再繼續**。**待辦**：
+1. 本次工作用的 worktree（`.claude/worktrees/m2c4-m2c5-action-and-haunt`，分支 `worktree-m2c4-m2c5-action-and-haunt`）目前被鎖定為進行中 session 的作業目錄，無法在該 session 內移除——下次開新 session 時，如果確認已經不在該 worktree 裡工作，記得執行 `git worktree remove` 清掉並刪除本地分支（遠端分支/內容都已經安全合併進 `main`，這只是收尾清潔，不影響任何功能）
+2. commit `52cdd1d` 因操作疏失把「`modifiers.js` 的 `removeWhen` 改可選」這個程式碼修正跟「M2c-3 第一批內容草稿」這個資料變更合併成同一筆提交了——功能跟測試都正確，只是這筆 commit 訊息只提到程式碼修正沒提到內容，之後看 commit 歷史對照時要注意這點，不是漏推或漏提交
 
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 讀最近一次工作階段範圍即可
-2. 開新 session 前先確認上方「唯一待辦」的 worktree 是否還被鎖定，能清就清掉
-3. **M2c-3（卡片＋房間操作 effects 內容，範圍已擴充）**：36 張事件/道具卡的 `effects` 內容 **加上**房間「操作」類 effects 內容（例如 `data/rooms/rooms.json` 的「保險庫」已有文字描述但 `effects:[]` 是空的）**加上** `omen-cards.json` 補 `needsCustomLogic` 欄位（目前完全沒有這個欄位，跟 event/item 卡的 schema 不一致）——agent 依 `card-mechanics-reference.md` 草擬 JSON，開發者審核修正。**撰寫這批內容時要遵守上方除錯注意事項新增的規則**：`category:"consumable"` 的道具不要在自己的 `effects` 裡額外寫指向自己的 `lose_item`
-4. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的預留版位（M3 叛徒切換多隻怪物用，現在不用做功能，只要介面結構預留空間）
-5. **執行順序已跟開發者確認**：M2c-3 → M2d，依序完成，不要打亂
-6. **M2c-3/M2d 全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/結束回合換人，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
+2. 開新 session 前先確認上方「worktree 待清理」是否還被鎖定，能清就清掉
+3. **確認開發者是否已審核完 M2c-3 第一批內容**（見上方「已完成進度」列出的 19 張卡片/房間），有修正意見就照著改
+4. **M2c-3 剩餘內容**：其餘卡片目前卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；房間結束回合/離開考驗的觸發點是獨立小任務，有空再補；`peek_and_reorder`（水晶球/通靈板）、狗的差遣能力、面具穿脫、電池耗盡的移動限制，都還沒排入具體任務
+5. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的預留版位（M3 叛徒切換多隻怪物用，現在不用做功能，只要介面結構預留空間）
+6. **執行順序已跟開發者確認**：M2c-3 → M2d，依序完成，不要打亂
+7. **M2c-3/M2d 全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/結束回合換人，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
 
 ## 關鍵設定 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Socket.IO（伺服器持有權威遊戲狀態）＋ React (Vite) 前端；純 JavaScript，不使用 TypeScript；單一程式碼庫同時支援區網與雲端部署
@@ -67,6 +76,9 @@
 - **邪祟觸發規則（M2c-5，已實作於 `resolveCardDraw`）**：每抽一張預兆卡，`omenCount` 遞增，骰 `omenCount` 顆骰子（0/0/1/1/2/2 面），總和 >5 觸發 `hauntStarted=true`——不是實體遊戲的「同名預兆抽第二張」規則
 - **物品 `category` 三分類規則（M2c-4，已實作）**：`category` 為 `武器`/`消耗品`/`一般`（欄位值為英文 `weapon`/`consumable`/`general`）。消耗品是否移除看效果是否「生效」（`appliedCount > 0`），不是看玩家是否嘗試使用——考驗類道具（如魔術方塊）未通過視為未生效，不移除。預兆卡**沒有**消耗品分類（必須留在場上供 `omenCount` 計數），這是硬性不變量
 - **「操作」（room_action）的行動力時機（M2c-4 Task 5 執行期間確認）**：開新房間會讓行動力歸零、回合立刻結束，同一回合不可能再觸發操作，必須等玩家下一次輪到行動才能對已開的房間操作／考驗；但進房間自動觸發的卡片效果（抽卡）不受此限，仍要解析完才能結束回合——兩者是不同機制
+- **`draw_card` 效果類型（M2c-3，已實作）**：`{type:"draw_card", deck:"item"|"event"|"omen", count:N}`，從指定牌庫隨機抽 N 張加入背包，牌庫抽空時中途停止；抽到的卡透過 `game:cardsDrawn` 私人事件只通知抽卡玩家本人，不廣播給其他人（僅限同步流程，見上方除錯注意事項的已知限制）
+- **傷害系統設計（已跟開發者定案，確認放在 M3 實作，見上方除錯注意事項）**：多點傷害＝連續跳出 N 次單點選擇視窗，每次顯示候選屬性當下級別+數值，逾時後剩餘點數改用「儘量平均分配」批次處理
+- **`persistent_modifier` 的 `removeWhen`（M2c-3 已修正為可選）**：省略＝永久不解除（`checkRemoveConditions` 目前無呼叫點，這個欄位暫時是純資料，等有呼叫點才會真的生效）；有填就必須是 `{type: "..."}` 格式，空物件或 `null` 仍會拋 `INVALID_REMOVE_WHEN`
 - **卡牌/房間內容分工**：agent 依 `card-mechanics-reference.md` 草擬 `effects` JSON，開發者審核修正（跟房間 `doors`/角色數值「開發者自己手填」不同，因為這是聲明式 schema 轉換）
 - **MVP 兩個劇本**：劇本1〈神鬼痴漢 The Mummy Walks〉、劇本10〈闔家團圓 Family Gathering〉
 - **未來階段**：Phase 2 為 AI 玩家（呼叫 Claude API 決策，選角色順序排真人之後、數量不可超過真人數量）；Phase 3+ 為原創劇本

@@ -321,17 +321,32 @@
 - 用 `finishing-a-development-branch` 流程合併：切回 `main`、`git pull`（第一次遇到暫時性網路錯誤，重試 `git fetch` 後正常）、合併 `worktree-m2c4-m2c5-action-and-haunt` 分支（乾淨合併無衝突）、合併後重跑全套測試（290/290）確認無誤才推送 `main`
 - 嘗試依慣例清理 worktree，發現該 worktree 目前正被本次 session 鎖定為作業目錄（`git worktree remove` 報錯 `locked working tree`），判斷不應該強制解鎖刪除自己正在使用中的目錄，保留待下次 session 處理，僅在 Handover 記錄待辦
 - 逐項列出 `item-cards.json`（12張已填內容）／`omen-cards.json`（13張）目前的 `category`/`canTargetOthers` 草稿值供開發者對照實體卡片審核，開發者確認全數正確，無需修改
+- 開始 M2c-3（36 張卡片＋房間操作 effects 內容）前，先盤點全部資料現況，發現 2 個需要跟開發者確認的架構問題：房間「結束回合被動加成」（禮拜堂/圖書室/食品儲藏室/健身房）完全沒有觸發點；治療藥膏/嗅鹽要用的 `restoreToBase` 既有邏輯有 bug（會誤降已達基本值以上的數值）。開發者裁定：觸發點另立獨立小任務、bug 直接修正，並確認武器/傷害類卡片這次維持 `needsCustomLogic:true` 留給 M3
+- 依 TDD 修好 `restoreToBase` bug（`server/src/game/effectResolver.js`），全套測試通過後提交
+- 逐項討論 4 個機制缺口的處理方向：(1) 多點傷害分配——開發者定案「連續跳出 N 次單點選擇視窗，每次顯示候選屬性當下級別+數值，逾時後剩餘點數改用規則書原案的平均分配批次處理」，確認整個傷害系統（新效果類型`damage`＋連續提示鏈＋即時查值機制）放到 M3 實作；(2) 新增 `draw_card` 效果類型（隨機抽 N 張卡），開發者要求抽卡結果要私下讓玩家知道、不廣播；(3) 「同房間全員各自考驗」目前唯一需要的卡片（駭人尖叫）本身也卡在傷害系統，一併延後；(4) 徽章這張預兆卡文字提到的房間不存在於目前房間清單，開發者裁定保留卡片存在但暫不寫功能
+- 依 TDD 實作 `draw_card` 效果類型（`effectResolver.js` 新增 handler＋`resolveEffects` 聚合 `drawnCards`），並在 `socketHandlers.js` 三個相關 handler（`game:move`/`game:selectAction`/`game:effectPromptRespond`）用發起方自己的 socket 私下發送 `game:cardsDrawn`，確認逾時路徑（無 socket 可用）是已知限制、目前沒有卡片會用到
+- 全套測試跑一次抓到 1 個 flaky 測試（`draw_card` 抽 2 張的測試斷言假設牌庫保持原始順序，但 `createCardDeck` 會洗牌），確認是自己剛寫的測試設計問題、非產品邏輯錯誤，改成順序無關的比對後穩定通過
+- 完整分類全部 36 張卡片＋相關房間，逐一跟開發者確認可以先草擬的批次，開始撰寫 `item-cards.json`（3張）、`omen-cards.json`（4張＋全部13張補上 `needsCustomLogic` 欄位）、`event-cards.json`（6張）、`rooms.json`（保險庫）的實際 `effects` 內容
+- 撰寫滴答聲/祈禱聲（房間持續骰數修改標記）時發現 `dice_check` 的骰數調整完全沒有上下限保護（卡面文字明確要求「最少一顆」「最多八顆」），依 TDD 補上 `[1,8]` 夾值後提交
+- 用一次性驗證腳本載入真實內容檔案，讓全部已草擬的卡片/房間在多組骰值與選項分支下實際跑過 `resolveEffects`，抓到 `persistent_modifier` 的 `removeWhen` 被誤設為強制欄位（滴答聲/祈禱聲卡面文字沒有寫解除條件）。跟開發者確認後，這兩個房間標記維持永久、不寫解除規則，依 TDD 把 `removeWhen` 改成可選欄位（省略＝永久不解除），驗證腳本全部 19 張卡片/房間通過後提交推送
+- 開發者指示先收工，審核完這批內容後再繼續
 
 **完成項目**：
 - **M2c-4/M2c-5 正式合併進 `main`**（含審查抓到並修復的 1 個 Important 問題），測試 290/290 全綠
 - `item-cards.json`/`omen-cards.json` 的 `category`/`canTargetOthers` 欄位已由開發者確認無誤
-- Handover.md 更新：M2c-4/M2c-5 標記完成、新增獨立審查發現的除錯注意事項條目、待辦清單移除已完成項目、新增 worktree 清理待辦
+- **M2c-3 第一批內容（19 張卡片/房間）已草擬並驗證，測試全綠（301/301）**：`item_003`/`item_004`/`item_009`、`omen_002`/`omen_005`/`omen_006`/`omen_007`/`omen_009`（含全部13張補 `needsCustomLogic`）、`event_001`/`event_005`/`event_006`/`event_007`/`event_009`/`event_010`、`room_vault`
+- 新增 `draw_card` 效果類型（含 `game:cardsDrawn` 私人通知機制）
+- 修復 3 個既有程式碼缺口：`restoreToBase` 誤降已達標數值、`dice_check` 骰數無上下限、`persistent_modifier` 的 `removeWhen` 誤設為強制欄位
+- Handover.md 更新：M2c-4/M2c-5 標記完成、M2c-3 進度與待辦、多項除錯注意事項新增（傷害系統設計定案、房間觸發點缺口、`draw_card`/`removeWhen` 使用說明）
 
 **遇到瓶頸**：
 - （已解決）合併前 `git pull` 一度出現「Empty reply from server」的暫時性網路錯誤，改用 `git fetch` 重試後正常，本地 `main` 其實已經跟遠端同步，不是真的落後
+- （已解決）`draw_card` 抽 2 張卡的測試因牌庫洗牌導致順序不定而 flaky，改成順序無關比對
 - （非阻塞，記錄待辦）功能分支的 worktree 因為是本次 session 的作業目錄而被鎖定，無法照慣例當場清理，內容已安全合併進 `main`，只是收尾清潔工作延後
+- （非阻塞，記錄待辦）操作疏失把 `removeWhen` 程式碼修正跟 M2c-3 內容草稿合併成同一筆 commit（`52cdd1d`），功能正確但 commit 訊息對不上完整內容
 
 **開發者交代備忘事項**：
-- 下一階段工作：正式開始 M2c-3（36 張事件/道具卡的 `effects` 內容＋房間操作類 effects＋`omen-cards.json` 補 `needsCustomLogic` 欄位），撰寫時要遵守新增的規則——消耗品道具的 `effects` 不要額外寫指向自己的 `lose_item`
+- 下一階段工作：先等開發者審核完 M2c-3 第一批內容（19 張卡片/房間）的實際數值是否正確，有修正意見再處理
+- 審核通過後才繼續 M2c-3 剩餘內容——依開發者已定案的方向：武器/傷害類卡片留給 M3（含新設計的連續提示鏈傷害分配機制）；房間結束回合/離開考驗的觸發點是獨立小任務；`peek_and_reorder`/差遣能力/穿脫狀態/移動限制持續效果目前都還沒排入具體任務
 - 開新 session 時記得檢查 `.claude/worktrees/m2c4-m2c5-action-and-haunt` 是否還被鎖定，能清就清掉（`git worktree remove` + `git branch -d worktree-m2c4-m2c5-action-and-haunt`）
 
