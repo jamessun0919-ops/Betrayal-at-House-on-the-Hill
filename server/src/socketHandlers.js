@@ -21,6 +21,7 @@ const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver')
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
 const { addItem, removeItem } = require('./game/playerEntity');
+const { checkRemoveConditions } = require('./game/modifiers');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
@@ -151,6 +152,21 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const { direction } = payload || {};
         const result = moveToRoom(gameState, playerId, direction);
         ack(result);
+
+        // Any modifier gated on "meets another player" (e.g. 電池耗盡) clears
+        // once the mover shares a room with someone -- check everyone now
+        // standing there, not just the mover, since it could be the other
+        // player's modifier that clears.
+        const mover = getPlayer(gameState, playerId);
+        const roommates = [...gameState.players.values()].filter(
+          (p) => p.floor === mover.floor && p.x === mover.x && p.y === mover.y
+        );
+        if (roommates.length > 1) {
+          for (const roommate of roommates) {
+            checkRemoveConditions(roommate, { type: 'meetsAnotherPlayer' });
+          }
+        }
+
         let stillResolving = false;
         if (result.pendingCardDraw) {
           try {
@@ -442,8 +458,8 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return { pending: true };
   }
   resolverEntry.pendingChoice = null;
+  const player = getPlayer(gameState, playerId);
   if (consumeItemIfApplied && effectResult.appliedCount > 0) {
-    const player = getPlayer(gameState, playerId);
     try {
       removeItem(player, sourceId);
     } catch (err) {
@@ -453,6 +469,12 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       // in the callers of this function (M2c-4/M2c-5 independent review, Important #1).
       console.error('consumeItemIfApplied removeItem failed (already removed?)', err);
     }
+  }
+  // Any effect resolution may have changed what the player holds (grant_item,
+  // draw_card, an omen added to inventory, etc.) -- re-check holdsItem-gated
+  // modifiers (e.g. 電池耗盡 clearing once the player picks up 蠟燭).
+  for (const item of player.inventory) {
+    checkRemoveConditions(player, { type: 'holdsItem', itemId: item.id });
   }
   io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
   const outcome = { pending: false };

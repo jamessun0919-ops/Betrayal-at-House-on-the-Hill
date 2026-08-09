@@ -7,6 +7,7 @@ const { createCharacterSelectionManager } = require('../src/game/characterSelect
 const { createEffectResolverManager } = require('../src/game/effectResolverManager');
 const { getGameState } = require('../src/game/gameManager');
 const { getPlayer } = require('../src/game/gameState');
+const { attachModifier } = require('../src/game/modifiers');
 
 function makeContent(overrides = {}) {
   return {
@@ -1653,6 +1654,71 @@ test('game:selectAction item: also finds items among held omens, not just conten
   await effectResolvedPromise;
 
   expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('resolving an effect that grants item_010 clears a holdsItem modifier on the player (e.g. 電池耗盡 + 蠟燭)', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_099',
+        name: '測試授予蠟燭道具',
+        effects: [{ type: 'grant_item', itemId: 'item_010' }],
+        category: 'general',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_099' });
+  attachModifier(player, {
+    effects: [{ hookType: 'blocksOpenDoor' }],
+    removeWhen: [{ type: 'meetsAnotherPlayer' }, { type: 'holdsItem', itemId: 'item_010' }],
+  });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_099' }, resolve));
+  await effectResolvedPromise;
+
+  expect(player.modifiers).toEqual([]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into a room with another player clears a meetsAnotherPlayer modifier on the mover (e.g. 電池耗盡)', async () => {
+  const content = makeContent({ rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }] });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+
+  const gameState = getGameState(gameManager, roomCode);
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+
+  // Pre-place an explored room east of the entrance hall (0,0) and put the
+  // other player there so the mover "meets" them on arrival.
+  gameState.board.ground.set('1,0', { roomId: 'room_manual', x: 1, y: 0, doorSides: ['north', 'east', 'south', 'west'] });
+  otherPlayer.floor = 'ground';
+  otherPlayer.x = 1;
+  otherPlayer.y = 0;
+
+  attachModifier(currentPlayer, {
+    effects: [{ hookType: 'blocksOpenDoor' }],
+    removeWhen: [{ type: 'meetsAnotherPlayer' }, { type: 'holdsItem', itemId: 'item_010' }],
+  });
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  expect(currentPlayer.modifiers).toEqual([]);
 
   clientA.close();
   clientB.close();
