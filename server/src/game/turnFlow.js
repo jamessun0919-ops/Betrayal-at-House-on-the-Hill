@@ -14,12 +14,17 @@ function requirePlayer(gameState, playerId) {
   return player;
 }
 
+function hasModifierEffect(player, hookType) {
+  return (player.modifiers || []).some((m) => m.effects.some((e) => e.hookType === hookType));
+}
+
 function getAvailableDirections(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const grid = gameState.board[player.floor];
   const room = grid.get(coordKey(player.x, player.y));
   const results = [];
   const doorSides = Array.isArray(room.doorSides) ? room.doorSides : [];
+  const blockedFromOpeningDoors = hasModifierEffect(player, 'blocksOpenDoor');
   for (const direction of SIDES) {
     if (!doorSides.includes(direction)) continue;
     const delta = DIRECTION_DELTA[direction];
@@ -29,7 +34,7 @@ function getAvailableDirections(gameState, playerId) {
       if (canMoveBetween(gameState.board, player.floor, { x: player.x, y: player.y }, direction)) {
         results.push({ direction, kind: 'move' });
       }
-    } else if (hasRoomForFloor(gameState.roomDeck, player.floor)) {
+    } else if (!blockedFromOpeningDoors && hasRoomForFloor(gameState.roomDeck, player.floor)) {
       results.push({ direction, kind: 'open_door' });
     }
   }

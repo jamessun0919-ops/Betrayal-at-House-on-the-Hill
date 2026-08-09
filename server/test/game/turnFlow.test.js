@@ -65,6 +65,15 @@ test('getAvailableDirections omits open_door once the room deck is empty', () =>
   expect(openDoorOptions).toEqual([]);
 });
 
+test('getAvailableDirections omits open_door for a player with a blocksOpenDoor modifier, but still lists moves to already-explored neighbors', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  player.modifiers = [{ effects: [{ hookType: 'blocksOpenDoor' }] }]; // e.g. 電池耗盡
+  const available = getAvailableDirections(gameState, 'p1');
+  expect(available.filter((a) => a.kind === 'open_door')).toEqual([]);
+  expect(available.find((a) => a.direction === 'north')).toEqual({ direction: 'north', kind: 'move' });
+});
+
 test('getAvailableDirections throws PLAYER_NOT_FOUND for an unknown player', () => {
   const { gameState } = makeGameStateWithPlayer();
   expect(() => getAvailableDirections(gameState, 'unknown')).toThrow('PLAYER_NOT_FOUND');
