@@ -385,3 +385,84 @@ test('resolveEffects appliedCount is 0 for an empty effects array', () => {
   const result = resolveEffects(gameState, createPromptState(), 'p1', []);
   expect(result).toEqual({ pending: false, appliedCount: 0 });
 });
+
+test('resolveEffects preview_and_choose offers the top N deck cards plus a skip option, without touching the deck yet', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    events: [
+      { id: 'event_a', name: 'A', effects: [] },
+      { id: 'event_b', name: 'B', effects: [] },
+      { id: 'event_c', name: 'C', effects: [] },
+      { id: 'event_d', name: 'D', effects: [] },
+    ],
+  });
+  const deckBefore = gameState.eventDeck.cards.map((c) => c.id);
+  const paused = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'preview_and_choose', deck: 'event', count: 3, description: '選擇一張事件卡', timeoutMs: 20000 },
+  ], { now: 1000 });
+
+  expect(paused.pending).toBe(true);
+  expect(paused.options).toHaveLength(4); // 3 previewed cards + skip
+  expect(paused.options.map((o) => o.optionId)).toEqual([...deckBefore.slice(0, 3), '__skip__']);
+  expect(paused.defaultOptionId).toBe('__skip__');
+  // Nothing removed from the deck yet -- only resolving an option does that.
+  expect(gameState.eventDeck.cards.map((c) => c.id)).toEqual(deckBefore);
+});
+
+test('resolveEffects preview_and_choose: choosing a previewed card takes it from the deck into inventory', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    events: [
+      { id: 'event_a', name: 'A', effects: [] },
+      { id: 'event_b', name: 'B', effects: [] },
+    ],
+  });
+  const promptState = createPromptState();
+  const paused = resolveEffects(gameState, promptState, 'p1', [
+    { type: 'preview_and_choose', deck: 'event', count: 3, description: '選擇一張事件卡', timeoutMs: 20000 },
+  ], { now: 1000 });
+
+  const response = respondToPrompt(promptState, { promptId: paused.promptId, playerId: 'p1', optionId: 'event_b' });
+  const chosenEffects = resolveChoiceOption(paused.options, response.chosenOptionId);
+  const finalResult = resolveEffects(gameState, promptState, 'p1', chosenEffects);
+
+  expect(finalResult).toEqual({ pending: false, appliedCount: 1, drawnCards: [{ id: 'event_b', name: 'B' }] });
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'event_b' }]);
+  expect(gameState.eventDeck.cards.map((c) => c.id)).toEqual(['event_a']); // only the chosen card left the deck
+});
+
+test('resolveEffects preview_and_choose: choosing __skip__ leaves the deck and inventory untouched', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    events: [{ id: 'event_a', name: 'A', effects: [] }],
+  });
+  const promptState = createPromptState();
+  const paused = resolveEffects(gameState, promptState, 'p1', [
+    { type: 'preview_and_choose', deck: 'event', count: 3, description: '選擇一張事件卡', timeoutMs: 20000 },
+  ], { now: 1000 });
+
+  const response = respondToPrompt(promptState, { promptId: paused.promptId, playerId: 'p1', optionId: '__skip__' });
+  const chosenEffects = resolveChoiceOption(paused.options, response.chosenOptionId);
+  const finalResult = resolveEffects(gameState, promptState, 'p1', chosenEffects);
+
+  expect(finalResult).toEqual({ pending: false, appliedCount: 0 });
+  expect(gameState.players.get('p1').inventory).toEqual([]);
+  expect(gameState.eventDeck.cards).toHaveLength(1);
+});
+
+test('resolveEffects preview_and_choose is a no-op when the deck is already empty', () => {
+  const gameState = makeGameStateWithPlayer('p1', { events: [] });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'preview_and_choose', deck: 'event', count: 3, description: '選擇一張事件卡', timeoutMs: 20000 },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('resolveEffects take_previewed_card no-ops gracefully if the card already left the deck (race with another draw)', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    events: [{ id: 'event_a', name: 'A', effects: [] }],
+  });
+  gameState.eventDeck.cards = []; // simulate someone else already drew it
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'take_previewed_card', deck: 'event', cardId: 'event_a' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(gameState.players.get('p1').inventory).toEqual([]);
+});

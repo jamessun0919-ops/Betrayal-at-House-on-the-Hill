@@ -97,6 +97,47 @@ function handleDrawCard(gameState, playerId, effect) {
   return result;
 }
 
+function handleTakePreviewedCard(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  const deckField = DECK_FIELD_BY_TYPE[effect.deck];
+  if (!deckField) {
+    throw new Error('UNKNOWN_DECK_TYPE');
+  }
+  const deck = gameState[deckField];
+  const index = deck.cards.findIndex((c) => c.id === effect.cardId);
+  if (index === -1) {
+    // Someone else already drew it between the preview and this choice resolving.
+    return { pending: false, appliedCount: 0 };
+  }
+  const [card] = deck.cards.splice(index, 1);
+  addItem(player, { id: card.id });
+  return { pending: false, appliedCount: 1, drawnCards: [{ id: card.id, name: card.name }] };
+}
+
+function handlePreviewAndChoose(gameState, promptState, playerId, effect, context) {
+  const deckField = DECK_FIELD_BY_TYPE[effect.deck];
+  if (!deckField) {
+    throw new Error('UNKNOWN_DECK_TYPE');
+  }
+  const deck = gameState[deckField];
+  const previewCards = deck.cards.slice(0, effect.count);
+  if (previewCards.length === 0) {
+    return { pending: false, appliedCount: 0 };
+  }
+  const options = previewCards.map((card) => ({
+    optionId: card.id,
+    label: card.name,
+    effects: [{ type: 'take_previewed_card', deck: effect.deck, cardId: card.id }],
+  }));
+  options.push({ optionId: '__skip__', label: '放棄', effects: [] });
+  return handleChoice(gameState, promptState, playerId, {
+    description: effect.description,
+    timeoutMs: effect.timeoutMs,
+    defaultOptionId: '__skip__',
+    options,
+  }, context);
+}
+
 function handleChoice(gameState, promptState, playerId, effect, context) {
   const prompt = createPrompt(promptState, {
     type: 'effect_choice',
@@ -130,6 +171,8 @@ const HANDLERS = Object.assign(Object.create(null), {
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
   draw_card: (gameState, promptState, playerId, effect) => handleDrawCard(gameState, playerId, effect),
+  take_previewed_card: (gameState, promptState, playerId, effect) => handleTakePreviewedCard(gameState, playerId, effect),
+  preview_and_choose: (gameState, promptState, playerId, effect, context) => handlePreviewAndChoose(gameState, promptState, playerId, effect, context),
   dice_check: (gameState, promptState, playerId, effect, context) => handleDiceCheck(gameState, promptState, playerId, effect, context),
   choice: (gameState, promptState, playerId, effect, context) => handleChoice(gameState, promptState, playerId, effect, context),
 });
