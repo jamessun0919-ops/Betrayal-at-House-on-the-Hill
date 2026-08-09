@@ -47,6 +47,18 @@ function handleLoseItem(gameState, playerId, effect) {
   return { pending: false };
 }
 
+function handleToggleActive(gameState, promptState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  const item = player.inventory.find((i) => i.id === effect.itemId);
+  if (!item) {
+    throw new Error('ITEM_NOT_HELD');
+  }
+  const wasActive = Boolean(item.active);
+  item.active = !wasActive;
+  const effectsToApply = wasActive ? effect.inactiveEffects : effect.activeEffects;
+  return resolveEffects(gameState, promptState, playerId, effectsToApply, context);
+}
+
 function handlePersistentModifier(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   if (effect.appliesTo !== 'player' && effect.appliesTo !== 'room') {
@@ -169,6 +181,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
+  toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
   draw_card: (gameState, promptState, playerId, effect) => handleDrawCard(gameState, playerId, effect),
   take_previewed_card: (gameState, promptState, playerId, effect) => handleTakePreviewedCard(gameState, playerId, effect),

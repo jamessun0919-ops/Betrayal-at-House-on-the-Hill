@@ -89,6 +89,45 @@ test('resolveEffects lose_item propagates ITEM_NOT_FOUND when the player does no
   ).toThrow('ITEM_NOT_FOUND');
 });
 
+test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_008' });
+  resolveEffects(gameState, createPromptState(), 'p1', [{
+    type: 'toggle_active',
+    itemId: 'omen_008',
+    activeEffects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }, { type: 'stat_change', stat: 'sanity', delta: -2 }],
+    inactiveEffects: [{ type: 'stat_change', stat: 'knowledge', delta: -2 }, { type: 'stat_change', stat: 'sanity', delta: 2 }],
+  }]);
+  expect(player.inventory).toEqual([{ id: 'omen_008', active: true }]);
+  expect(player.stats.knowledge.currentIndex).toBe(3); // baseIndex 1 + 2
+  expect(player.stats.sanity.currentIndex).toBe(1); // baseIndex 2 - 2, clamped to the pre-haunt floor (skullIndex 0 + 1)
+});
+
+test('resolveEffects toggle_active applies inactiveEffects and marks the item inactive when it was active', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_008', active: true });
+  resolveEffects(gameState, createPromptState(), 'p1', [{
+    type: 'toggle_active',
+    itemId: 'omen_008',
+    activeEffects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }, { type: 'stat_change', stat: 'sanity', delta: -2 }],
+    inactiveEffects: [{ type: 'stat_change', stat: 'knowledge', delta: -2 }, { type: 'stat_change', stat: 'sanity', delta: 2 }],
+  }]);
+  expect(player.inventory).toEqual([{ id: 'omen_008', active: false }]);
+  expect(player.stats.knowledge.currentIndex).toBe(1); // baseIndex 1 - 2, clamped to the pre-haunt floor (skullIndex 0 + 1)
+  expect(player.stats.sanity.currentIndex).toBe(4); // baseIndex 2 + 2
+});
+
+test('resolveEffects toggle_active throws ITEM_NOT_HELD when the player does not hold the item', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{
+      type: 'toggle_active', itemId: 'omen_008', activeEffects: [], inactiveEffects: [],
+    }])
+  ).toThrow('ITEM_NOT_HELD');
+});
+
 test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {
   const gameState = makeGameStateWithPlayer('p1', {
     items: [
