@@ -40,9 +40,14 @@
     "id": "event_004",
     "name": "電池耗盡",
     "description": "玩家手上的手電筒，閃爍了幾下後熄滅了",
-    "text": "（本事件卡持續保留於玩家身上）玩家的行動力受到影響，只能移動到相鄰的房間（人物屬性的速度不受影響），直到玩家與其他玩家相遇（取得備用電池）或身上有道具蠟燭，此事件卡消失。",
-    "effects": [],
-    "needsCustomLogic": true
+    "text": "（本事件卡持續保留於玩家身上）玩家的行動力受到影響，不能開啟新房間，直到玩家與其他玩家相遇（取得備用電池）或身上有道具蠟燭，此事件卡消失。",
+    "effects": [{
+      "type": "persistent_modifier",
+      "appliesTo": "player",
+      "effects": [{ "hookType": "blocksOpenDoor" }],
+      "removeWhen": [{ "type": "meetsAnotherPlayer" }, { "type": "holdsItem", "itemId": "item_010" }]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_005",
