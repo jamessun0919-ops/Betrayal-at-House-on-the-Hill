@@ -350,3 +350,19 @@
 - 審核通過後才繼續 M2c-3 剩餘內容——依開發者已定案的方向：武器/傷害類卡片留給 M3（含新設計的連續提示鏈傷害分配機制）；房間結束回合/離開考驗的觸發點是獨立小任務；`peek_and_reorder`/差遣能力/穿脫狀態/移動限制持續效果目前都還沒排入具體任務
 - 開新 session 時記得檢查 `.claude/worktrees/m2c4-m2c5-action-and-haunt` 是否還被鎖定，能清就清掉（`git worktree remove` + `git branch -d worktree-m2c4-m2c5-action-and-haunt`）
 
+## 2026-08-09 第 2 次工作階段
+
+**當日工作內容**：
+- 開發者要求繼續下一階段工作，Agent 確認環境狀態（`main` 乾淨、無未提交異動、worktree 仍鎖定）後詢問 M2c-3 第一批內容審核狀況與下一步方向
+- 開發者要求刪除 worktree，Agent 再次嘗試 `git worktree remove` 仍被 `locked working tree` 擋下（鎖定原因明確指向本次 session 自己），判斷這不是普通風險確認後可執行的情況——這是 session 自己正在使用的作業環境，強制解鎖有讓當下 session 壞掉的風險，不能貿然執行，改為說明限制並提供開發者自己在 Claude Code 之外的終端機執行、或開一個不用這個 worktree 的全新 session 執行的替代方案
+
+**完成項目**：
+- Handover.md 更新：worktree 清理限制說明得更完整（明確寫出無法在任何仍使用這個 worktree 的 session 內完成的原因，附上開發者可自行執行的指令）
+
+**遇到瓶頸**：
+- （非阻塞，記錄待辦）worktree 清理需要開發者自己動手或換一個不相關的 session 才能完成，本 session 無法處理
+
+**開發者交代備忘事項**：
+- 下一階段工作：先等開發者審核完 M2c-3 第一批內容，審核完再繼續（同上次交代）
+- worktree 清理如果開發者想現在處理，可以直接在系統終端機（非 Claude Code）執行 Handover 裡列出的指令
+

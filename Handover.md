@@ -1,6 +1,6 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-09（第 1 次工作階段，M2c-3 進行中）
+最後更新：2026-08-09（第 2 次工作階段，M2c-3 進行中）
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -51,8 +51,13 @@
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-無設計層面阻塞。M2c-3 第一批內容（19 張卡片/房間）已草擬並用真實內容跑過驗證，**開發者正在審核，審核完再繼續**。**待辦**：
-1. 本次工作用的 worktree（`.claude/worktrees/m2c4-m2c5-action-and-haunt`，分支 `worktree-m2c4-m2c5-action-and-haunt`）目前被鎖定為進行中 session 的作業目錄，無法在該 session 內移除——下次開新 session 時，如果確認已經不在該 worktree 裡工作，記得執行 `git worktree remove` 清掉並刪除本地分支（遠端分支/內容都已經安全合併進 `main`，這只是收尾清潔，不影響任何功能）
+無設計層面阻塞。M2c-3 第一批內容（19 張卡片/房間）已草擬並用真實內容跑過驗證，**開發者審核中**。**待辦**：
+1. **worktree 清理，已確認兩次無法在 Claude Code session 內完成**：`.claude/worktrees/m2c4-m2c5-action-and-haunt`（分支 `worktree-m2c4-m2c5-action-and-haunt`）被鎖定為「進行中 session 的作業目錄」，只要是還在用這個 worktree 當作業目錄的 Claude Code session，`git worktree remove` 一律會被 `locked working tree` 擋下（強制解鎖有風險：這是 session 自己正在使用的環境，強制移除可能讓當下 session 壞掉，不能貿然執行）。**內容/分支都已安全合併進 `main`，這個 worktree 只是收尾清潔，不影響任何功能，不急**。真的要清掉的話，兩個辦法：(a) 開發者自己在 Claude Code **之外**的終端機執行：
+   ```bash
+   git worktree remove --force "C:/Users/User/Desktop/Betrayal at House on the Hill/.claude/worktrees/m2c4-m2c5-action-and-haunt"
+   git branch -D worktree-m2c4-m2c5-action-and-haunt
+   ```
+   (b) 開一個**不使用**這個 worktree 當作業目錄的全新 Claude Code session 執行同樣指令
 2. commit `52cdd1d` 因操作疏失把「`modifiers.js` 的 `removeWhen` 改可選」這個程式碼修正跟「M2c-3 第一批內容草稿」這個資料變更合併成同一筆提交了——功能跟測試都正確，只是這筆 commit 訊息只提到程式碼修正沒提到內容，之後看 commit 歷史對照時要注意這點，不是漏推或漏提交
 
 ## 下一步行動 (Next Steps)
