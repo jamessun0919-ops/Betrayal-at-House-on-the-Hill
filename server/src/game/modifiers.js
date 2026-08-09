@@ -5,12 +5,19 @@ function generateModifierId() {
   return `modifier_${modifierCounter}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function isValidRemoveWhenEntry(entry) {
+  return Boolean(entry) && typeof entry.type === 'string' && entry.type.length > 0;
+}
+
 function attachModifier(entity, { effects, removeWhen }) {
   if (!Array.isArray(effects) || effects.length === 0) {
     throw new Error('INVALID_MODIFIER_EFFECTS');
   }
-  if (removeWhen !== undefined && (!removeWhen || typeof removeWhen.type !== 'string' || removeWhen.type.length === 0)) {
-    throw new Error('INVALID_REMOVE_WHEN');
+  if (removeWhen !== undefined) {
+    const conditions = Array.isArray(removeWhen) ? removeWhen : [removeWhen];
+    if (conditions.length === 0 || !conditions.every(isValidRemoveWhenEntry)) {
+      throw new Error('INVALID_REMOVE_WHEN');
+    }
   }
   const modifier = { id: generateModifierId(), effects, removeWhen };
   entity.modifiers = entity.modifiers || [];
@@ -27,13 +34,18 @@ function removeModifier(entity, modifierId) {
   modifiers.splice(index, 1);
 }
 
-function matchesRemoveWhen(removeWhen, context) {
-  if (!removeWhen) return false;
-  if (removeWhen.type !== context.type) return false;
-  if (removeWhen.type === 'holdsItem') {
-    return removeWhen.itemId === context.itemId;
+function matchesOneRemoveWhen(condition, context) {
+  if (condition.type !== context.type) return false;
+  if (condition.type === 'holdsItem') {
+    return condition.itemId === context.itemId;
   }
   return true;
+}
+
+function matchesRemoveWhen(removeWhen, context) {
+  if (!removeWhen) return false;
+  const conditions = Array.isArray(removeWhen) ? removeWhen : [removeWhen];
+  return conditions.some((condition) => matchesOneRemoveWhen(condition, context));
 }
 
 function checkRemoveConditions(entity, context) {

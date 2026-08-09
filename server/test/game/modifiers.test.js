@@ -51,6 +51,36 @@ test('checkRemoveConditions never matches a permanent modifier that has no remov
   expect(player.modifiers).toHaveLength(1);
 });
 
+test('attachModifier accepts removeWhen as an array of conditions (e.g. 電池耗盡: either condition removes it)', () => {
+  const player = {};
+  const modifier = attachModifier(player, {
+    effects: [{ hookType: 'blocksOpenDoor' }],
+    removeWhen: [{ type: 'meetsAnotherPlayer' }, { type: 'holdsItem', itemId: 'item_010' }],
+  });
+  expect(player.modifiers).toEqual([modifier]);
+});
+
+test('attachModifier throws INVALID_REMOVE_WHEN when the removeWhen array is empty or contains a malformed entry', () => {
+  const effects = [{ hookType: 'blocksOpenDoor' }];
+  expect(() => attachModifier({}, { effects, removeWhen: [] })).toThrow('INVALID_REMOVE_WHEN');
+  expect(() => attachModifier({}, { effects, removeWhen: [{ type: 'meetsAnotherPlayer' }, {}] })).toThrow('INVALID_REMOVE_WHEN');
+});
+
+test('checkRemoveConditions removes a modifier whose removeWhen array matches on any one condition', () => {
+  const player = {};
+  attachModifier(player, {
+    effects: [{ hookType: 'blocksOpenDoor' }],
+    removeWhen: [{ type: 'meetsAnotherPlayer' }, { type: 'holdsItem', itemId: 'item_010' }],
+  });
+  // Neither condition matches yet.
+  expect(checkRemoveConditions(player, { type: 'holdsItem', itemId: 'item_099' })).toEqual([]);
+  expect(player.modifiers).toHaveLength(1);
+  // The second condition in the array matches.
+  const removed = checkRemoveConditions(player, { type: 'holdsItem', itemId: 'item_010' });
+  expect(removed).toHaveLength(1);
+  expect(player.modifiers).toHaveLength(0);
+});
+
 test('removeModifier removes the matching modifier by id', () => {
   const player = {};
   const a = attachModifier(player, { effects: [{ hookType: 'onBeforeRoll', delta: 1 }], removeWhen: { type: 'leavesRoom' } });
