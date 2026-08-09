@@ -10,7 +10,7 @@
       { "min": 0, "max": 0, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -2 }] }
     ]
   }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_004", "name": "狗", "text": "玩家的力量及意志上升一個級別，如果失去狗的追隨，玩家的意志及力量下降一個級別。玩家的回合中可差遣這個動物前往最多六格的房間撿拾或丟棄一件物品，完成後即刻回到玩家身邊，狗不可被丟棄、竊盜或轉交", "effects": [], "category": "general", "needsCustomLogic": true },
+  { "id": "omen_004", "name": "犬靈", "text": "玩家的力量及意志上升一個級別，如果失去犬靈的追隨，玩家的意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取物品，犬靈不可被丟棄、竊盜或轉交", "effects": [], "category": "general", "needsCustomLogic": true },
   { "id": "omen_005", "name": "女孩", "text": "玩家的意志和知識上升一個級別．如果失去女孩的追隨，知識和意志下降一個級別。不可被偷竊、丟棄和轉交", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }], "category": "general", "needsCustomLogic": false },
   { "id": "omen_006", "name": "聖符", "text": "玩家的意志上升兩個級別，若玩家失去聖符，玩家的意志下降兩個級別", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 2 }], "category": "general", "needsCustomLogic": false },
   { "id": "omen_007", "name": "瘋漢", "text": "瘋漢跟隨著玩家，力量上升兩個級別，意志下降兩個級別。若失去瘋漢追隨，力量下降兩個級別，意志上升兩個級別。不可被偷竊、丟棄及轉交", "effects": [{ "type": "stat_change", "stat": "might", "delta": 2 }, { "type": "stat_change", "stat": "sanity", "delta": -2 }], "category": "general", "needsCustomLogic": false },
