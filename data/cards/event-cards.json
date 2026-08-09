@@ -4,8 +4,21 @@
     "name": "腐敗惡臭",
     "description": "玩家聞到一陣腐敗、血腥的臭味",
     "text": "玩家以意志進行考驗，骰數大於等於５：玩家忍受了這股惡臭，意志上升一個級別；骰數１至４：玩家受到惡臭的影響，力量下降一個級別；骰數０：玩家感覺嚴重不適，所有屬性下降一個級別",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "dice_check",
+      "stat": "sanity",
+      "tiers": [
+        { "min": 5, "max": 8, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }] },
+        { "min": 1, "max": 4, "effects": [{ "type": "stat_change", "stat": "might", "delta": -1 }] },
+        { "min": 0, "max": 0, "effects": [
+          { "type": "stat_change", "stat": "might", "delta": -1 },
+          { "type": "stat_change", "stat": "speed", "delta": -1 },
+          { "type": "stat_change", "stat": "knowledge", "delta": -1 },
+          { "type": "stat_change", "stat": "sanity", "delta": -1 }
+        ] }
+      ]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_002",
@@ -36,24 +49,39 @@
     "name": "不起眼的櫃子",
     "description": "玩家在房間的角落裡找到了一個不起眼的櫃子",
     "text": "投擲兩顆骰子，骰數３至４：抽取一張物品卡，骰數０至２：空空如也，無事發生",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "dice_check",
+      "diceCount": 2,
+      "tiers": [
+        { "min": 3, "max": 4, "effects": [{ "type": "draw_card", "deck": "item", "count": 1 }] },
+        { "min": 0, "max": 2, "effects": [] }
+      ]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_006",
     "name": "滴答聲",
     "description": "玩家一進入這個房間，腦海中就不斷出現惱人的水滴聲",
     "text": "將「水滴」標記，放在此房間中，任何人物在此房間進行能力考驗時，減少一顆骰子（最少仍需擲一顆）",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "persistent_modifier",
+      "appliesTo": "room",
+      "effects": [{ "hookType": "onBeforeRoll", "delta": -1 }]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_007",
     "name": "祈禱聲",
     "description": "玩家一進入這個房間，腦海中出現了莊嚴神聖的祈禱聲",
     "text": "將「祈禱」標記，放在此房間中，任何人物在此房間進行能力考驗時，增加一顆骰子（最多八顆）",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "persistent_modifier",
+      "appliesTo": "room",
+      "effects": [{ "hookType": "onBeforeRoll", "delta": 1 }]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_008",
@@ -68,16 +96,41 @@
     "name": "挑釁的幻覺",
     "description": "玩家眼前的牆壁上出現了玩家最厭惡痛恨的人的面孔，玩家用力朝面前的牆壁打去",
     "text": "玩家以意志進行考驗，骰數大於等於４：玩家理智克制了自己的行動，無事發生；骰數０到３：在混亂之中玩家扭傷了手腕，力量降低一個級別",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "dice_check",
+      "stat": "sanity",
+      "tiers": [
+        { "min": 4, "max": 8, "effects": [] },
+        { "min": 0, "max": 3, "effects": [{ "type": "stat_change", "stat": "might", "delta": -1 }] }
+      ]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_010",
     "name": "電話鈴聲",
     "description": "從房間的角落裡的骨董電話傳出鈴聲，玩家接起後話筒對面出了一道謎題。",
     "text": "玩家以知識進行考驗，骰數大於等於４：任意選擇一項能力提升一個級別；骰數０到３：玩家受到了嘲笑，除此之外無事發生",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "dice_check",
+      "stat": "knowledge",
+      "tiers": [
+        { "min": 4, "max": 8, "effects": [{
+          "type": "choice",
+          "description": "選擇一項能力提升一個級別",
+          "timeoutMs": 20000,
+          "defaultOptionId": "might",
+          "options": [
+            { "optionId": "might", "label": "力量", "effects": [{ "type": "stat_change", "stat": "might", "delta": 1 }] },
+            { "optionId": "speed", "label": "速度", "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }] },
+            { "optionId": "knowledge", "label": "知識", "effects": [{ "type": "stat_change", "stat": "knowledge", "delta": 1 }] },
+            { "optionId": "sanity", "label": "意志", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }] }
+          ]
+        }] },
+        { "min": 0, "max": 3, "effects": [] }
+      ]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_011",

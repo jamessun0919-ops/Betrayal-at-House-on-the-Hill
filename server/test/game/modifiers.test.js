@@ -30,11 +30,25 @@ test('attachModifier throws INVALID_MODIFIER_EFFECTS for missing or empty effect
   expect(() => attachModifier({}, { removeWhen: { type: 'leavesRoom' } })).toThrow('INVALID_MODIFIER_EFFECTS');
 });
 
-test('attachModifier throws INVALID_REMOVE_WHEN for a missing or malformed removeWhen', () => {
+test('attachModifier throws INVALID_REMOVE_WHEN for a malformed removeWhen', () => {
   const effects = [{ hookType: 'onBeforeRoll', delta: 1 }];
-  expect(() => attachModifier({}, { effects })).toThrow('INVALID_REMOVE_WHEN');
   expect(() => attachModifier({}, { effects, removeWhen: {} })).toThrow('INVALID_REMOVE_WHEN');
   expect(() => attachModifier({}, { effects, removeWhen: null })).toThrow('INVALID_REMOVE_WHEN');
+});
+
+test('attachModifier allows an omitted removeWhen for a permanent modifier with no removal condition', () => {
+  const player = {};
+  const modifier = attachModifier(player, { effects: [{ hookType: 'onBeforeRoll', delta: -1 }] });
+  expect(modifier.removeWhen).toBeUndefined();
+  expect(player.modifiers).toEqual([modifier]);
+});
+
+test('checkRemoveConditions never matches a permanent modifier that has no removeWhen', () => {
+  const player = {};
+  attachModifier(player, { effects: [{ hookType: 'onBeforeRoll', delta: -1 }] });
+  const removed = checkRemoveConditions(player, { type: 'meetsAnotherPlayer' });
+  expect(removed).toEqual([]);
+  expect(player.modifiers).toHaveLength(1);
 });
 
 test('removeModifier removes the matching modifier by id', () => {

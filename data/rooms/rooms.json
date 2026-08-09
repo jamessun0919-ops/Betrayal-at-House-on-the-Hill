@@ -264,7 +264,14 @@
     "doors": 1,
     "drawType": "item",
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
-    "effects": [],
+    "effects": [{
+      "type": "dice_check",
+      "stat": "knowledge",
+      "tiers": [
+        { "min": 6, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
+        { "min": 0, "max": 5, "effects": [] }
+      ]
+    }],
     "needsCustomLogic": true
   },
   {

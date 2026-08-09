@@ -24,20 +24,26 @@
     "name": "治療藥膏",
     "description": "",
     "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的力量、速度或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
-    "effects": [],
+    "effects": [
+      { "type": "stat_change", "stat": "might", "restoreToBase": true },
+      { "type": "stat_change", "stat": "speed", "restoreToBase": true }
+    ],
     "category": "consumable",
     "canTargetOthers": true,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_004",
     "name": "嗅鹽",
     "description": "",
     "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的知識、意志或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
-    "effects": [],
+    "effects": [
+      { "type": "stat_change", "stat": "knowledge", "restoreToBase": true },
+      { "type": "stat_change", "stat": "sanity", "restoreToBase": true }
+    ],
     "category": "consumable",
     "canTargetOthers": true,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_005",
@@ -84,10 +90,17 @@
     "name": "魔術方塊",
     "description": "",
     "text": "玩家在其回合內可以進行知識考驗，骰數大於等於六：抽取兩張物品牌，魔術方塊消失。骰數０至五：沒有事情發生",
-    "effects": [],
+    "effects": [{
+      "type": "dice_check",
+      "stat": "knowledge",
+      "tiers": [
+        { "min": 6, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
+        { "min": 0, "max": 5, "effects": [] }
+      ]
+    }],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_010",

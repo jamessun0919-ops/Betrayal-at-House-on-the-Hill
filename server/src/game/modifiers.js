@@ -9,7 +9,7 @@ function attachModifier(entity, { effects, removeWhen }) {
   if (!Array.isArray(effects) || effects.length === 0) {
     throw new Error('INVALID_MODIFIER_EFFECTS');
   }
-  if (!removeWhen || typeof removeWhen.type !== 'string' || removeWhen.type.length === 0) {
+  if (removeWhen !== undefined && (!removeWhen || typeof removeWhen.type !== 'string' || removeWhen.type.length === 0)) {
     throw new Error('INVALID_REMOVE_WHEN');
   }
   const modifier = { id: generateModifierId(), effects, removeWhen };
@@ -28,6 +28,7 @@ function removeModifier(entity, modifierId) {
 }
 
 function matchesRemoveWhen(removeWhen, context) {
+  if (!removeWhen) return false;
   if (removeWhen.type !== context.type) return false;
   if (removeWhen.type === 'holdsItem') {
     return removeWhen.itemId === context.itemId;
