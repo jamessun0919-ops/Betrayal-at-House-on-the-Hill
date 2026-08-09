@@ -1612,3 +1612,49 @@ test('game:move into a room whose event card draws an item card privately notifi
   clientB.close();
   httpServer.close();
 });
+
+test('drawing an omen card adds the omen itself to the player inventory, like an item', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_002', name: '書', effects: [{ type: 'stat_change', stat: 'knowledge', delta: 1 }] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const gameState = getGameState(gameManager, roomCode);
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'omen_002' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: also finds items among held omens, not just content.cards.items', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_003', name: '水晶球', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'omen_003' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_003' }, resolve));
+  expect(result.error).toBeUndefined();
+  await effectResolvedPromise;
+
+  expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

@@ -20,7 +20,7 @@ const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
-const { removeItem } = require('./game/playerEntity');
+const { addItem, removeItem } = require('./game/playerEntity');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
@@ -197,7 +197,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         let consumeItemIfApplied = false;
 
         if (actionType === 'item') {
-          const itemContent = content.cards.items.find((i) => i.id === itemId);
+          const itemContent = content.cards.items.find((i) => i.id === itemId) || content.cards.omens.find((o) => o.id === itemId);
           selectOptions.itemCanTargetOthers = Boolean(itemContent && itemContent.canTargetOthers);
           sourceEffects = itemContent ? itemContent.effects : [];
           sourceId = itemId;
@@ -391,6 +391,12 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   }
   const card = drawCard(deck);
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name });
+
+  if (deckType === 'omen') {
+    // Omens are kept by the player like items -- some (crystal ball, mask) have
+    // an active use ability invoked later via game:selectAction's 'item' path.
+    addItem(getPlayer(gameState, playerId), { id: card.id });
+  }
 
   if (deckType === 'omen' && !gameState.hauntStarted) {
     gameState.omenCount += 1;
