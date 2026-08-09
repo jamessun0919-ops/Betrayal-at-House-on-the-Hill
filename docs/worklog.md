@@ -311,3 +311,27 @@
 - 分支已推送至 GitHub 備份，worktree 保留供審查後續修正使用
 - M2c-3（36 張卡片＋房間操作 effects 內容）、M2d（簡易使用者介面）仍在排隊，待 M2c-4/M2c-5 審查與合併後接續
 
+## 2026-08-09 第 1 次工作階段
+
+**當日工作內容**：
+- 讀取 Handover，確認 M2c-4/M2c-5 分支狀態沒有變動，開始優先處理獨立審查
+- 用 `requesting-code-review` 技能派出獨立審查（`general-purpose` subagent，比對 base/head SHA 完整 diff），特別要求重點檢查前次新增的兩個機制：async-choice-resolution 慣例是否正確套用在道具/操作動作、消耗品移除的 `appliedCount` 邏輯是否正確
+- 審查結果：核心機制與硬性不變量（預兆卡不可為消耗品、開新房間後行動力歸零不可能同回合操作、`game:cardDrawn` 保留 `cardId`）皆通過檢查，288 測試全綠；但抓到 1 個 Important 級潛在問題——`handleEffectResolveResult` 的 `removeItem` 呼叫沒有包 try/catch，若未來消耗品道具自己的 `effects` 又額外寫了指向自己的 `lose_item`，會造成重複移除拋錯，且會在非同步選擇解析路徑（`game:effectPromptRespond`／逾時）跳過推進回合與廣播狀態——跟 M2c-2 的 Critical C1 是同一類問題，透過新增的 `removeItem` 呼叫點重新出現
+- 依 TDD 流程先寫失敗測試重現這個潛在 bug（真的讓一個消耗品道具的 choice 選項效果包含指向自己的 `lose_item`，確認會拋 `ITEM_NOT_FOUND` 並跳過收尾動作），修好後（`removeItem` 包 try/catch，視「已不存在」為良性 no-op）確認測試轉綠，另外補一個「消耗品透過非同步選擇路徑正確移除」的涵蓋測試（審查同時指出的 Important #2 缺口），全套 290 測試通過後提交推送
+- 用 `finishing-a-development-branch` 流程合併：切回 `main`、`git pull`（第一次遇到暫時性網路錯誤，重試 `git fetch` 後正常）、合併 `worktree-m2c4-m2c5-action-and-haunt` 分支（乾淨合併無衝突）、合併後重跑全套測試（290/290）確認無誤才推送 `main`
+- 嘗試依慣例清理 worktree，發現該 worktree 目前正被本次 session 鎖定為作業目錄（`git worktree remove` 報錯 `locked working tree`），判斷不應該強制解鎖刪除自己正在使用中的目錄，保留待下次 session 處理，僅在 Handover 記錄待辦
+- 逐項列出 `item-cards.json`（12張已填內容）／`omen-cards.json`（13張）目前的 `category`/`canTargetOthers` 草稿值供開發者對照實體卡片審核，開發者確認全數正確，無需修改
+
+**完成項目**：
+- **M2c-4/M2c-5 正式合併進 `main`**（含審查抓到並修復的 1 個 Important 問題），測試 290/290 全綠
+- `item-cards.json`/`omen-cards.json` 的 `category`/`canTargetOthers` 欄位已由開發者確認無誤
+- Handover.md 更新：M2c-4/M2c-5 標記完成、新增獨立審查發現的除錯注意事項條目、待辦清單移除已完成項目、新增 worktree 清理待辦
+
+**遇到瓶頸**：
+- （已解決）合併前 `git pull` 一度出現「Empty reply from server」的暫時性網路錯誤，改用 `git fetch` 重試後正常，本地 `main` 其實已經跟遠端同步，不是真的落後
+- （非阻塞，記錄待辦）功能分支的 worktree 因為是本次 session 的作業目錄而被鎖定，無法照慣例當場清理，內容已安全合併進 `main`，只是收尾清潔工作延後
+
+**開發者交代備忘事項**：
+- 下一階段工作：正式開始 M2c-3（36 張事件/道具卡的 `effects` 內容＋房間操作類 effects＋`omen-cards.json` 補 `needsCustomLogic` 欄位），撰寫時要遵守新增的規則——消耗品道具的 `effects` 不要額外寫指向自己的 `lose_item`
+- 開新 session 時記得檢查 `.claude/worktrees/m2c4-m2c5-action-and-haunt` 是否還被鎖定，能清就清掉（`git worktree remove` + `git branch -d worktree-m2c4-m2c5-action-and-haunt`）
+
