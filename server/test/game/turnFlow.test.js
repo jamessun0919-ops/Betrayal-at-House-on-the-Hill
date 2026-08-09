@@ -143,11 +143,11 @@ test('moveToRoom throws NOT_YOUR_TURN when called by a player who is not the cur
   expect(() => moveToRoom(gameState, 'p2', 'east')).toThrow('NOT_YOUR_TURN');
 });
 
-test('selectAction deducts 1 action point and returns a pending marker', () => {
+test('selectAction deducts 1 action point and returns a pending marker for attack (still a stub)', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   const startingAP = player.actionPoints;
-  const result = selectAction(gameState, 'p1', 'item');
-  expect(result).toEqual({ kind: 'item', pending: true });
+  const result = selectAction(gameState, 'p1', 'attack');
+  expect(result).toEqual({ kind: 'attack', pending: true });
   expect(player.actionPoints).toBe(startingAP - 1);
 });
 
@@ -270,4 +270,61 @@ test('useStairs throws NOT_YOUR_TURN when called by a player who is not the curr
   gameState.turnOrder = ['p1', 'p2'];
   gameState.currentPlayerIndex = 0; // p1's turn
   expect(() => useStairs(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+});
+
+test('selectAction item: succeeds when the player holds the item, defaults target to self', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_003' });
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_003' });
+  expect(result).toEqual({ kind: 'item', itemId: 'item_003', targetPlayerId: 'p1' });
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction item: throws ITEM_NOT_HELD when the player does not have the item', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003' })).toThrow('ITEM_NOT_HELD');
+});
+
+test('selectAction item: succeeds targeting another player in the same room when itemCanTargetOthers is true', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  // addPlayer always places new players at the entrance hall (0,0), same as p1.
+  player.inventory.push({ id: 'item_003' });
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_003', targetPlayerId: 'p2', itemCanTargetOthers: true });
+  expect(result).toEqual({ kind: 'item', itemId: 'item_003', targetPlayerId: 'p2' });
+  expect(player2.floor).toBe('ground'); // sanity check target resolved correctly
+});
+
+test('selectAction item: throws ITEM_CANNOT_TARGET_OTHERS when targeting another player without permission', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.inventory.push({ id: 'item_010' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_010', targetPlayerId: 'p2', itemCanTargetOthers: false })
+  ).toThrow('ITEM_CANNOT_TARGET_OTHERS');
+});
+
+test('selectAction item: throws TARGET_NOT_IN_ROOM when the target is elsewhere, even with itemCanTargetOthers', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player2.x = 5; // move p2 out of the entrance hall
+  player.inventory.push({ id: 'item_003' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', targetPlayerId: 'p2', itemCanTargetOthers: true })
+  ).toThrow('TARGET_NOT_IN_ROOM');
+});
+
+test('selectAction room_action: succeeds when hasRoomAction is true', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'room_action', { hasRoomAction: true });
+  expect(result).toEqual({ kind: 'room_action' });
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when hasRoomAction is false or omitted', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => selectAction(gameState, 'p1', 'room_action', { hasRoomAction: false })).toThrow('NO_ROOM_ACTION_AVAILABLE');
+  expect(() => selectAction(gameState, 'p1', 'room_action')).toThrow('NO_ROOM_ACTION_AVAILABLE');
 });

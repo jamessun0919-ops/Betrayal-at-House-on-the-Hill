@@ -15,9 +15,12 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
+const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
+const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
+const { removeItem } = require('./game/playerEntity');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
@@ -184,13 +187,53 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        const { actionType } = payload || {};
-        const result = selectAction(gameState, playerId, actionType);
+        const { actionType, itemId, targetPlayerId } = payload || {};
+        const selectOptions = { itemId, targetPlayerId };
+        let sourceEffects = null;
+        let sourceId = null;
+        let consumeItemIfApplied = false;
+
+        if (actionType === 'item') {
+          const itemContent = content.cards.items.find((i) => i.id === itemId);
+          selectOptions.itemCanTargetOthers = Boolean(itemContent && itemContent.canTargetOthers);
+          sourceEffects = itemContent ? itemContent.effects : [];
+          sourceId = itemId;
+          consumeItemIfApplied = Boolean(itemContent && itemContent.category === 'consumable');
+        }
+
+        if (actionType === 'room_action') {
+          const currentPlayer = getPlayer(gameState, playerId);
+          const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));
+          const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
+          sourceEffects =
+            roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
+              ? roomDefinition.effects
+              : null;
+          selectOptions.hasRoomAction = Boolean(sourceEffects);
+          sourceId = placedRoom.roomId;
+        }
+
+        const result = selectAction(gameState, playerId, actionType, selectOptions);
         ack(result);
-        if (result.pending) {
+
+        let stillResolving = false;
+        if (sourceEffects) {
+          try {
+            const resolverEntry = getResolver(effectResolverManager, roomCode);
+            const targetForEffects = result.targetPlayerId || playerId;
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
+            stillResolving = outcome.pending;
+          } catch (err) {
+            console.error('selectAction effect resolution error', err);
+          }
+        } else if (result.pending) {
           io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
         }
-        advanceTurnIfOver(gameState, playerId);
+
+        if (!stillResolving) {
+          advanceTurnIfOver(gameState, playerId);
+        }
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:selectAction error', err);
@@ -237,13 +280,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'NO_ACTIVE_EFFECT_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, cardId, options } = resolverEntry.pendingChoice;
+        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied } = resolverEntry.pendingChoice;
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
         const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
         const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now() });
-        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, cardId, nextResult, effectChoiceTimeouts);
+        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
         if (!resolveOutcome.pending) {
           advanceTurnIfOver(gameState, choicePlayerId);
         }
@@ -321,6 +364,13 @@ function hasPendingEffectChoice(effectResolverManager, roomCode) {
   return Boolean(resolverEntry && resolverEntry.pendingChoice);
 }
 
+function findRoomDefinition(content, roomId) {
+  return (
+    content.rooms.find((r) => r.id === roomId) ||
+    content.startingRooms.find((r) => r.id === roomId)
+  );
+}
+
 function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts) {
   const deckField = DECK_FIELD_BY_TYPE[deckType];
   if (!deckField) {
@@ -332,6 +382,17 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   }
   const card = drawCard(deck);
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name });
+
+  if (deckType === 'omen' && !gameState.hauntStarted) {
+    gameState.omenCount += 1;
+    const rollSum = rollDice(gameState.omenCount);
+    io.to(roomCode).emit('game:hauntCheck', { omenCount: gameState.omenCount, rollSum });
+    if (rollSum > 5) {
+      gameState.hauntStarted = true;
+      io.to(roomCode).emit('game:hauntStarted', { omenCount: gameState.omenCount, rollSum });
+    }
+  }
+
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, { now: Date.now() });
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts);
@@ -341,7 +402,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
 // now or wait until the choice this call may have just opened gets resolved
 // (see M2c-2 final review, Critical C1: advancing the turn while a choice is
 // still pending let a second card draw collide with the first).
-function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, cardId, effectResult, effectChoiceTimeouts) {
+function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   if (effectResult.pending) {
     resolverEntry.pendingChoice = {
@@ -349,7 +410,8 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       options: effectResult.options,
       defaultOptionId: effectResult.defaultOptionId,
       playerId,
-      cardId,
+      sourceId,
+      consumeItemIfApplied,
     };
     io.to(roomCode).emit('game:effectPendingChoice', {
       playerId,
@@ -365,7 +427,19 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return { pending: true };
   }
   resolverEntry.pendingChoice = null;
-  io.to(roomCode).emit('game:effectResolved', { playerId, cardId });
+  if (consumeItemIfApplied && effectResult.appliedCount > 0) {
+    const player = getPlayer(gameState, playerId);
+    try {
+      removeItem(player, sourceId);
+    } catch (err) {
+      // The item's own effects may have already removed it (e.g. an explicit
+      // lose_item targeting itself) -- treat "already gone" as a benign no-op
+      // rather than letting this throw skip turn-advancement/state-broadcast
+      // in the callers of this function (M2c-4/M2c-5 independent review, Important #1).
+      console.error('consumeItemIfApplied removeItem failed (already removed?)', err);
+    }
+  }
+  io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
   return { pending: false };
 }
 
@@ -382,7 +456,7 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     const resolverEntry = getResolver(effectResolverManager, roomCode);
     if (!resolverEntry || !resolverEntry.pendingChoice) return;
     effectChoiceTimeouts.delete(roomCode);
-    const { playerId, cardId, options, defaultOptionId } = resolverEntry.pendingChoice;
+    const { playerId, sourceId, options, defaultOptionId, consumeItemIfApplied } = resolverEntry.pendingChoice;
     const result = resolvePromptTimeout(resolverEntry.promptState, { promptId, defaultOptionId });
     if (!result) {
       return;
@@ -390,7 +464,7 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     io.to(roomCode).emit('game:promptResolved', result);
     const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
     const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now() });
-    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, cardId, nextResult, effectChoiceTimeouts);
+    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
     if (!resolveOutcome.pending) {
       advanceTurnIfOver(gameState, playerId);
     }

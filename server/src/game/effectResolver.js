@@ -112,6 +112,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     throw new Error('INVALID_EFFECTS_LIST');
   }
   requirePlayer(gameState, playerId);
+  let appliedCount = 0;
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -121,8 +122,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     if (result && result.pending) {
       return result;
     }
+    appliedCount += (result && typeof result.appliedCount === 'number') ? result.appliedCount : 1;
   }
-  return { pending: false };
+  return { pending: false, appliedCount };
 }
 
 module.exports = { resolveEffects, resolveChoiceOption };
