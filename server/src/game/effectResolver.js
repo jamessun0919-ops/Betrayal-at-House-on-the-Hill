@@ -24,7 +24,7 @@ function handleStatChange(gameState, playerId, effect) {
     if (!statTrack) {
       throw new Error('UNKNOWN_STAT');
     }
-    const delta = statTrack.baseIndex - statTrack.currentIndex;
+    const delta = Math.max(0, statTrack.baseIndex - statTrack.currentIndex);
     changeStat(player, effect.stat, delta, gameState.hauntStarted);
   } else {
     changeStat(player, effect.stat, effect.delta, gameState.hauntStarted);

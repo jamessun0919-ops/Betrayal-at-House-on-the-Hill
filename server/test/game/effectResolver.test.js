@@ -43,6 +43,16 @@ test('resolveEffects restores a stat to its baseIndex when restoreToBase is set'
   expect(player.stats.might.currentIndex).toBe(2);
 });
 
+test('resolveEffects does not lower a stat that is already at or above baseIndex when restoreToBase is set', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.stats.might.currentIndex = 4; // already above base (baseIndex 2)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', restoreToBase: true },
+  ]);
+  expect(player.stats.might.currentIndex).toBe(4); // unchanged, restoreToBase only raises
+});
+
 test('resolveEffects processes multiple effects in order', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
