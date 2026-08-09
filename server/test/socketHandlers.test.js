@@ -1442,3 +1442,97 @@ test('a haunt check that does not exceed 5 does not set hauntStarted', async () 
   clientB.close();
   httpServer.close();
 });
+
+test('game:selectAction item: a consumable item resolved via a pending choice is removed after the choice applies', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_020',
+        name: '測試選擇型消耗品',
+        effects: [{
+          type: 'choice',
+          description: '選擇效果',
+          options: [
+            { optionId: 'opt_apply', label: '套用', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_apply',
+        }],
+        category: 'consumable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_020' });
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  const selectResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_020' }, resolve));
+  expect(selectResult.error).toBeUndefined();
+  const pendingChoice = await pendingChoicePromise;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const respondResult = await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_apply' }, resolve);
+  });
+  expect(respondResult.error).toBeUndefined();
+
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.sourceId).toBe('item_020');
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]); // consumed after the choice actually applied
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item: a consumable item whose choice effect also removes itself does not break the async resolution path (double-removal guard)', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_021',
+        name: '測試自我移除消耗品',
+        effects: [{
+          type: 'choice',
+          description: '選擇效果',
+          options: [
+            { optionId: 'opt_remove', label: '移除', effects: [{ type: 'lose_item', itemId: 'item_021' }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_remove',
+        }],
+        category: 'consumable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_021' });
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_021' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const respondResult = await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_remove' }, resolve);
+  });
+  // The item's own effect already removed it; consumeItemIfApplied's follow-up
+  // removeItem call must not throw and must not skip turn-advancement/broadcast
+  // (see M2c-4/M2c-5 independent review, Important #1).
+  expect(respondResult.error).toBeUndefined();
+  await updatePromise; // game:stateUpdate must still fire after the choice resolves
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]); // removed exactly once, no crash
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

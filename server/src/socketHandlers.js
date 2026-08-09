@@ -429,7 +429,15 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
   resolverEntry.pendingChoice = null;
   if (consumeItemIfApplied && effectResult.appliedCount > 0) {
     const player = getPlayer(gameState, playerId);
-    removeItem(player, sourceId);
+    try {
+      removeItem(player, sourceId);
+    } catch (err) {
+      // The item's own effects may have already removed it (e.g. an explicit
+      // lose_item targeting itself) -- treat "already gone" as a benign no-op
+      // rather than letting this throw skip turn-advancement/state-broadcast
+      // in the callers of this function (M2c-4/M2c-5 independent review, Important #1).
+      console.error('consumeItemIfApplied removeItem failed (already removed?)', err);
+    }
   }
   io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
   return { pending: false };
