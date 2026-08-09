@@ -18,8 +18,8 @@ function makeStats() {
   };
 }
 
-function makeGameStateWithPlayer(playerId = 'p1') {
-  const gameState = createGameState(STARTING_ROOMS, [{ id: 'room_x', doors: 2 }]);
+function makeGameStateWithPlayer(playerId = 'p1', cards = {}) {
+  const gameState = createGameState(STARTING_ROOMS, [{ id: 'room_x', doors: 2 }], cards);
   addPlayer(gameState, { playerId, name: 'Alice', stats: makeStats() });
   return gameState;
 }
@@ -87,6 +87,56 @@ test('resolveEffects lose_item propagates ITEM_NOT_FOUND when the player does no
   expect(() =>
     resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'lose_item', itemId: 'not_held' }])
   ).toThrow('ITEM_NOT_FOUND');
+});
+
+test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    items: [
+      { id: 'item_a', name: 'A', effects: [] },
+      { id: 'item_b', name: 'B', effects: [] },
+    ],
+  });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'draw_card', deck: 'item', count: 2 },
+  ]);
+  expect(result.appliedCount).toBe(2);
+  // createCardDeck shuffles on creation, so with both cards drawn the order
+  // is not deterministic -- compare as sets.
+  expect([...result.drawnCards].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+    { id: 'item_a', name: 'A' },
+    { id: 'item_b', name: 'B' },
+  ]);
+  expect([...gameState.players.get('p1').inventory].sort((a, b) => a.id.localeCompare(b.id))).toEqual([
+    { id: 'item_a' },
+    { id: 'item_b' },
+  ]);
+});
+
+test('resolveEffects draw_card stops early and reports a partial appliedCount when the deck runs out', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    items: [{ id: 'item_a', name: 'A', effects: [] }],
+  });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'draw_card', deck: 'item', count: 2 },
+  ]);
+  expect(result.appliedCount).toBe(1);
+  expect(result.drawnCards).toEqual([{ id: 'item_a', name: 'A' }]);
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_a' }]);
+});
+
+test('resolveEffects draw_card reports appliedCount 0 and no drawnCards key when the deck is already empty', () => {
+  const gameState = makeGameStateWithPlayer('p1', { items: [] });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'draw_card', deck: 'item', count: 2 },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('resolveEffects draw_card throws UNKNOWN_DECK_TYPE for an unrecognized deck', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'draw_card', deck: 'monster', count: 1 }])
+  ).toThrow('UNKNOWN_DECK_TYPE');
 });
 
 test('resolveEffects persistent_modifier attaches to the player by default', () => {

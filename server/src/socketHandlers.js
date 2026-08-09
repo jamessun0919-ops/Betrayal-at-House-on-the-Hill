@@ -156,6 +156,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           try {
             const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts);
             stillResolving = drawOutcome.pending;
+            if (drawOutcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
+            }
           } catch (drawErr) {
             // A card-effect resolution failure (e.g. malformed content) must not
             // prevent the turn from advancing and the room from staying in sync —
@@ -224,6 +227,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
             stillResolving = outcome.pending;
+            if (outcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
+            }
           } catch (err) {
             console.error('selectAction effect resolution error', err);
           }
@@ -289,6 +295,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
         if (!resolveOutcome.pending) {
           advanceTurnIfOver(gameState, choicePlayerId);
+        }
+        if (resolveOutcome.drawnCards) {
+          socket.emit('game:cardsDrawn', { cards: resolveOutcome.drawnCards });
         }
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
         ack({});
@@ -440,7 +449,11 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     }
   }
   io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
-  return { pending: false };
+  const outcome = { pending: false };
+  if (Array.isArray(effectResult.drawnCards) && effectResult.drawnCards.length > 0) {
+    outcome.drawnCards = effectResult.drawnCards;
+  }
+  return outcome;
 }
 
 function clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts) {

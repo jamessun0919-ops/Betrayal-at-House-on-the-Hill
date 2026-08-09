@@ -4,6 +4,9 @@ const { attachModifier } = require('./modifiers');
 const { coordKey } = require('./boardGenerator');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
 const { createPrompt } = require('./promptState');
+const { hasCards, drawCard } = require('./cardDeck');
+
+const DECK_FIELD_BY_TYPE = { item: 'itemDeck', event: 'eventDeck', omen: 'omenDeck' };
 
 function requirePlayer(gameState, playerId) {
   const player = getPlayer(gameState, playerId);
@@ -71,6 +74,29 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   return resolveEffects(gameState, promptState, playerId, tier.effects, context);
 }
 
+function handleDrawCard(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  const deckField = DECK_FIELD_BY_TYPE[effect.deck];
+  if (!deckField) {
+    throw new Error('UNKNOWN_DECK_TYPE');
+  }
+  const deck = gameState[deckField];
+  const drawnCards = [];
+  for (let i = 0; i < effect.count; i += 1) {
+    if (!hasCards(deck)) {
+      break;
+    }
+    const card = drawCard(deck);
+    addItem(player, { id: card.id });
+    drawnCards.push({ id: card.id, name: card.name });
+  }
+  const result = { pending: false, appliedCount: drawnCards.length };
+  if (drawnCards.length > 0) {
+    result.drawnCards = drawnCards;
+  }
+  return result;
+}
+
 function handleChoice(gameState, promptState, playerId, effect, context) {
   const prompt = createPrompt(promptState, {
     type: 'effect_choice',
@@ -103,6 +129,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
+  draw_card: (gameState, promptState, playerId, effect) => handleDrawCard(gameState, playerId, effect),
   dice_check: (gameState, promptState, playerId, effect, context) => handleDiceCheck(gameState, promptState, playerId, effect, context),
   choice: (gameState, promptState, playerId, effect, context) => handleChoice(gameState, promptState, playerId, effect, context),
 });
@@ -113,6 +140,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   }
   requirePlayer(gameState, playerId);
   let appliedCount = 0;
+  let drawnCards = [];
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -123,8 +151,15 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
       return result;
     }
     appliedCount += (result && typeof result.appliedCount === 'number') ? result.appliedCount : 1;
+    if (result && Array.isArray(result.drawnCards)) {
+      drawnCards = drawnCards.concat(result.drawnCards);
+    }
   }
-  return { pending: false, appliedCount };
+  const output = { pending: false, appliedCount };
+  if (drawnCards.length > 0) {
+    output.drawnCards = drawnCards;
+  }
+  return output;
 }
 
 module.exports = { resolveEffects, resolveChoiceOption };

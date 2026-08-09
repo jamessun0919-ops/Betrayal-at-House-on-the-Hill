@@ -1536,3 +1536,79 @@ test('game:selectAction item: a consumable item whose choice effect also removes
   clientB.close();
   httpServer.close();
 });
+
+test('game:selectAction item: a draw_card effect privately notifies only the drawing player via game:cardsDrawn', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_030',
+        name: '測試魔術方塊',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 1,
+          tiers: [
+            { min: 2, max: 2, effects: [{ type: 'draw_card', deck: 'item', count: 1 }] },
+            { min: 0, max: 1, effects: [] },
+          ],
+        }],
+        category: 'consumable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_030' });
+
+  let otherClientReceivedCardsDrawn = false;
+  otherClient.on('game:cardsDrawn', () => {
+    otherClientReceivedCardsDrawn = true;
+  });
+
+  jest.spyOn(Math, 'random').mockReturnValue(0.99); // force the die's max face (2) -> hits the success tier
+
+  const cardsDrawnPromise = new Promise((resolve) => currentClient.once('game:cardsDrawn', resolve));
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_030' }, resolve));
+  await effectResolvedPromise;
+
+  const cardsDrawn = await cardsDrawnPromise;
+  expect(cardsDrawn.cards).toEqual([{ id: 'item_030', name: '測試魔術方塊' }]);
+  expect(otherClientReceivedCardsDrawn).toBe(false);
+
+  jest.restoreAllMocks();
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into a room whose event card draws an item card privately notifies only the mover via game:cardsDrawn', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{ id: 'event_099', name: '測試抽卡事件', effects: [{ type: 'draw_card', deck: 'item', count: 1 }] }],
+      items: [{ id: 'item_040', name: '測試抽到的道具', effects: [] }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient } = await setUpStartedGameWithContent(content);
+
+  let otherClientReceivedCardsDrawn = false;
+  otherClient.on('game:cardsDrawn', () => {
+    otherClientReceivedCardsDrawn = true;
+  });
+
+  const cardsDrawnPromise = new Promise((resolve) => currentClient.once('game:cardsDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const cardsDrawn = await cardsDrawnPromise;
+  expect(cardsDrawn.cards).toEqual([{ id: 'item_040', name: '測試抽到的道具' }]);
+  expect(otherClientReceivedCardsDrawn).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
