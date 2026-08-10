@@ -206,8 +206,8 @@ function pickupItemAction(gameState, player, itemId) {
   if (index === -1) {
     throw new Error('ITEM_NOT_IN_ROOM');
   }
-  room.droppedItems.splice(index, 1);
-  player.inventory.push({ id: itemId });
+  const [item] = room.droppedItems.splice(index, 1);
+  player.inventory.push(item);
   player.actionPoints -= 1;
   return { kind: 'item', mode: 'pickup', itemId };
 }

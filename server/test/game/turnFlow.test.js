@@ -405,6 +405,16 @@ test('selectAction item mode:leave preserves the item object\'s extra fields (e.
   expect(room.droppedItems).toEqual([{ id: 'omen_008', active: true }]);
 });
 
+test('selectAction item mode:leave then mode:pickup round-trips the item object without losing extra fields', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'omen_008', active: true });
+  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'leave' });
+  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'pickup' });
+  expect(player.inventory).toEqual([{ id: 'omen_008', active: true }]);
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  expect(room.droppedItems).toEqual([]);
+});
+
 test('selectAction item mode:leave throws ITEM_NOT_HELD when the player does not hold it', () => {
   const { gameState } = makeGameStateWithPlayer();
   expect(() =>
