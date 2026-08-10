@@ -157,7 +157,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
         }
-        const result = moveToRoom(gameState, playerId, direction);
+        const currentRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
+        const currentRoomDefinition = findRoomDefinition(content, currentRoom.roomId);
+        const leaveCheck = currentRoomDefinition ? currentRoomDefinition.leaveCheck : null;
+        const result = moveToRoom(gameState, playerId, direction, leaveCheck);
         ack(result);
 
         // Any modifier gated on "meets another player" (e.g. 電池耗盡) clears

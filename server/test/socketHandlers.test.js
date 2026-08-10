@@ -585,6 +585,34 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
   httpServer.close();
 });
 
+test('game:move applies a room\'s leaveCheck before allowing the player to move out, blocking on a failed roll', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  const startingAP = player.actionPoints;
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> face 0, guaranteed fail
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('leaveCheckFailed');
+  expect(player.x).toBe(0); // unmoved
+  expect(player.actionPoints).toBe(startingAP - 1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move rejects a caller who is not the current turn player', async () => {
   const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
 

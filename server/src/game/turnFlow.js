@@ -2,7 +2,8 @@ const { SIDES } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
 const { drawRoom, hasRoomForFloor } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
-const { movePlayerTo, resetActionPoints } = require('./playerEntity');
+const { movePlayerTo, resetActionPoints, getStatValue } = require('./playerEntity');
+const { rollDice } = require('./effectPipeline');
 
 const ACTION_TYPES = ['item', 'attack', 'room_action'];
 
@@ -41,7 +42,7 @@ function getAvailableDirections(gameState, playerId) {
   return results;
 }
 
-function moveToRoom(gameState, playerId, direction) {
+function moveToRoom(gameState, playerId, direction, leaveCheck = null, rng = Math.random) {
   const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
     throw new Error('NOT_YOUR_TURN');
@@ -54,6 +55,21 @@ function moveToRoom(gameState, playerId, direction) {
   if (!choice) {
     throw new Error('INVALID_MOVE_DIRECTION');
   }
+
+  if (leaveCheck) {
+    // e.g. 塔橋/雜亂的房間/藤蔓糾纏的溫室 -- leaving this room (either to an
+    // already-placed neighbor or by opening a new door) requires a stat
+    // check first. A failed check costs the same 1 AP a normal move
+    // attempt would, and never draws/places a new room -- the player never
+    // actually left, so nothing about the door they tried is revealed.
+    const diceCount = getStatValue(player, leaveCheck.stat);
+    const rolled = rollDice(diceCount, rng);
+    if (rolled < leaveCheck.min) {
+      player.actionPoints -= 1;
+      return { kind: 'leaveCheckFailed', rolled, required: leaveCheck.min };
+    }
+  }
+
   const delta = DIRECTION_DELTA[direction];
   const targetCoord = { x: player.x + delta.dx, y: player.y + delta.dy };
 
