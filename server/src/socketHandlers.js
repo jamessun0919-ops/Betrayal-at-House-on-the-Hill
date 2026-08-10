@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, selectAction, useStairs, endTurn } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
@@ -150,6 +150,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
         const { direction } = payload || {};
+        const player = getPlayer(gameState, playerId);
+        if (player.summons) {
+          const result = moveSummon(gameState, playerId, direction);
+          ack(result);
+          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+          return;
+        }
         const result = moveToRoom(gameState, playerId, direction);
         ack(result);
 
@@ -201,13 +208,21 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        const { actionType, itemId, targetPlayerId } = payload || {};
-        const selectOptions = { itemId, targetPlayerId };
+        const player = getPlayer(gameState, playerId);
+        if (player.summons) {
+          const { actionType, itemId, mode } = payload || {};
+          const result = selectSummonAction(gameState, playerId, actionType, { itemId, mode });
+          ack(result);
+          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+          return;
+        }
+        const { actionType, itemId, targetPlayerId, mode } = payload || {};
+        const selectOptions = { itemId, targetPlayerId, mode };
         let sourceEffects = null;
         let sourceId = null;
         let consumeItemIfApplied = false;
 
-        if (actionType === 'item') {
+        if (actionType === 'item' && (!mode || mode === 'use')) {
           const itemContent = content.cards.items.find((i) => i.id === itemId) || content.cards.omens.find((o) => o.id === itemId);
           selectOptions.itemCanTargetOthers = Boolean(itemContent && itemContent.canTargetOthers);
           sourceEffects = itemContent ? itemContent.effects : [];

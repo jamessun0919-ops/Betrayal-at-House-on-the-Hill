@@ -1862,3 +1862,102 @@ test('game:move into a room with another player clears a meetsAnotherPlayer modi
   clientB.close();
   httpServer.close();
 });
+
+test('game:selectAction item mode:give transfers an item to a same-room player via socket', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGame();
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' });
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'give', targetPlayerId: otherPlayerId }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]);
+  expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([{ id: 'item_003' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item mode:leave then mode:pickup round-trips an item through a room\'s droppedItems', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' });
+
+  const leaveResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'leave' }, resolve)
+  );
+  expect(leaveResult.error).toBeUndefined();
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]);
+
+  const pickupResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'pickup' }, resolve)
+  );
+  expect(pickupResult.error).toBeUndefined();
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_003' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a player controlling a summon moves the summon via game:move, leaving the player\'s own position untouched', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], items: [],
+      omens: [{ id: 'omen_004', name: '犬靈', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
+
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  expect(player.summons).toBeTruthy();
+  const playerX = player.x;
+  const playerY = player.y;
+
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
+  expect(moveResult.error).toBeUndefined();
+  expect(player.summons.x).toBe(0);
+  expect(player.summons.y).toBe(-1);
+  expect(player.x).toBe(playerX); // player's own position frozen
+  expect(player.y).toBe(playerY);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction actionType:dissipate clears the summon and does not end the turn by itself', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], items: [],
+      omens: [{ id: 'omen_004', name: '犬靈', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  expect(player.summons).toBeTruthy();
+  const apBeforeDissipate = player.actionPoints;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'dissipate' }, resolve));
+  expect(result.error).toBeUndefined();
+  expect(player.summons).toBeNull();
+  // Dissipating is a pure state switch -- it must not itself spend the
+  // player's own action points or force the turn to end.
+  expect(player.actionPoints).toBe(apBeforeDissipate);
+  expect(gameState.turnOrder[gameState.currentPlayerIndex]).toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
