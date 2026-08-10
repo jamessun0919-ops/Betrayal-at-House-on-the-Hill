@@ -310,6 +310,7 @@ function advanceTurn(gameState) {
     }
     outgoingPlayer.summons = null; // safety net -- should already be null before a turn can end
     outgoingPlayer.summonUsedThisTurn = false;
+    outgoingPlayer.diceInterjectionUsedThisTurn = [];
   }
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;
   const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
