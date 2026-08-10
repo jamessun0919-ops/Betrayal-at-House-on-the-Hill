@@ -10,6 +10,8 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
   const [actionError, setActionError] = useState('');
   const [lastCardDrawn, setLastCardDrawn] = useState(null);
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
+  const [pendingRollChoice, setPendingRollChoice] = useState(null);
+  const [overrideInput, setOverrideInput] = useState('0');
   const [lastEffectResolved, setLastEffectResolved] = useState(null);
 
   useEffect(() => {
@@ -19,6 +21,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     function onPromptResolved(data) {
       setLastPromptResolved(data);
       setPrompt(null);
+      setPendingRollChoice(null);
     }
     function onCharacterSelectUpdate(data) {
       setCharacterSelectState(data);
@@ -43,6 +46,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
       setLastEffectResolved(data);
       setPendingEffectChoice(null);
     }
+    function onDiceChoicePending(data) {
+      setPendingRollChoice(data);
+    }
 
     socket.on('game:prompt', onPrompt);
     socket.on('game:promptResolved', onPromptResolved);
@@ -53,6 +59,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     socket.on('game:cardDrawn', onCardDrawn);
     socket.on('game:effectPendingChoice', onEffectPendingChoice);
     socket.on('game:effectResolved', onEffectResolved);
+    socket.on('game:diceChoicePending', onDiceChoicePending);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -64,6 +71,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
       socket.off('game:cardDrawn', onCardDrawn);
       socket.off('game:effectPendingChoice', onEffectPendingChoice);
       socket.off('game:effectResolved', onEffectResolved);
+      socket.off('game:diceChoicePending', onDiceChoicePending);
     };
   }, [socket]);
 
@@ -107,6 +115,13 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
   function handleEffectChoiceRespond(optionId) {
     if (!pendingEffectChoice) return;
     socket.emit('game:effectPromptRespond', { promptId: pendingEffectChoice.promptId, optionId }, (res) => {
+      if (res && res.error) setActionError(res.error);
+    });
+  }
+
+  function handleRollChoiceRespond(optionId, overrideValue) {
+    if (!pendingRollChoice) return;
+    socket.emit('game:diceChoiceRespond', { promptId: pendingRollChoice.promptId, optionId, overrideValue }, (res) => {
       if (res && res.error) setActionError(res.error);
     });
   }
@@ -178,6 +193,33 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {pendingRollChoice && (
+            <div>
+              <p>擲骰道具介入：要不要使用道具？</p>
+              <ul>
+                {pendingRollChoice.options.map((o) => (
+                  <li key={o.itemId}>
+                    {o.name}
+                    {o.diceInterjection.override ? (
+                      <>
+                        <input
+                          type="number"
+                          min="0"
+                          max="8"
+                          value={overrideInput}
+                          onChange={(e) => setOverrideInput(e.target.value)}
+                        />
+                        <button onClick={() => handleRollChoiceRespond(o.itemId, Number(overrideInput))}>使用</button>
+                      </>
+                    ) : (
+                      <button onClick={() => handleRollChoiceRespond(o.itemId, undefined)}>使用</button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
             </div>
           )}
         </div>
