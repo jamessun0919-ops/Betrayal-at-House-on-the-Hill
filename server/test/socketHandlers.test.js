@@ -712,6 +712,57 @@ test('game:endTurn rejects the caller while they are controlling an active summo
   httpServer.close();
 });
 
+test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the player ends their turn there', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  const baseSanity = player.stats.sanity.currentIndex;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBeUndefined();
+  expect(player.stats.sanity.currentIndex).toBe(baseSanity + 1);
+  expect(player.roomBonusesReceived).toEqual(['room_entrance_hall']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the player has already received it', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex + 1);
+
+  // Cycle back around to the same player without moving them, then end turn again.
+  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex + 1); // unchanged
+  expect(player.roomBonusesReceived).toEqual(['room_entrance_hall']); // not duplicated
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('when a move exhausts action points, the turn does not auto-advance -- game:endTurn is required', async () => {
   const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
 

@@ -305,7 +305,18 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
+        const player = getPlayer(gameState, playerId);
+        const placedRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
+        const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
         const nextPlayerId = endTurn(gameState, playerId);
+        try {
+          applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts);
+        } catch (bonusErr) {
+          // Same rationale as the resolveCardDraw catch below -- a bad room
+          // bonus definition must not prevent the turn from having already
+          // advanced, or skip the state broadcast.
+          console.error('applyRoomEndTurnBonus error', bonusErr);
+        }
         ack({ nextPlayerId });
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
@@ -412,6 +423,25 @@ function findRoomDefinition(content, roomId) {
     content.rooms.find((r) => r.id === roomId) ||
     content.startingRooms.find((r) => r.id === roomId)
   );
+}
+
+function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts) {
+  if (!roomDefinition || !Array.isArray(roomDefinition.effects)) {
+    return;
+  }
+  const player = getPlayer(gameState, playerId);
+  const received = player.roomBonusesReceived || [];
+  if (received.includes(roomDefinition.id)) {
+    return;
+  }
+  const bonusEffects = roomDefinition.effects.filter((e) => e.onceOnlyPerPlayer);
+  if (bonusEffects.length === 0) {
+    return;
+  }
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now() });
+  handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition.id, effectResult, effectChoiceTimeouts, false);
+  player.roomBonusesReceived = [...received, roomDefinition.id];
 }
 
 function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts) {
