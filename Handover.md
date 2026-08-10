@@ -1,6 +1,12 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-09（第 3 次工作階段，M2c-3 進行中）
+最後更新：2026-08-10（第 4 次工作階段，summon-control-and-item-drop SDD 執行中，Task 7/7 進行到一半收工）
+
+**本次工作階段的成果都在 worktree 分支上，尚未合併回 `main`**：
+- Worktree 路徑：`.claude/worktrees/summon-control-and-item-drop`
+- 分支：`worktree-summon-control-and-item-drop`
+- 已推送至 `origin`（見下方「目前的瓶頸或停頓點」確認推送狀態）
+- **下次接手務必先進這個 worktree 繼續**，不要在 `main` 或新開的 worktree 重做
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -19,8 +25,14 @@
     - **M2c-4/M2c-5（道具/操作動作接線＋邪祟考驗機制）—— 已完成、已通過獨立審查（含 1 輪修正）、已合併進 `main`**：[spec](docs/superpowers/specs/2026-08-05-m2c4-m2c5-action-and-haunt-design.md)、[計畫](docs/superpowers/plans/2026-08-05-m2c4-m2c5-action-and-haunt.md)——`item-cards.json`/`omen-cards.json` 補 `category`（武器/消耗品/一般）/`canTargetOthers` 欄位（開發者已對照實體卡片全數確認正確，無需修改）、`effectResolver.js` 新增 `appliedCount` 回傳值、`turnFlow.js` 的 `selectAction` 接上道具/操作真實邏輯、`socketHandlers.js` 的 `cardId`→`sourceId` 改名（`game:cardDrawn` 例外保留 `cardId`）＋`consumeItemIfApplied` 參數、`game:selectAction` 接上真實效果解析、`resolveCardDraw` 加入邪祟考驗。測試全綠（290/290）
     - **M2c-3（36 張卡片＋房間操作類 effects 內容）—— 進行中，22 張已草擬並驗證，等開發者審核；2 張（犬靈＋道具給予/遺留機制）的設計文件已寫完等開發者過目**：agent 依 `card-mechanics-reference.md` 逐卡分類，跟開發者確認多個機制缺口的處理方向後，草擬了 22 張卡片/房間的 `effects` 內容——`item_003`（治療藥膏）/`item_004`（嗅鹽）/`item_009`（魔術方塊）、`omen_002`（書）/`omen_003`（水晶球）/`omen_005`（女孩）/`omen_006`（聖符）/`omen_007`（瘋漢）/`omen_008`（面具）/`omen_009`（徽章，維持無效果）、`event_001`（腐敗惡臭）/`event_004`（電池耗盡）/`event_005`（不起眼的櫃子）/`event_006`（滴答聲）/`event_007`（祈禱聲）/`event_009`（挑釁的幻覺）/`event_010`（電話鈴聲）、`room_vault`（保險庫）。已用一次性腳本載入真實內容、多組骰值/選項分支實際跑過 `resolveEffects` 驗證無誤才提交。`omen-cards.json` 全部 13 張已補上 `needsCustomLogic` 欄位（原本完全沒有這個欄位）。
       過程中新增的機制（詳見下方除錯注意事項）：`draw_card`（隨機抽 N 張卡）、`preview_and_choose`/`take_previewed_card`（水晶球：展示牌庫前 3 張供選一張，牌庫順序不調整）、`toggle_active`（面具：可泛用的「生效狀態」切換）、**預兆牌現在會跟道具一樣被加進玩家背包**（水晶球/面具這類需要「持有後主動使用」的預兆牌因此可以透過 `game:selectAction actionType:'item'` 使用）、`removeWhen` 可以填陣列（OR 邏輯）、`persistent_modifier` 新增 `blocksOpenDoor` 效果（電池耗盡）、`checkRemoveConditions` 終於接上真實呼叫點（移動後檢查同房間、任何效果解析後檢查持有道具）。也修好 3 個既有缺口：`restoreToBase` 會誤降已達基本值以上的數值、`dice_check` 的骰數調整沒有 `[1,8]` 上下限、`persistent_modifier` 的 `removeWhen` 原本被誤設為強制欄位。
-      **狗（改名犬靈）＋道具給予/遺留/撿取機制**：範圍已超出單純內容撰寫（多實體操控切換＋新的道具子動作＋房間動態狀態），跟開發者逐項確認設計後寫成獨立設計文件 [docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md)，**尚未實作，等開發者過目確認後才進 `writing-plans`**。
+      **犬靈＋道具給予/遺留/撿取機制——設計文件已核准，計畫已寫完，SDD 執行中（見下方新段落）**：範圍已超出單純內容撰寫，設計文件 [docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md) 已跟開發者逐項確認並核准（開發者「刪除遠端分枝後直接進行下一個階段」，未提出修改意見）。已用 `writing-plans` 轉成實作計畫 [docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md](docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md)（7 個任務），用 `subagent-driven-development` 在獨立 worktree 執行，進度見下方新段落。
       其餘卡片維持 `needsCustomLogic:true`（M3 傷害/攻擊系統、房間結束回合/離開考驗觸發點等機制缺口，詳見下方除錯注意事項）
+    - **M2c-3 附屬功能：召喚物操控切換＋道具給予/遺留/撿取（`summon-control-and-item-drop`）—— SDD 執行中，7 個任務完成 6 個，第 7 個做到一半收工**：worktree `.claude/worktrees/summon-control-and-item-drop`，分支 `worktree-summon-control-and-item-drop`，計畫 [docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md](docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md)（7 任務，每任務都經過獨立審查才算完成，詳細審查結論見 `.superpowers/sdd/2026-08-10-summon-control-and-item-drop/progress.md`）：
+      - Task 1（`droppedItems` 房間欄位）、Task 2（`switch_control` 效果類型）、Task 3（道具 give/leave/pickup，一般玩家）、Task 4（`moveSummon`/`selectSummonAction`，含一輪修正：`advanceTurn` 安全網原本會弄丟召喚物身上攜帶的道具，已修復並重新審查通過）——**皆已完成並通過審查**
+      - **Task 5（回合手動結束機制，全體玩家）—— 已完成並通過審查，是這次執行期間新增的任務，不在原計畫裡**：Task 4 審查時發現，犬靈道具（`switch_control`）本身要花 1 點行動力，若玩家使用當下剩 1 點，行動力歸零會自動觸發回合結束，剛建立的召喚物瞬間被摧毀。跟開發者確認後決定**全面改為手動結束回合**（不限召喚物情境）：新增 `endTurn`/`game:endTurn`，移除 `advanceTurnIfOver` 及其 4 個呼叫點，`isTurnOver` 保留但不再被自動呼叫。**前端「結束回合」按鈕留到 M2d**，這次只做後端。審查期間發現一個測試競態（`otherClient.once` 抓到前一動作殘留的廣播），已用檔案裡既有的 pattern（persistent filtered listener）修復，349/349 穩定通過
+      - Task 6（`socketHandlers.js` 接上 `player.summons` 分流＋`mode` 透傳）—— **已完成並通過審查**
+      - **Task 7（`omen_004` 犬靈卡片內容）—— 尚未開始，收工前中斷**：把 `switch_control` 效果接上 `data/cards/omen-cards.json` 的 `omen_004`
+      - **全部 7 個任務完成後還要做**：全分支最終審查（`requesting-code-review`，用最強模型）→ 處理發現項 → `finishing-a-development-branch`（合併回 `main`）
 - **角色資料範本**：[data/characters/characters.json](data/characters/characters.json)（6 個佔位角色位置），開發者尚未填寫真實內容
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`——技術棧/規模都跟本專案不符
 
@@ -56,24 +68,21 @@
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-無設計層面阻塞。M2c-3 已有 22 張卡片/房間草擬並驗證完成，**開發者審核中**；犬靈（原「狗」）＋道具給予/遺留/撿取機制的設計文件已寫完，**等開發者過目確認後才進 `writing-plans`**。**待辦**：
-1. **worktree 清理，已確認多次無法在 Claude Code session 內完成**：`.claude/worktrees/m2c4-m2c5-action-and-haunt`（分支 `worktree-m2c4-m2c5-action-and-haunt`）被鎖定為「進行中 session 的作業目錄」，只要是還在用這個 worktree 當作業目錄的 Claude Code session，`git worktree remove` 一律會被 `locked working tree` 擋下（強制解鎖有風險：這是 session 自己正在使用的環境，強制移除可能讓當下 session 壞掉，不能貿然執行）。**內容/分支都已安全合併進 `main`，這個 worktree 只是收尾清潔，不影響任何功能，不急**。真的要清掉的話，兩個辦法：(a) 開發者自己在 Claude Code **之外**的終端機執行：
-   ```bash
-   git worktree remove --force "C:/Users/User/Desktop/Betrayal at House on the Hill/.claude/worktrees/m2c4-m2c5-action-and-haunt"
-   git branch -D worktree-m2c4-m2c5-action-and-haunt
-   ```
-   (b) 開一個**不使用**這個 worktree 當作業目錄的全新 Claude Code session 執行同樣指令
-2. commit `52cdd1d` 因操作疏失把「`modifiers.js` 的 `removeWhen` 改可選」這個程式碼修正跟「M2c-3 第一批內容草稿」這個資料變更合併成同一筆提交了——功能跟測試都正確，只是這筆 commit 訊息只提到程式碼修正沒提到內容，之後看 commit 歷史對照時要注意這點，不是漏推或漏提交
+無設計層面阻塞，純粹是**收工中斷**。`summon-control-and-item-drop` 這個 SDD 執行到 Task 6/7 完成、Task 7 開始前中斷（見上方「已完成進度」的詳細段落）。
+
+**舊的 worktree 清理問題已解決**：`.claude/worktrees/m2c4-m2c5-action-and-haunt` 已不存在（`git worktree list`/`git branch -a` 皆確認），不需要再處理。
+
+**commit `52cdd1d` 的歷史備註（僅供之後對照 commit 歷史時參考，非待辦）**：該筆提交因操作疏失把「`modifiers.js` 的 `removeWhen` 改可選」這個程式碼修正跟「M2c-3 第一批內容草稿」合併成同一筆——功能跟測試都正確，只是 commit 訊息只提到程式碼修正沒提到內容。
 
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 讀最近一次工作階段範圍即可
-2. 開新 session 前先確認上方「worktree 待清理」是否還被鎖定，能清就清掉
-3. **確認開發者是否已審核完 M2c-3 已完成的 22 張卡片/房間**（見上方「已完成進度」），有修正意見就照著改
-4. **確認開發者是否已看過** [docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md)（犬靈操控切換＋道具給予/遺留/撿取），核准後呼叫 `writing-plans` 轉成實作計畫再執行
-5. **M2c-3 剩餘卡片**：卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；房間結束回合/離開考驗的觸發點是獨立小任務，有空再補；通靈板整張延後到 M3
-6. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單（**現在也會包含預兆牌**，見上方除錯注意事項）、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的預留版位（犬靈是第一個真實案例，之後 M3 叛徒切換多隻怪物沿用同一套）
-7. **執行順序已跟開發者確認**：M2c-3 → M2d，依序完成，不要打亂（犬靈設計文件核准後何時實作，待開發者排入順序）
-8. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/結束回合換人，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
+2. **進入 worktree** `.claude/worktrees/summon-control-and-item-drop`（分支 `worktree-summon-control-and-item-drop`）繼續，不要在 `main` 或新 worktree 重做
+3. **繼續 SDD 執行，從 Task 7 開始**：`subagent-driven-development` skill，計畫 `docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md`，進度帳本 `.superpowers/sdd/2026-08-10-summon-control-and-item-drop/progress.md`（先讀這個帳本確認 Task 1-6 都已記錄完成，再從 Task 7 繼續，不要重跑已完成的任務）
+4. Task 7（`omen_004` 犬靈卡片內容）完成並通過審查後，依 SDD 流程跑**全分支最終審查**（最強模型）→ 處理發現項 → `finishing-a-development-branch`（跟開發者確認合併方式後合併回 `main`）
+5. 合併回 `main` 後，**M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；房間結束回合/離開考驗的觸發點是獨立小任務，有空再補；通靈板整張延後到 M3
+6. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單（**現在也會包含預兆牌**，見上方除錯注意事項）、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的預留版位（犬靈是第一個真實案例，之後 M3 叛徒切換多隻怪物沿用同一套）、**「結束回合」按鈕（本次新增的手動回合結束機制，後端已完成，前端待做，見上方 Task 5 說明）**
+7. **執行順序已跟開發者確認**：M2c-3（含 summon-control-and-item-drop）→ M2d，依序完成，不要打亂
+8. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（新機制，注意不再是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
 
 ## 關鍵設定 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Socket.IO（伺服器持有權威遊戲狀態）＋ React (Vite) 前端；純 JavaScript，不使用 TypeScript；單一程式碼庫同時支援區網與雲端部署
@@ -81,6 +90,7 @@
 - **輸入驗證慣例（M2a 確立，沿用至今）**：所有函式對不合法輸入一律拋出自訂 `Error`，訊息用 UPPER_SNAKE_CASE 字串，不可靜默失敗
 - **角色屬性是刻度制，不是連續整數**：`track`/`currentIndex`/`baseIndex`/`skullIndex`
 - **回合機制關鍵慣例**：樓梯移動免費、`advanceTurn` 自動重設行動力、所有回合內動作都要驗證 turn ownership、效果選擇未解決前不可推進回合（見上方「除錯注意事項」）
+- **回合結束機制（`summon-control-and-item-drop` Task 5 改動，尚未合併進 `main`）**：行動力歸零**不再**自動結束回合，全體玩家都要手動呼叫新的 `game:endTurn` 才會換人（即使行動力還沒用完也可以提前結束）。`advanceTurnIfOver` 已整個移除；`turnFlow.js` 新增 `endTurn(gameState, playerId)`（`NOT_YOUR_TURN`/`SUMMON_ACTIVE` 兩種拒絕情境，`SUMMON_ACTIVE`＝操控召喚物期間必須先消散才能結束回合）。**前端「結束回合」按鈕留到 M2d**，目前只有後端事件可用
 - **「架構性缺口」vs「防呆修正」的處理原則**：只是輸入驗證/防呆類（有明確既有慣例可套用）可以直接修正不用問；牽涉新的遊戲規則/架構設計決策，必須先跟開發者確認方向
 - **「操作」跟「道具」的定義（8/1 `turn-flow-and-action-points.md` 已核准，容易混淆，注意）**：「道具」＝使用手上持有卡片的主動能力（面具戴脫、魔術方塊考驗等）；「操作」＝**房間本身**觸發的機制（例如保險庫知識考驗開鎖），不含卡片能力。兩者的 `effects` schema 相同，都可以直接用 `effectResolver.resolveEffects`
 - **20 秒兩層計時提問 UI**：8/1 已核准的設計，M2b-2、M2c-4 都明確決定先不做，改用直接事件模式——**這是暫時簡化，不是取消，M2 完整測試跑完後要記得補回去**
@@ -93,7 +103,7 @@
 - **`preview_and_choose`/`take_previewed_card` 效果類型（M2c-3，水晶球用）**：展示牌庫最前面 N 張（牌庫本身建立時就洗過牌，等同隨機展示），動態產生選項讓玩家選一張直接拿走，其餘完全不動、不重排。完全沿用既有 `choice`/`pendingChoice` 機制，只是選項是即時算出來的
 - **`toggle_active` 效果類型（M2c-3，面具用，可泛用）**：背包道具項目多一個 `active` 布林欄位，`{itemId, activeEffects, inactiveEffects}` 依目前狀態套用其中一組並切換狀態，之後其他「有生效狀態」的道具可以直接沿用
 - **`persistent_modifier` 的 `blocksOpenDoor` 效果（M2c-3，電池耗盡用）**：`{hookType:"blocksOpenDoor"}`，`turnFlow.js` 的 `getAvailableDirections` 檢查到就不列出開新房間的選項，但已存在的相鄰房間仍可移動
-- **犬靈操控切換＋道具給予/遺留/撿取（設計已定案，尚未實作）**：玩家物件新增 `summons` 欄位（單一物件不是陣列，`type` 欄位分辨召喚物種類，之後可擴充不限犬靈）；房間動態狀態（`gameState.board` 裡的房間物件，不是靜態 `rooms.json`）新增 `droppedItems` 陣列。詳見 [設計文件](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md)
+- **犬靈操控切換＋道具給予/遺留/撿取（後端已實作 6/7 任務，在 `worktree-summon-control-and-item-drop` 分支上，尚未合併進 `main`）**：玩家物件新增 `summons` 欄位（單一物件不是陣列，`type` 欄位分辨召喚物種類，之後可擴充不限犬靈，`null`＝無召喚物；`{type, floor, x, y, actionPoints, carryingItemId}`）；房間動態狀態（`gameState.board` 裡的房間物件，不是靜態 `rooms.json`）新增 `droppedItems` 陣列。新效果類型 `switch_control`（`{summonType, actionPoints}`，建立 `summons`）。`turnFlow.js` 新增 `moveSummon`/`selectSummonAction`（操控召喚物期間限定 移動/撿取/遺留/消散，消散＝純狀態切換不算結束回合，行動力歸零不影響消散）；`selectAction` 的 `item` 動作新增 `mode: 'give'|'leave'|'pickup'`（預設/`'use'`＝原本邏輯）。`socketHandlers.js` 的 `game:move`/`game:selectAction` 依 `player.summons` 是否存在分流。詳見 [設計文件](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md)、[實作計畫](docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md)
 - **卡牌/房間內容分工**：agent 依 `card-mechanics-reference.md` 草擬 `effects` JSON，開發者審核修正（跟房間 `doors`/角色數值「開發者自己手填」不同，因為這是聲明式 schema 轉換）
 - **MVP 兩個劇本**：劇本1〈神鬼痴漢 The Mummy Walks〉、劇本10〈闔家團圓 Family Gathering〉
 - **未來階段**：Phase 2 為 AI 玩家（呼叫 Claude API 決策，選角色順序排真人之後、數量不可超過真人數量）；Phase 3+ 為原創劇本

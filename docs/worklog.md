@@ -389,3 +389,29 @@
 - 下一階段工作：先確認開發者是否審核完這批 22 張卡片內容，以及是否已看過犬靈設計文件——核准後才呼叫 `writing-plans` 把設計文件轉成實作計畫
 - worktree 清理待辦維持不變（見上次交代）
 
+## 2026-08-10 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者指示「刪除遠端分枝後直接進行下一個階段」：刪除已合併的遠端備份分支，並確認 M2c-3 22 張卡片＋犬靈設計文件視為已核准（開發者未提出修改意見）
+- 呼叫 `writing-plans` skill，把犬靈設計文件轉成 7 任務實作計畫，自我審查後提交（[docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md](superpowers/plans/2026-08-10-summon-control-and-item-drop.md)）
+- 開發者選擇 Subagent-Driven-Development 執行方式；建立獨立 worktree（分支 `worktree-summon-control-and-item-drop`），過程中發現剛寫好的計畫檔案沒有先 commit 就開了 worktree，導致新 worktree（從 `origin/main` 分岔）讀不到計畫檔——用 `Read` 工具讀回主副本內容，在 worktree 裡重新寫入並 commit 解決
+- 依序派 subagent 執行並審查 Task 1（`droppedItems` 房間欄位）、Task 2（`switch_control` 效果類型）、Task 3（道具 give/leave/pickup）——三個任務皆一次通過，無需修正
+- Task 4（`moveSummon`/`selectSummonAction`）審查發現 Important 問題：`advanceTurn` 安全網清空 `summons` 時沒有先把召喚物攜帶的道具掉落，會讓道具憑空消失——跑一輪修正＋重新審查後通過。審查同時發現一個計畫沒設想到的架構缺口：犬靈道具本身花 1 點行動力，若玩家使用當下剩 1 點，行動力歸零會觸發回合自動結束，剛建立的召喚物瞬間被摧毀
+- 停下來跟開發者討論這個缺口的解法（不自行決定），開發者決定：**回合結束機制全面改為手動**（不限召喚物情境），新增 `game:endTurn`，前端按鈕留到 M2d。查證發現這會改到全遊戲共用的回合推進邏輯，且會弄壞 `socketHandlers.test.js` 裡約 8-10 個既有斷言——如實回報這個影響範圍給開發者，開發者確認一起帶入這個 worktree 執行，把它插入計畫成為新的 Task 5（後面兩個任務順延成 Task 6/7），並同步修正 Task 6 裡跟舊回合機制相關的過時內容
+- Task 5 執行後審查通過（無 Critical/Important），過程中 implementer 發現並修正一個既有的測試競態類型（套用檔案裡既有的修法慣例，非隨意試錯），349/349 穩定通過
+- Task 6（`socketHandlers.js` 接上 `player.summons` 分流＋`mode` 透傳）審查通過，無 Critical/Important
+- Task 7（`omen_004` 犬靈卡片內容）尚未開始，開發者指示收工，中斷於此
+
+**完成項目**：
+- [docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md](superpowers/plans/2026-08-10-summon-control-and-item-drop.md) 實作計畫（7 任務，含執行期間插入的 Task 5）
+- SDD 執行 Task 1-6/7 完成並通過獨立審查（詳細審查結論見 worktree 內 `.superpowers/sdd/2026-08-10-summon-control-and-item-drop/progress.md`）：`droppedItems` 房間欄位、`switch_control` 效果類型、道具 give/leave/pickup、`moveSummon`/`selectSummonAction`、**手動結束回合機制（`endTurn`/`game:endTurn`，全體玩家適用）**、`socketHandlers.js` 召喚物分流
+- Handover.md 更新：worktree/分支位置、SDD 執行進度、新機制的除錯注意事項
+
+**遇到瓶頸**：
+- 計畫檔案在開 worktree 前忘記 commit，導致新 worktree 讀不到——用 `Read` 工具讀回內容重寫解決，過程記錄在上方工作內容
+- Task 4 審查發現的回合結束機制缺口，不是單純程式錯誤，是計畫沒設想到的架構決策，依規則停下來跟開發者討論確認方向，沒有自行決定
+
+**開發者交代備忘事項**：
+- 下一階段工作：進 worktree `.claude/worktrees/summon-control-and-item-drop`（分支 `worktree-summon-control-and-item-drop`），從 SDD 進度帳本確認的 Task 7 開始繼續，完成後跑全分支最終審查再合併回 `main`
+- 回合結束機制的改動（Task 5）是全遊戲共用邏輯的改動，不是單純召喚物功能——合併前的全分支審查要特別注意這部分的完整性
+
