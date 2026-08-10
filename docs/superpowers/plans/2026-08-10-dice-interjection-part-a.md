@@ -712,9 +712,11 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     itemCatalog: content.cards.items,
     sourceDeckType: deckType,
   });
-  return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts);
+  return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts, false, content);
 }
 ```
+
+（`handleEffectResolveResult` 呼叫也要補上 `, false, content` 兩個參數——`false` 對應既有的 `consumeItemIfApplied` 位置參數，`resolveCardDraw` 一直以來就沒有傳這個參數、靠預設值 `false`，這裡補上是因為後面要再多帶一個 `content` 參數，前面的位置參數不能省略。這是本節唯一容易漏掉的地方：`resolveCardDraw` 也是下面「呼叫 `handleEffectResolveResult` 的地方要補 `content`」清單裡的一員，不是只有 `game:selectAction`/`applyRoomEndTurnBonus`/`game:effectPromptRespond` 這 3 個。）
 
 （函式其餘部分——`activatedOnUse` 提早 return 之前的所有內容——完全不變，只改 `context` 物件跟簽章多一個參數）
 
@@ -841,10 +843,11 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
 }
 ```
 
-**`handleEffectResolveResult` 的所有呼叫點**（4 個，在 `registerSocketHandlers` 內，都有 `content` closure，各自最後補上 `, content`）：
-- `game:selectAction` handler 裡的呼叫
+**`handleEffectResolveResult` 的所有呼叫點**（5 個，各自最後補上 `, content`；`resolveCardDraw` 內的那次已經在上面補過了，這裡是其餘 4 個）：
+- `resolveCardDraw` 內的呼叫（已在上面補過，這裡列出只是完整性提醒，不要重複改）
+- `game:selectAction` handler 裡的呼叫（在 `registerSocketHandlers` 內，有 `content` closure，直接補上）
 - `applyRoomEndTurnBonus` 內的呼叫（因為 `applyRoomEndTurnBonus` 這時已經有 `content` 參數了，直接補上）
-- `game:effectPromptRespond` handler 裡的呼叫
+- `game:effectPromptRespond` handler 裡的呼叫（在 `registerSocketHandlers` 內，有 `content` closure，直接補上）
 - （`handleEffectChoiceTimeout` 內部也會呼叫一次 `handleEffectResolveResult`，同樣補上 `content`——見下方）
 
 `handleEffectChoiceTimeout` 內部呼叫 `handleEffectResolveResult` 那一行也要補上 `content`：
@@ -1138,7 +1141,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
 }
 ```
 
-**`handleEffectResolveResult` 的所有呼叫點**（Task 6 已經補過 `content` 的那 4 處）都再補上 `, rollChoiceTimeouts, rollChoiceTimeoutMs`（在 `registerSocketHandlers` 內的呼叫點有 closure 可直接取用；`handleEffectChoiceTimeout` 內部的呼叫也要往下傳，所以 `handleEffectChoiceTimeout` 自己的簽章也要多接這兩個參數，從它自己的呼叫點——`handleEffectResolveResult`（Task 6 已經在傳 `content` 了）——一併補上）。
+**`handleEffectResolveResult` 的所有呼叫點**（Task 6 已經補過 `content` 的那 5 處）都再補上 `, rollChoiceTimeouts, rollChoiceTimeoutMs`（在 `registerSocketHandlers` 內的呼叫點有 closure 可直接取用；`handleEffectChoiceTimeout` 內部的呼叫也要往下傳，所以 `handleEffectChoiceTimeout` 自己的簽章也要多接這兩個參數，從它自己的呼叫點——`handleEffectResolveResult`（Task 6 已經在傳 `content` 了）——一併補上）。
 
 **新增 `handleRollChoicePending`**（放在 `handleEffectResolveResult`之前或之後皆可，這裡放在它後面）：
 ```js
