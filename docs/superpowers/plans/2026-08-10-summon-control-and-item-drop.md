@@ -605,7 +605,625 @@ git commit -m "feat(summon): add moveSummon/selectSummonAction and advanceTurn s
 
 ---
 
-## Task 5: `socketHandlers.js` — 接上召喚物分流與 give/leave/pickup
+## Task 5: 回合手動結束機制（全體玩家）
+
+**背景**：Task 4 審查時發現一個計畫原本沒設想到的落差——玩家使用犬靈道具（`switch_control`）本身要花 1 點行動力，如果玩家使用當下剩下剛好 1 點，行動力歸零後，既有的 `advanceTurnIfOver`（`socketHandlers.js`）會自動把回合結束，Task 4 剛做的安全網會立刻把剛建立的 `summons` 清空——玩家連操控召喚物的機會都沒有。
+
+與開發者確認後決定：**回合結束機制全面改為手動**，不限於召喚物情境——行動力歸零不再自動結束回合，玩家透過新的 `game:endTurn` 動作自行決定何時結束（即使行動力還沒用完，只要沒有其他想做的事也可以提前結束）。前端「結束回合」按鈕留到 M2d 再做，這次只做後端機制。
+
+**Files:**
+- Modify: `server/src/game/turnFlow.js`
+- Modify: `server/src/socketHandlers.js`
+- Test: `server/test/game/turnFlow.test.js`
+- Test: `server/test/socketHandlers.test.js`
+
+**Interfaces:**
+- Consumes: `player.summons`（Task 2/4）——操控召喚物期間不可結束回合，需先消散
+- Produces: `endTurn(gameState, playerId)`（`turnFlow.js`，回傳下一位玩家的 id，同 `advanceTurn`），新的 `game:endTurn` socket 事件
+
+### Part A — `turnFlow.js`：新增 `endTurn`
+
+- [ ] **Step 1: 寫失敗測試**
+
+在 `server/test/game/turnFlow.test.js` 找到既有的 `advanceTurn`/`isTurnOver` 測試附近，新增：
+
+```js
+test('endTurn advances the turn even when the current player still has unspent actionPoints', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.actionPoints = 3; // deliberately not exhausted
+  const result = endTurn(gameState, 'p1');
+  expect(result).toBe('p2');
+  expect(gameState.turnOrder[gameState.currentPlayerIndex]).toBe('p2');
+});
+
+test('endTurn throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  expect(() => endTurn(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+});
+
+test('endTurn throws SUMMON_ACTIVE when the player has an active summon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  expect(() => endTurn(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
+});
+```
+
+- [ ] **Step 2: 執行測試確認失敗**
+
+Run: `cd server && npx jest test/game/turnFlow.test.js --forceExit`
+Expected: FAIL — `endTurn is not a function`
+
+- [ ] **Step 3: 實作**
+
+在 `server/src/game/turnFlow.js` 新增（放在 `advanceTurn` 之後即可）：
+
+```js
+function endTurn(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  if (player.summons) {
+    throw new Error('SUMMON_ACTIVE');
+  }
+  return advanceTurn(gameState);
+}
+```
+
+把 `module.exports` 加上 `endTurn`：
+
+```js
+module.exports = {
+  getAvailableDirections,
+  moveToRoom,
+  moveSummon,
+  selectAction,
+  selectSummonAction,
+  isTurnOver,
+  getCurrentTurnPlayerId,
+  advanceTurn,
+  endTurn,
+  canUseStairs,
+  useStairs,
+};
+```
+
+**注意**：`isTurnOver` 保留不動——雖然它現在不再被任何地方自動呼叫觸發回合結束，但它是一個通用的純函式（判斷行動力是否歸零），未來前端可能用同樣邏輯判斷要不要提示玩家「行動力用完了，要結束回合嗎」。不要因為它暫時沒有內部呼叫者就刪除它或它的既有測試。
+
+- [ ] **Step 4: 執行測試確認通過**
+
+Run: `cd server && npx jest test/game/turnFlow.test.js --forceExit`
+Expected: PASS
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add server/src/game/turnFlow.js server/test/game/turnFlow.test.js
+git commit -m "feat(turn): add endTurn for manual turn-ending"
+```
+
+### Part B — `socketHandlers.js`：移除自動結束、新增 `game:endTurn`
+
+這部分同時是「加新功能」跟「移除舊行為」，舊行為目前由 4 個地方呼叫同一個 `advanceTurnIfOver` 函式觸發：`game:move` handler、`game:selectAction` handler、`game:effectPromptRespond` handler、`handleEffectChoiceTimeout` 函式。這 4 個呼叫點全部要移除，`advanceTurnIfOver` 函式本身也要刪除（改動後沒有任何呼叫者了）。因為這是全域行為改變，這個 Part 的測試步驟包含改寫既有測試，不是單純新增。
+
+- [ ] **Step 1: 寫失敗測試（新增 `game:endTurn` 測試）**
+
+在 `server/test/socketHandlers.test.js` 找一個既有 `game:useStairs`/`game:selectAction` 測試附近，新增：
+
+```js
+test('game:endTurn advances the turn even when the current player still has unspent action points', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+
+  const updatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBeUndefined();
+  expect(result.nextPlayerId).not.toBe(currentPlayerId);
+
+  const update = await updatePromise;
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  const newCurrentPlayer = update.players.find((p) => p.playerId === update.turnOrder[update.currentPlayerIndex]);
+  expect(newCurrentPlayer.actionPoints).toBeGreaterThan(0); // reset by advanceTurn
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn rejects a caller who is not the current turn player', async () => {
+  const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('NOT_YOUR_TURN');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn is rejected while an effect choice is pending', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await pendingChoicePromise;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn rejects the caller while they are controlling an active summon', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).summons = {
+    type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null,
+  };
+
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('SUMMON_ACTIVE');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+```
+
+- [ ] **Step 2: 執行測試確認失敗**
+
+Run: `cd server && npx jest test/socketHandlers.test.js --forceExit`
+Expected: FAIL — 沒有 `game:endTurn` 這個事件，callback 永遠不會被呼叫（測試會 timeout）
+
+- [ ] **Step 3: 實作 — 新增 handler，移除自動結束**
+
+修改 `server/src/socketHandlers.js` 第 17 行的 import，移除 `isTurnOver`、`advanceTurn`（改由 `endTurn` 承接，兩者都不再被 `socketHandlers.js` 直接呼叫），加入 `endTurn`：
+
+```js
+const { moveToRoom, selectAction, useStairs, endTurn } = require('./game/turnFlow');
+```
+
+在 `game:useStairs` handler 之後、`game:effectPromptRespond` handler 之前，新增：
+
+```js
+    socket.on('game:endTurn', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+          return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
+        }
+        const nextPlayerId = endTurn(gameState, playerId);
+        ack({ nextPlayerId });
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:endTurn error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+```
+
+刪除 `advanceTurnIfOver` 函式本身（原本在檔案後段，`hasPendingEffectChoice` 函式之前）：
+
+```js
+function advanceTurnIfOver(gameState, playerId) {
+  const player = getPlayer(gameState, playerId);
+  if (isTurnOver(player)) {
+    advanceTurn(gameState);
+  }
+}
+```
+
+這整個函式直接刪除，不留殘餘。
+
+修改 `game:move` handler 裡的這段（把 `let stillResolving = false;` 和最後的 `if (!stillResolving) { advanceTurnIfOver(...); }` 一併移除，因為 `stillResolving` 這個變數移除呼叫後就沒有其他用途了）：
+
+原本：
+```js
+        let stillResolving = false;
+        if (result.pendingCardDraw) {
+          try {
+            const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts);
+            stillResolving = drawOutcome.pending;
+            if (drawOutcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
+            }
+          } catch (drawErr) {
+            console.error('resolveCardDraw error', drawErr);
+          }
+        }
+        if (!stillResolving) {
+          advanceTurnIfOver(gameState, playerId);
+        }
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+改為：
+```js
+        if (result.pendingCardDraw) {
+          try {
+            const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts);
+            if (drawOutcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
+            }
+          } catch (drawErr) {
+            console.error('resolveCardDraw error', drawErr);
+          }
+        }
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+修改 `game:selectAction` handler 裡的對應段落，同樣道理移除 `stillResolving`：
+
+原本：
+```js
+        let stillResolving = false;
+        if (sourceEffects) {
+          try {
+            const resolverEntry = getResolver(effectResolverManager, roomCode);
+            const targetForEffects = result.targetPlayerId || playerId;
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
+            stillResolving = outcome.pending;
+            if (outcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
+            }
+          } catch (err) {
+            console.error('selectAction effect resolution error', err);
+          }
+        } else if (result.pending) {
+          io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
+        }
+
+        if (!stillResolving) {
+          advanceTurnIfOver(gameState, playerId);
+        }
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+改為：
+```js
+        if (sourceEffects) {
+          try {
+            const resolverEntry = getResolver(effectResolverManager, roomCode);
+            const targetForEffects = result.targetPlayerId || playerId;
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
+            if (outcome.drawnCards) {
+              socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
+            }
+          } catch (err) {
+            console.error('selectAction effect resolution error', err);
+          }
+        } else if (result.pending) {
+          io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
+        }
+
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+修改 `game:effectPromptRespond` handler，移除 `if (!resolveOutcome.pending) { advanceTurnIfOver(gameState, choicePlayerId); }` 這個區塊（`resolveOutcome` 變數其餘用途——`.drawnCards`——保留不動）：
+
+原本：
+```js
+        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+        if (!resolveOutcome.pending) {
+          advanceTurnIfOver(gameState, choicePlayerId);
+        }
+        if (resolveOutcome.drawnCards) {
+```
+
+改為：
+```js
+        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+        if (resolveOutcome.drawnCards) {
+```
+
+修改 `handleEffectChoiceTimeout` 函式裡同樣的區塊：
+
+原本：
+```js
+    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+    if (!resolveOutcome.pending) {
+      advanceTurnIfOver(gameState, playerId);
+    }
+    io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+改為：
+```js
+    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+    io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+```
+
+- [ ] **Step 4: 執行測試確認新測試通過（既有測試會壞，屬於預期，Step 5 處理）**
+
+Run: `cd server && npx jest test/socketHandlers.test.js --forceExit`
+Expected: 新增的 4 個 `game:endTurn` 測試 PASS；以下 6 個既有測試會 FAIL（timeout，因為它們在等一個現在不會再發生的自動回合結束）——這是預期中的，Step 5 會逐一修正：
+- `'when a move exhausts action points, the turn automatically advances to the next player'`
+- `'the turn advances only after a pending effect choice is resolved via game:effectPromptRespond'`
+- `'the turn advances only after a pending effect choice times out'`
+- `'game:move into a room with an unknown drawType does not crash the room and still advances state'`
+- `'an event-deck card requiring a choice defers the turn the same way an item-deck card does'`
+- `'an omen-deck card requiring a choice defers the turn the same way an item-deck card does'`
+
+- [ ] **Step 5: 修正 6 個既有測試**
+
+這 6 個測試原本驗證的都是「行動力歸零（且若有待處理選擇，等選擇解決）後，回合自動換人」。新機制下這個前提不成立了，改寫成「回合不會自動換人，需要玩家自己呼叫 `game:endTurn` 才會換人」，驗證的行為改變，但測試的精神（這條路徑最終能正常換到下一位玩家、沒有卡死）保留。
+
+**測試 1** — 找到 `test('when a move exhausts action points, the turn automatically advances to the next player', ...)`，整段改為：
+
+```js
+test('when a move exhausts action points, the turn does not auto-advance -- game:endTurn is required', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // zeroes AP
+  const update = await updatePromise;
+
+  // AP is zero, but the turn must stay with the same player until they
+  // explicitly end it -- see Task 5's manual-end-turn mechanism.
+  expect(update.turnOrder[update.currentPlayerIndex]).toBe(currentPlayerId);
+  const me = update.players.find((p) => p.playerId === currentPlayerId);
+  expect(me.actionPoints).toBe(0);
+
+  const nextUpdatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+  const newCurrentPlayer = nextUpdate.players.find((p) => p.playerId === nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]);
+  expect(newCurrentPlayer.actionPoints).toBeGreaterThan(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+```
+
+**測試 2** — 找到 `test('the turn advances only after a pending effect choice is resolved via game:effectPromptRespond', ...)`，整段改為：
+
+```js
+test('resolving a pending effect choice does not by itself advance the turn -- game:endTurn is still required', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const respondedUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+  const respondedUpdate = await respondedUpdatePromise;
+  expect(respondedUpdate.turnOrder[respondedUpdate.currentPlayerIndex]).toBe(currentPlayerId);
+
+  // The choice is resolved now, so EFFECT_CHOICE_IN_PROGRESS no longer blocks
+  // game:endTurn -- proves resolving the choice actually cleared the gate.
+  const nextUpdatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+```
+
+**測試 3** — 找到 `test('the turn advances only after a pending effect choice times out', ...)`，把最後一段（等待 `game:stateUpdate` 顯示換人）改為：先確認逾時解決後回合仍是同一人，再手動呼叫 `game:endTurn` 確認換人。函式其餘部分（設定 `content`、觸發 `game:move`、等 `promptResolvedPromise`）不變，只改測試名稱與最後的斷言區塊：
+
+```js
+test('a pending effect choice that times out still requires game:endTurn to advance the turn', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 50,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const timedOutUpdatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      const me = data.players.find((p) => p.playerId === currentPlayerId);
+      if (me.stats.might.currentIndex < me.stats.might.baseIndex) resolve(data);
+    });
+  });
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const timedOutUpdate = await timedOutUpdatePromise;
+  expect(timedOutUpdate.turnOrder[timedOutUpdate.currentPlayerIndex]).toBe(currentPlayerId);
+
+  const nextUpdatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 2000);
+```
+
+**測試 4** — 找到 `test('game:move into a room with an unknown drawType does not crash the room and still advances state', ...)`，整段改為：
+
+```js
+test('game:move into a room with an unknown drawType does not crash the room, and the turn still ends normally via game:endTurn', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'unknown_deck_type' }],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(result.error).toBeUndefined(); // moveToRoom itself succeeded
+
+  const update = await updatePromise;
+  // Despite the resolveCardDraw failure (UNKNOWN_DECK_TYPE), the room stays in
+  // sync and nothing crashes -- see M2c-2 final review Important I3. The turn
+  // itself no longer auto-advances (Task 5), so confirm it's still endable.
+  expect(update.turnOrder[update.currentPlayerIndex]).toBe(currentPlayerId);
+
+  const nextUpdatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+```
+
+**測試 5** — 找到 `test('an event-deck card requiring a choice defers the turn the same way an item-deck card does', ...)`，把最後一段（`advancedUpdatePromise`／斷言）改為手動呼叫 `game:endTurn`：函式開頭到 `blockedMove` 的斷言（`EFFECT_CHOICE_IN_PROGRESS`）都不變，只改最後這段：
+
+原本：
+```js
+  const advancedUpdatePromise = new Promise((resolve) => {
+    currentClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+  const advancedUpdate = await advancedUpdatePromise;
+  expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+```
+
+改為：
+```js
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
+  });
+
+  const advancedUpdatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const advancedUpdate = await advancedUpdatePromise;
+  expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+```
+
+（這個測試的解構賦值那行 `const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);` 要加上 `otherClient`，改成 `const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);`）
+
+**測試 6** — 找到 `test('an omen-deck card requiring a choice defers the turn the same way an item-deck card does', ...)`，套用跟測試 5 完全相同的修改方式（同樣加上 `otherClient` 解構，同樣把最後的 `advancedUpdatePromise`／`effectPromptRespond` 區塊改成先送出 `effectPromptRespond`，再呼叫 `game:endTurn` 換人）。
+
+- [ ] **Step 6: 順手修正一個現在敘述不準確的既有測試註解（非必要但建議一併處理）**
+
+`test('game:selectAction room_action: resolves the current room\'s effects', ...)`（約在檔案第 1310 行）裡有這段：
+
+```js
+  // Opening the door to room_new zeroes AP and ends the turn immediately
+  // (confirmed rule: entering a brand-new room never leaves AP for further
+  // actions the same turn -- a room's "operation" waits until the player's
+  // next turn). Simulate that next turn having come back around to this
+  // player, already standing in the now-open room_new with fresh AP.
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPlayerIndex = gameState.turnOrder.indexOf(currentPlayerId);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+```
+
+回合現在不會自動結束了，所以 `gameState.currentPlayerIndex = ...` 這行其實已經是不必要的重置（本來就沒變過），但這個測試的其餘部分（手動把 `actionPoints` 設回 1 來模擬「有行動力可以做房間動作」）仍然成立、不受影響。把註解與這行改為：
+
+```js
+  // Manually restore some actionPoints so there's a room action to perform
+  // -- opening the door already spent them all on the move itself.
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+```
+
+（只刪除 `gameState.currentPlayerIndex = gameState.turnOrder.indexOf(currentPlayerId);` 這行並更新註解，`actionPoints = 1` 那行維持不變）
+
+- [ ] **Step 7: 執行完整測試套件確認全部通過**
+
+Run: `cd server && npx jest --forceExit`
+Expected: PASS，全部測試（新增的 + 修改過的 + 其餘既有的）都綠燈
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add server/src/socketHandlers.js server/test/socketHandlers.test.js
+git commit -m "feat(turn): replace automatic AP-triggered turn advance with manual game:endTurn"
+```
+
+---
+
+## Task 6: `socketHandlers.js` — 接上召喚物分流與 give/leave/pickup
 
 **Files:**
 - Modify: `server/src/socketHandlers.js`
@@ -727,10 +1345,10 @@ Expected: FAIL——`mode` 目前完全被忽略（give/leave/pickup 都會被�
 
 - [ ] **Step 3: 實作**
 
-在 `server/src/socketHandlers.js` 頂部的 `require('./game/turnFlow')` 那行加上 `moveSummon`、`selectSummonAction`：
+**前置依賴**：這個任務接在 Task 5（回合手動結束機制）之後，Task 5 已經把 `server/src/socketHandlers.js` 頂部的 import 改成 `const { moveToRoom, selectAction, useStairs, endTurn } = require('./game/turnFlow');`（移除了 `isTurnOver`/`advanceTurn`，因為兩者的呼叫者 `advanceTurnIfOver` 已被刪除）。在這個基礎上加上 `moveSummon`、`selectSummonAction`：
 
 ```js
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn } = require('./game/turnFlow');
 ```
 
 修改 `game:move` handler，把原本緊接在 `hasPendingEffectChoice` 檢查之後的 `const { direction } = payload || {};` 往前挪到檢查之前一起解構，中間插入召喚物分流：
@@ -780,7 +1398,7 @@ const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, isT
         }
 ```
 
-（`room_action` 分支、`selectAction(...)` 呼叫、`sourceEffects` 之後的處理都不變——只有 `item` 分支的 `itemContent` 查找那段，多包一層 `(!mode || mode === 'use')` 的條件，give/leave/pickup 這三種 `mode` 不需要查內容目錄，也不需要解析 `effects`，`sourceEffects` 對它們來說本來就會保持 `null`，走到既有的 `else if (result.pending)` 之後自然略過，`advanceTurnIfOver` 照舊執行）
+（`room_action` 分支、`selectAction(...)` 呼叫、`sourceEffects` 之後的處理都不變——只有 `item` 分支的 `itemContent` 查找那段，多包一層 `(!mode || mode === 'use')` 的條件，give/leave/pickup 這三種 `mode` 不需要查內容目錄，也不需要解析 `effects`，`sourceEffects` 對它們來說本來就會保持 `null`，走到既有的 `else if (result.pending)` 之後自然略過。回合是否結束現在完全由玩家另外呼叫 `game:endTurn` 決定，跟這個任務的 `mode` 分流無關，不需要在這裡處理）
 
 **這裡有一個地方要注意**：召喚物分流那段呼叫 `getPlayer(gameState, playerId)` 拿到的 `player` 變數，跟後面既有邏輯裡沒有再宣告一次 `player` 變數（既有邏輯直接用 `playerId`），不會撞名，但插入分流之後，這個新的 `player` 變數在函式其餘部分仍然存在於作用域內——不影響既有邏輯運作（既有邏輯不會用到這個變數），純粹提醒你在複查 diff 時知道這是預期的。
 
@@ -798,7 +1416,7 @@ git commit -m "feat(summon): wire game:move/game:selectAction to branch on playe
 
 ---
 
-## Task 6: 犬靈（omen_004）卡片內容
+## Task 7: 犬靈（omen_004）卡片內容
 
 **Files:**
 - Modify: `data/cards/omen-cards.json`
