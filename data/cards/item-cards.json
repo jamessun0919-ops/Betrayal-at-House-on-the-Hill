@@ -51,9 +51,10 @@
     "description": "",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後玩家選擇０～８範圍內數字，取代該次擲骰的結果。本道具使用一次後消失。",
     "effects": [],
+    "diceInterjection": { "scope": "any", "override": true, "consumesItem": true },
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_006",
@@ -61,9 +62,15 @@
     "description": "",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後可以多投擲兩顆骰子（最多八顆），使用後意志降低一個級別，每回合限用一次，本道具使用後不會消失",
     "effects": [],
+    "diceInterjection": {
+      "scope": "any",
+      "bonusDice": 2,
+      "cost": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }],
+      "consumesItem": false
+    },
     "category": "general",
     "canTargetOthers": false,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_008",
@@ -98,9 +105,10 @@
     "description": "",
     "text": "當玩家因事件卡需要進行考驗時，可以多投擲一顆骰子（最多八顆）",
     "effects": [],
+    "diceInterjection": { "scope": "eventTriggered", "bonusDice": 1, "consumesItem": false },
     "category": "general",
     "canTargetOthers": false,
-    "needsCustomLogic": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_011",
