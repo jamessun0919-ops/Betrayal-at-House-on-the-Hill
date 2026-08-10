@@ -287,6 +287,11 @@ function advanceTurn(gameState) {
   const outgoingPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
   const outgoingPlayer = getPlayer(gameState, outgoingPlayerId);
   if (outgoingPlayer) {
+    const summon = outgoingPlayer.summons;
+    if (summon && summon.carryingItemId) {
+      const room = getRoomAt(gameState, summon.floor, summon.x, summon.y);
+      room.droppedItems.push({ id: summon.carryingItemId });
+    }
     outgoingPlayer.summons = null; // safety net -- should already be null before a turn can end
   }
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;

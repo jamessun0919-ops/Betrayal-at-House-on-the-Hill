@@ -493,3 +493,15 @@ test('advanceTurn clears the outgoing player\'s summons as a safety net', () => 
   advanceTurn(gameState);
   expect(player.summons).toBeNull();
 });
+
+test('advanceTurn drops the outgoing summon\'s carried item into its room instead of destroying it', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 3, carryingItemId: 'item_003' };
+  advanceTurn(gameState);
+  expect(player.summons).toBeNull();
+  const room = gameState.board.ground.get(coordKey(0, 0));
+  expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
