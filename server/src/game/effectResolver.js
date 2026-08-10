@@ -138,11 +138,12 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
       return { pending: true, rollChoice: true, baseCount, options, effect };
     }
   }
-  const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, context.interjectionChoice || null, context);
-  // Strip interjectionChoice before recursing into the matched tier's own
-  // effects -- it belongs only to *this* dice_check, not to any dice_check
-  // nested inside the tier's effects (which needs its own fresh scan).
+  // Strip interjectionChoice once it's been consumed for *this* dice_check --
+  // it must not leak into any resolveEffects call triggered from here (the
+  // chosen item's own cost effects, or the matched tier's effects), each of
+  // which needs a fresh scan if it contains its own nested dice_check.
   const { interjectionChoice, ...restContext } = context;
+  const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice || null, restContext);
   const tier = evaluateTiers(finalSum, effect.tiers);
   return resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
 }

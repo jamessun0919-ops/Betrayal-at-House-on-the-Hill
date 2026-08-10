@@ -477,9 +477,22 @@ test('resolveEffects dice_check does not leak interjectionChoice into a nested e
   // another dice_check, it must not silently reuse the outer interjection
   // decision -- it needs its own fresh scan (context.interjectionChoice
   // must be undefined again for it, not the outer resumed value).
+  //
+  // Discriminating setup: the OUTER dice_check resumes with a real (truthy)
+  // interjectionChoice -- a consumable override item ('item_005'). If that
+  // object leaked into the INNER dice_check's context instead of being
+  // stripped, the inner call would see context.interjectionChoice already
+  // defined, skip its own scan entirely, and treat the outer's
+  // override/consumesItem semantics as its own -- trying to remove
+  // 'item_005' a second time and throwing ITEM_NOT_FOUND, since the outer
+  // resolution already removed it. With the strip in place, the inner
+  // dice_check sees a fresh context.interjectionChoice === undefined, finds
+  // no eligible items (empty itemCatalog), and just rolls normally instead.
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
-  const rng = jest.fn().mockReturnValue(0.0); // every die -> face 0 for the inner check
+  player.inventory.push({ id: 'item_005' });
+  const diceInterjection = { scope: 'any', override: true, consumesItem: true };
+  const rng = jest.fn().mockReturnValue(0.0); // used only by the INNER dice_check's real roll
   const result = resolveEffects(gameState, createPromptState(), 'p1', [
     {
       type: 'dice_check',
@@ -493,9 +506,14 @@ test('resolveEffects dice_check does not leak interjectionChoice into a nested e
         }],
       }],
     },
-  ], { rng, interjectionChoice: null, itemCatalog: [] }); // itemCatalog: [] proves the inner check re-scanned (found nothing) rather than skipping
+  ], {
+    rng,
+    itemCatalog: [], // proves the inner check re-scanned (found nothing) rather than skipping
+    interjectionChoice: { itemId: 'item_005', diceInterjection, overrideValue: 5 },
+  });
   expect(result.pending).toBe(false);
   expect(player.stats.knowledge.currentIndex).toBe(player.stats.knowledge.baseIndex + 1);
+  expect(player.inventory).toEqual([]); // the outer's consumable item was removed exactly once, not twice
 });
 
 test('resolveEffects choice creates a pending prompt and returns the full options with nested effects', () => {
