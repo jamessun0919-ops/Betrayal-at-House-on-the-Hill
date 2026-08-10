@@ -98,6 +98,12 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
     });
   }
 
+  function handleEndTurn() {
+    socket.emit('game:endTurn', {}, (res) => {
+      if (res && res.error) setActionError(res.error);
+    });
+  }
+
   function handleEffectChoiceRespond(optionId) {
     if (!pendingEffectChoice) return;
     socket.emit('game:effectPromptRespond', { promptId: pendingEffectChoice.promptId, optionId }, (res) => {
@@ -155,6 +161,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId }) {
           <button onClick={() => handleSelectAction('attack')}>襲擊</button>
           <button onClick={() => handleSelectAction('room_action')}>操作</button>
           <button onClick={handleUseStairs}>樓梯（免費）</button>
+          <button onClick={handleEndTurn}>結束回合</button>
           <h3>最新遊戲狀態</h3>
           <pre>{JSON.stringify(gameState, null, 2)}</pre>
           {lastPendingAction && <p>待處理動作：{JSON.stringify(lastPendingAction)}</p>}
