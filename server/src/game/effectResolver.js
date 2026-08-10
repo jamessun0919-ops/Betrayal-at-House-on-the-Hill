@@ -135,7 +135,7 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
     const itemCatalog = context.itemCatalog || [];
     const options = findInterjectionOptions(player, itemCatalog, context.sourceDeckType);
     if (options.length > 0) {
-      return { pending: true, rollChoice: true, baseCount, options, effect };
+      return { pending: true, rollChoice: true, baseCount, options, effect, sourceDeckType: context.sourceDeckType };
     }
   }
   // Strip interjectionChoice once it's been consumed for *this* dice_check --

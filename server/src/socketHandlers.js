@@ -393,6 +393,19 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         }
         const { promptId, optionId, overrideValue } = payload || {};
         const { playerId: choicePlayerId, options, resumeKind, resumeContext } = resolverEntry.pendingRollChoice;
+
+        // Validate BEFORE consuming the prompt (respondToPrompt below) so a
+        // malformed response doesn't destroy the item or drop the pending
+        // choice -- the player can simply retry with a valid overrideValue.
+        if (optionId !== '__skip__') {
+          const candidateOption = options.find((o) => o.itemId === optionId);
+          if (candidateOption && candidateOption.diceInterjection.override) {
+            if (!Number.isInteger(overrideValue) || overrideValue < 0 || overrideValue > 8) {
+              return ack({ error: 'INVALID_OVERRIDE_VALUE' });
+            }
+          }
+        }
+
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearRollChoiceTimeout(roomCode, rollChoiceTimeouts);
         resolverEntry.pendingRollChoice = null;
@@ -624,8 +637,9 @@ function handleRollChoicePending(io, effectResolverManager, gameState, roomCode,
     deadline: prompt.deadline,
     options: effectResult.options,
     resumeKind: 'diceCheck',
-    resumeContext: { effect: effectResult.effect, sourceId, consumeItemIfApplied },
+    resumeContext: { effect: effectResult.effect, sourceId, consumeItemIfApplied, sourceDeckType: effectResult.sourceDeckType },
   };
+  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
   io.to(roomCode).emit('game:diceChoicePending', {
     playerId,
     promptId: prompt.promptId,
@@ -645,8 +659,8 @@ function resumeRollChoice(io, effectResolverManager, gameState, roomCode, player
     throw new Error('UNSUPPORTED_ROLL_CHOICE_RESUME_KIND');
   }
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  const { effect, sourceId, consumeItemIfApplied } = resumeContext;
-  const context = { now: Date.now(), interjectionChoice, itemCatalog: content.cards.items };
+  const { effect, sourceId, consumeItemIfApplied, sourceDeckType } = resumeContext;
+  const context = { now: Date.now(), interjectionChoice, itemCatalog: content.cards.items, sourceDeckType };
   const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, [effect], context);
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
 }
@@ -666,7 +680,10 @@ function handleRollChoiceTimeout(io, effectResolverManager, gameState, roomCode,
     rollChoiceTimeouts.delete(roomCode);
     const { playerId, resumeKind, resumeContext } = resolverEntry.pendingRollChoice;
     const result = resolvePromptTimeout(resolverEntry.promptState, { promptId, defaultOptionId: '__skip__' });
-    if (!result) return;
+    if (!result) {
+      resolverEntry.pendingRollChoice = null;
+      return;
+    }
     resolverEntry.pendingRollChoice = null;
     io.to(roomCode).emit('game:promptResolved', result);
     resumeRollChoice(io, effectResolverManager, gameState, roomCode, playerId, resumeKind, resumeContext, null, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);

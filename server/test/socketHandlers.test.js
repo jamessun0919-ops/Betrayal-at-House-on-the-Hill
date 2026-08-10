@@ -4,7 +4,7 @@ const { LobbyManager } = require('../src/lobbyManager');
 const { registerSocketHandlers } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
-const { createEffectResolverManager } = require('../src/game/effectResolverManager');
+const { createEffectResolverManager, getResolver } = require('../src/game/effectResolverManager');
 const { getGameState } = require('../src/game/gameManager');
 const { getPlayer } = require('../src/game/gameState');
 const { attachModifier } = require('../src/game/modifiers');
@@ -911,7 +911,7 @@ test('game:move into a room whose card effects include a choice broadcasts game:
 });
 
 async function setUpStartedGameWithContent(content, options) {
-  const { httpServer, port, gameManager } = await startTestServer(content, options);
+  const { httpServer, port, gameManager, effectResolverManager } = await startTestServer(content, options);
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
@@ -958,7 +958,7 @@ async function setUpStartedGameWithContent(content, options) {
   const currentClient = currentPlayerId === aliceId ? clientA : clientB;
   const otherClient = currentPlayerId === aliceId ? clientB : clientA;
 
-  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager };
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager, effectResolverManager };
 }
 
 test('game:effectPromptRespond resolves the pending choice and applies the chosen effects', async () => {
@@ -2256,6 +2256,134 @@ test('game:diceChoiceRespond rejects an optionId that isn\'t one of the offered 
     currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'not_a_real_item' }, resolve)
   );
   expect(result.error).toBe('INVALID_PROMPT_OPTION');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+function makeOverrideInterjectionContent() {
+  return makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_003',
+          name: '測試道具',
+          effects: [{
+            type: 'dice_check',
+            diceCount: 2,
+            tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+          }],
+          category: 'general',
+        },
+        {
+          id: 'item_005',
+          name: '天使羽毛',
+          diceInterjection: { scope: 'any', override: true, consumesItem: true },
+        },
+      ],
+    },
+  });
+}
+
+test('game:diceChoiceRespond with a malformed overrideValue is rejected before the item is consumed, and the roll choice stays open', async () => {
+  const content = makeOverrideInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_003' }, { id: 'item_005' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const pending = await pendingPromise;
+
+  // Missing overrideValue.
+  const missing = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005' }, resolve)
+  );
+  expect(missing.error).toBe('INVALID_OVERRIDE_VALUE');
+  // Out-of-range overrideValue.
+  const outOfRange = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 9 }, resolve)
+  );
+  expect(outOfRange.error).toBe('INVALID_OVERRIDE_VALUE');
+
+  // The item survived and the choice is still pending -- nothing was consumed.
+  expect(player.inventory).toEqual([{ id: 'item_003' }, { id: 'item_005' }]);
+  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice).not.toBeNull();
+
+  // A valid retry against the same promptId still resolves normally.
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const retry = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 6 }, resolve)
+  );
+  expect(retry.error).toBeUndefined();
+  await effectResolvedPromise;
+  expect(player.inventory).toEqual([{ id: 'item_003' }]); // consumed only on the valid response
+  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice).toBeNull();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('opening a roll choice clears any pendingChoice left on the room entry', async () => {
+  // A choice effect whose chosen option contains a dice_check: handleEffectResolveResult
+  // takes the rollChoice branch before it would have nulled pendingChoice, so the entry
+  // would otherwise hold both a pendingChoice and a pendingRollChoice at once.
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_007',
+          name: '巢狀選擇道具',
+          category: 'general',
+          effects: [{
+            type: 'choice',
+            description: '選一個',
+            options: [{
+              optionId: 'opt_roll',
+              label: '擲骰',
+              effects: [{
+                type: 'dice_check',
+                diceCount: 2,
+                tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+              }],
+            }],
+            timeoutMs: 20000,
+            defaultOptionId: 'opt_roll',
+          }],
+        },
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [], consumesItem: false },
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_007' }, { id: 'item_006' });
+
+  const effectChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_007' }, resolve));
+  const effectChoice = await effectChoicePromise;
+  expect(getResolver(effectResolverManager, roomCode).pendingChoice).not.toBeNull();
+
+  const rollPendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:effectPromptRespond', { promptId: effectChoice.promptId, optionId: 'opt_roll' }, resolve)
+  );
+  await rollPendingPromise;
+
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingRollChoice).not.toBeNull();
+  expect(entry.pendingChoice).toBeNull();
 
   clientA.close();
   clientB.close();
