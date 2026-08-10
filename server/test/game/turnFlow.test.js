@@ -4,7 +4,9 @@ const { coordKey } = require('../../src/game/boardGenerator');
 const {
   getAvailableDirections,
   moveToRoom,
+  moveSummon,
   selectAction,
+  selectSummonAction,
   isTurnOver,
   getCurrentTurnPlayerId,
   advanceTurn,
@@ -397,4 +399,97 @@ test('selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when hasRoomActi
   const { gameState } = makeGameStateWithPlayer();
   expect(() => selectAction(gameState, 'p1', 'room_action', { hasRoomAction: false })).toThrow('NO_ROOM_ACTION_AVAILABLE');
   expect(() => selectAction(gameState, 'p1', 'room_action')).toThrow('NO_ROOM_ACTION_AVAILABLE');
+});
+
+test('moveSummon moves the summon to an already-explored neighbor room and spends 1 of its own actionPoints', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  const result = moveSummon(gameState, 'p1', 'north');
+  expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
+  expect(player.summons.x).toBe(0);
+  expect(player.summons.y).toBe(-1);
+  expect(player.summons.actionPoints).toBe(5);
+});
+
+test('moveSummon never offers open_door -- throws INVALID_MOVE_DIRECTION toward unexplored territory', () => {
+  const { gameState, player } = makeGameStateWithPlayer(); // room deck has cards available for a human player's open_door
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  expect(() => moveSummon(gameState, 'p1', 'east')).toThrow('INVALID_MOVE_DIRECTION');
+});
+
+test('moveSummon throws NO_ACTIVE_SUMMON when the player has no summon', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => moveSummon(gameState, 'p1', 'north')).toThrow('NO_ACTIVE_SUMMON');
+});
+
+test('moveSummon throws NOT_ENOUGH_ACTION_POINTS when the summon is out of actionPoints', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 0, carryingItemId: null };
+  expect(() => moveSummon(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
+});
+
+test('selectSummonAction item mode:pickup picks up a dropped item at the summon\'s own position, not the player\'s', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [{ id: 'item_003' }] });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: -1, actionPoints: 6, carryingItemId: null };
+  const result = selectSummonAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'pickup' });
+  expect(result).toEqual({ kind: 'item', mode: 'pickup', itemId: 'item_003' });
+  expect(player.summons.carryingItemId).toBe('item_003');
+  expect(player.inventory).toEqual([]); // did not go to the player's own inventory
+});
+
+test('selectSummonAction item mode:pickup throws SUMMON_ALREADY_CARRYING when already holding something', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  const room = gameState.board.ground.get(coordKey(0, 0));
+  room.droppedItems.push({ id: 'item_099' });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: 'item_003' };
+  expect(() =>
+    selectSummonAction(gameState, 'p1', 'item', { itemId: 'item_099', mode: 'pickup' })
+  ).toThrow('SUMMON_ALREADY_CARRYING');
+});
+
+test('selectSummonAction item mode:leave drops the carried item at the summon\'s current room', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: 'item_003' };
+  const result = selectSummonAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'leave' });
+  expect(result).toEqual({ kind: 'item', mode: 'leave', itemId: 'item_003' });
+  expect(player.summons.carryingItemId).toBeNull();
+  const room = gameState.board.ground.get(coordKey(0, 0));
+  expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('selectSummonAction actionType:dissipate clears player.summons and drops the carried item where the summon stood', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: -1, actionPoints: 0, carryingItemId: 'item_003' };
+  const result = selectSummonAction(gameState, 'p1', 'dissipate', {});
+  expect(result).toEqual({ kind: 'dissipate' });
+  expect(player.summons).toBeNull();
+  const room = gameState.board.ground.get(coordKey(0, -1));
+  expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('selectSummonAction actionType:dissipate works even when the summon has 0 actionPoints left', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 0, carryingItemId: null };
+  const result = selectSummonAction(gameState, 'p1', 'dissipate', {});
+  expect(result).toEqual({ kind: 'dissipate' });
+  expect(player.summons).toBeNull();
+});
+
+test('selectSummonAction throws NO_ACTIVE_SUMMON when the player has no summon', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => selectSummonAction(gameState, 'p1', 'dissipate', {})).toThrow('NO_ACTIVE_SUMMON');
+});
+
+test('advanceTurn clears the outgoing player\'s summons as a safety net', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 3, carryingItemId: null };
+  advanceTurn(gameState);
+  expect(player.summons).toBeNull();
 });

@@ -90,6 +90,85 @@ function getRoomAt(gameState, floor, x, y) {
   return gameState.board[floor].get(coordKey(x, y));
 }
 
+function moveSummon(gameState, playerId, direction) {
+  const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  const summon = player.summons;
+  if (!summon) {
+    throw new Error('NO_ACTIVE_SUMMON');
+  }
+  if (summon.actionPoints < 1) {
+    throw new Error('NOT_ENOUGH_ACTION_POINTS');
+  }
+  const room = getRoomAt(gameState, summon.floor, summon.x, summon.y);
+  const doorSides = Array.isArray(room.doorSides) ? room.doorSides : [];
+  if (
+    !doorSides.includes(direction) ||
+    !canMoveBetween(gameState.board, summon.floor, { x: summon.x, y: summon.y }, direction)
+  ) {
+    // Summons can only move into already-placed neighbor rooms -- never open a
+    // new door, regardless of whether the room deck has cards left.
+    throw new Error('INVALID_MOVE_DIRECTION');
+  }
+  const delta = DIRECTION_DELTA[direction];
+  summon.x += delta.dx;
+  summon.y += delta.dy;
+  summon.actionPoints -= 1;
+  return { kind: 'move', x: summon.x, y: summon.y };
+}
+
+const SUMMON_ITEM_MODES = ['pickup', 'leave'];
+
+function selectSummonAction(gameState, playerId, actionType, options = {}) {
+  const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  const summon = player.summons;
+  if (!summon) {
+    throw new Error('NO_ACTIVE_SUMMON');
+  }
+  if (actionType === 'dissipate') {
+    if (summon.carryingItemId) {
+      const room = getRoomAt(gameState, summon.floor, summon.x, summon.y);
+      room.droppedItems.push({ id: summon.carryingItemId });
+    }
+    player.summons = null;
+    return { kind: 'dissipate' };
+  }
+  if (actionType !== 'item' || !SUMMON_ITEM_MODES.includes(options.mode)) {
+    throw new Error('INVALID_ACTION_TYPE');
+  }
+  if (summon.actionPoints < 1) {
+    throw new Error('NOT_ENOUGH_ACTION_POINTS');
+  }
+  const { itemId, mode } = options;
+  const room = getRoomAt(gameState, summon.floor, summon.x, summon.y);
+  if (mode === 'leave') {
+    if (summon.carryingItemId !== itemId) {
+      throw new Error('ITEM_NOT_HELD');
+    }
+    room.droppedItems.push({ id: itemId });
+    summon.carryingItemId = null;
+    summon.actionPoints -= 1;
+    return { kind: 'item', mode: 'leave', itemId };
+  }
+  // mode === 'pickup'
+  if (summon.carryingItemId) {
+    throw new Error('SUMMON_ALREADY_CARRYING');
+  }
+  const index = room.droppedItems.findIndex((i) => i.id === itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_IN_ROOM');
+  }
+  room.droppedItems.splice(index, 1);
+  summon.carryingItemId = itemId;
+  summon.actionPoints -= 1;
+  return { kind: 'item', mode: 'pickup', itemId };
+}
+
 function giveItemAction(gameState, player, itemId, targetPlayerId) {
   const index = player.inventory.findIndex((item) => item.id === itemId);
   if (index === -1) {
@@ -205,6 +284,11 @@ function getCurrentTurnPlayerId(gameState) {
 
 function advanceTurn(gameState) {
   requireTurnOrder(gameState);
+  const outgoingPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
+  const outgoingPlayer = getPlayer(gameState, outgoingPlayerId);
+  if (outgoingPlayer) {
+    outgoingPlayer.summons = null; // safety net -- should already be null before a turn can end
+  }
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;
   const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
   const nextPlayer = getPlayer(gameState, nextPlayerId);
@@ -251,7 +335,9 @@ function useStairs(gameState, playerId) {
 module.exports = {
   getAvailableDirections,
   moveToRoom,
+  moveSummon,
   selectAction,
+  selectSummonAction,
   isTurnOver,
   getCurrentTurnPlayerId,
   advanceTurn,
