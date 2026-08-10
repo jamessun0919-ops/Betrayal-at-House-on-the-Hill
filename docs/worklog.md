@@ -440,3 +440,32 @@
 **開發者交代備忘事項**：
 - 下一階段工作：M2c-3 其餘卡片（傷害系統等機制缺口，見 Handover）或 M2d（簡易前端 UI），順序已跟開發者確認為 M2c-3 → M2d
 
+## 2026-08-10 第 3 次工作階段
+
+**當日工作內容**：
+- 開發者「晚安」開新 session，讀取 Handover 後討論本階段工作方向，選定先做房間獨立小任務（結束回合被動加成＋離開房間前考驗）
+- 說明 `onceOnlyPerPlayer` 欄位的用途（禮拜堂等 4 間房間的結束回合加成，目前完全沒有觸發點），跟開發者確認離開房間前考驗（塔橋/雜亂的房間/藤蔓糾纏的溫室）的細節：塔橋的「跨越」機制併入統一的「離開時考驗」處理；考驗失敗行動力照扣但可以當回合再試
+- 設計「結束回合被動加成」＋「離開房間前考驗」兩個機制方向，確認可以直接在 `main` 上用 TDD 逐項實作（範圍小，不用開 worktree），實作完成：`game:endTurn` 接上房間加成觸發、`moveToRoom` 新增 `leaveCheck` 參數（沿用既有 `dice_check` 的骰值機制，但只需要通過/沒通過的布林結果，不是完整 tiers），確認離開房間前考驗要同時擋住「移動到已知房間」與「開新門」兩種離開方式，開門失敗不影響行動力歸零規則，成功才會歸零。3 個 commit，364/364 測試全綠，推送
+- 開發者要求繼續討論 M2c-3，實際盤點後發現先前的印象有誤（不是幾乎都卡在 M3），還有 8 張卡片＋保險庫沒排查過。逐一看過卡面文字後，確認其中 4 張其實隱含綁在 M3 傷害/戰鬥系統上（先前 Handover 沒有列出全部清單），真正沒卡住、需要新機制的是天使羽毛/詭異人偶/幸運兔腳/蠟燭 4 張「影響擲骰」的道具
+- 討論「影響擲骰的道具」機制，開發者確認要做「統一擲骰入口」讓 `dice_check` 跟 `leaveCheck` 共用同一套機制，並確認幸運兔腳（擲骰後重骰）不做（後期擴展性低），直接把這張卡從遊戲移除（`item-cards.json` 刪除該筆資料）
+- 用 `brainstorming` skill 正式討論「可被道具介入的擲骰」設計，確認幾個關鍵決定：暫停等待玩家回應的狀態要另開一個獨立欄位（`pendingRollChoice`），不跟既有的 `pendingChoice` 共用；詢問視窗一次列完所有可用道具選項（不分兩層問要不要用/用哪個）；天使羽毛需要的數值直接跟著選項一起送出，不用第二層視窗。設計文件寫完並提交
+- 用 `writing-plans` skill 轉成實作計畫，讀程式碼時發現規格文件沒完全講清楚的技術細節（`effectResolver.js` 無法直接讀卡片目錄，需要透過 `context.itemCatalog` 往下傳；巢狀擲骰的 `interjectionChoice` 沒清掉會誤套用）。任務量偏大（10 個任務），跟開發者確認拆成兩份計畫，第一份先做 `dice_check` 路徑（7 任務），`leaveCheck` 路徑留給之後的 Part B
+- 用 `subagent-driven-development` 在獨立 worktree 執行 Part A 全部 7 個任務：Task 6 執行時 implementer 發現並正確停下（不自行修改）一個計畫本身的一行遺漏（`resolveCardDraw` 缺少 `content` 參數傳遞，導致 2 個測試失敗），確認是計畫作者的疏失後授權修正，計畫文件也同步訂正；Task 5 審查發現 2 個 Important（迴歸測試沒有鑑別力、cost 路徑仍會洩漏 `interjectionChoice`），修一輪後通過重新審查
+- 全分支最終審查（最強模型，涵蓋全部 9 筆 commit）：發現 3 個 Important（`overrideValue` 沒驗證就先消耗道具，導致天使羽毛可能被永久摧毀且擲骰結果憑空消失；新暫停狀態沒清空舊的，架構上可能導致房間永久卡死；除錯頁面完全沒有新事件監聽，20 秒凍結）＋1 個 Minor（`sourceDeckType` 沒有在恢復流程中保留）。除錯頁面凍結問題跟開發者確認要加最小監聽/按鈕（不是接受凍結或延後），派 subagent 一次修完 4 項，其中一項（`pendingChoice` 卡死）原本以為無法測試，implementer 找到辦法補了真正會失敗的迴歸測試。重新審查全數通過，391/391 測試穩定
+- 用 `finishing-a-development-branch` 合併：`ExitWorktree` 退回主副本、merge、測試確認、刪除 worktree/分支、推送
+- 更新 Handover.md：兩個小任務段落改為已完成，新增全分支審查發現的兩個通用教訓（消耗前驗證、新暫停狀態要主動清空舊的）到除錯注意事項
+
+**完成項目**：
+- 房間獨立小任務（結束回合被動加成＋離開房間前考驗）已完成並合併進 `main`
+- `dice-interjection-part-a`（天使羽毛/詭異人偶/蠟燭三張卡的擲骰介入機制，`dice_check` 路徑）全部 7 任務＋全分支審查修正，已合併進 `main`
+- 幸運兔腳（`item_007`）依開發者指示從遊戲移除
+- [docs/superpowers/specs/2026-08-10-dice-interjection-design.md](superpowers/specs/2026-08-10-dice-interjection-design.md)、[docs/superpowers/plans/2026-08-10-dice-interjection-part-a.md](superpowers/plans/2026-08-10-dice-interjection-part-a.md) 已撰寫並提交
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- 全分支審查發現的問題都是跨任務組合出來的，個別任務審查看不到——跟先前 `summon-control-and-item-drop` 的經驗一致，確立了「新增暫停狀態要檢查跟既有狀態共存」這個通用教訓
+- Task 6 執行期間再次遇到計畫本身有遺漏（跟上一階段的犬靈計畫如出一轍），依同樣流程處理：implementer 停下不自行修改，確認是計畫問題後才授權修正
+
+**開發者交代備忘事項**：
+- 下一階段工作：M2c-3 其餘卡片（傷害系統/通靈板/中世紀鎧甲，都卡在 M3）或 `dice-interjection` Part B（`leaveCheck` 路徑）或 M2d，開發者尚未排定順序
+

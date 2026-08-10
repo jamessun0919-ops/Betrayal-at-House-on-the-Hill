@@ -1,8 +1,8 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-10（第 4 次工作階段續篇，summon-control-and-item-drop 全部 7 個任務完成，全分支審查通過並已合併進 `main`）
+最後更新：2026-08-10（第 5 次工作階段，房間獨立小任務＋`dice-interjection` Part A 全部完成並合併進 `main`）
 
-**`summon-control-and-item-drop` 已完成並合併進 `main`**：worktree（`.claude/worktrees/summon-control-and-item-drop`）與分支（`worktree-summon-control-and-item-drop`，本機與遠端）皆已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
+**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection-part-a` 皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -26,6 +26,8 @@
       - Task 1（`droppedItems` 房間欄位）、Task 2（`switch_control` 效果類型）、Task 3（道具 give/leave/pickup，一般玩家）、Task 4（`moveSummon`/`selectSummonAction`，含一輪修正：`advanceTurn` 安全網原本會弄丟召喚物身上攜帶的道具）、Task 6（`socketHandlers.js` 接上 `player.summons` 分流＋`mode` 透傳）、Task 7（`omen_004` 犬靈卡片內容）——皆完成並通過審查
       - **Task 5（回合手動結束機制，全體玩家）—— 執行期間新增的任務，不在原計畫裡**：Task 4 審查時發現，犬靈道具（`switch_control`）本身要花 1 點行動力，若玩家使用當下剩 1 點，行動力歸零會自動觸發回合結束，剛建立的召喚物瞬間被摧毀。跟開發者確認後決定**全面改為手動結束回合**（不限召喚物情境）：新增 `endTurn`/`game:endTurn`，移除 `advanceTurnIfOver` 及其 4 個呼叫點，`isTurnOver` 保留但不再被自動呼叫。**前端「結束回合」按鈕本來規劃留到 M2d，但全分支審查發現除錯頁面完全無法結束回合會讓多回合遊玩完全跑不動，已補了一個最小按鈕到 `DebugGameScreen.jsx`（見下方全分支審查段落），完整的行動選單 UI 仍留給 M2d**
       - **全分支最終審查（合併前，見下方除錯注意事項的新段落）發現 1 個 Critical＋4 個 Important，已全數修復並重新審查通過，349/349→358/358**
+    - **房間獨立小任務（結束回合被動加成＋離開房間前考驗）—— 已完成並合併進 `main`**：直接在 `main` 上用 TDD 逐項實作（範圍小，未開 worktree）。禮拜堂/圖書室/食品儲藏室/健身房的「結束回合獲得加成」（`onceOnlyPerPlayer`）終於接上 `game:endTurn` 觸發點；塔橋/雜亂的房間/藤蔓糾纏的溫室的「離開房間前考驗」用新的 `leaveCheck` 房間欄位＋`moveToRoom` 新參數實作，兩種離開方式（移動到已知房間／開新門）都會被擋，失敗只扣 1 點行動力（跟正常移動花費一樣，不會多扣），可以當回合重試。3 個 commit，364/364 測試全綠。
+    - **`dice-interjection-part-a`（可被道具介入的擲骰，卡片/房間操作觸發的 `dice_check` 路徑）—— 已完成並合併進 `main`**：設計文件 [docs/superpowers/specs/2026-08-10-dice-interjection-design.md](docs/superpowers/specs/2026-08-10-dice-interjection-design.md)、實作計畫 [docs/superpowers/plans/2026-08-10-dice-interjection-part-a.md](docs/superpowers/plans/2026-08-10-dice-interjection-part-a.md)（7 任務，`subagent-driven-development` 在獨立 worktree 執行）。天使羽毛（`item_005`，擲骰前自選 0~8 覆蓋結果）、詭異人偶（`item_006`，擲骰前多骰兩顆，代價意志-1，每回合限一次）、蠟燭（`item_010`，僅事件卡觸發的考驗可用，多骰一顆）三張卡現在能在擲骰前跳出詢問視窗讓玩家決定要不要介入。幸運兔腳（`item_007`，擲骰後重骰）已依開發者指示直接從遊戲移除，不做。**只涵蓋 `dice_check` 路徑，`leaveCheck`（塔橋等房間）的道具介入是 Part B，尚未開始**，`diceInterjection.js` 刻意保持無外部依賴的純函式模組供 Part B 直接沿用。全分支最終審查發現 3 個 Important（`overrideValue` 未驗證就先消耗道具、`pendingRollChoice`／`pendingChoice` 共存導致永久卡死房間、除錯頁面完全沒有新事件監聽）＋1 個 Minor（`sourceDeckType` 沒有在恢復流程中保留），全數修復並重新審查通過，391/391 測試全綠。
 - **角色資料範本**：[data/characters/characters.json](data/characters/characters.json)（6 個佔位角色位置），開發者尚未填寫真實內容
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`——技術棧/規模都跟本專案不符
 
@@ -58,6 +60,11 @@
 - **Important（已修復）**：`DebugGameScreen.jsx` 完全沒有「結束回合」按鈕——Task 5 把自動結束回合機制拿掉後，除錯頁面連過第二回合都做不到。補了一個最小的 `結束回合` 按鈕（跟既有 `handleUseStairs` 同樣寫法），完整的行動選單／召喚物操控 UI 仍然是 M2d 的範圍
 - **Minor（已記錄，暫不處理）**：`SUMMON_ALREADY_USED_THIS_TURN` 這類新拋錯目前會被 `game:selectAction` 既有的 catch-and-log 模式吞掉（玩家端看不到錯誤訊息，但行動力已經被扣），這是既有的吞錯模式，不是這次新增的缺陷，但這次新的拋錯讓它第一次在正常遊玩中可能被踩到，前端做出對應 UI 提示前先记录
 
+**`dice-interjection-part-a` 全分支最終審查發現的實際案例（已修復，供未來同類流程參考）**：
+- **Important（已修復）：consume-before-validate 模式——道具先被消耗，驗證失敗才拋錯，導致玩家永久失去道具且擲骰結果憑空消失**。天使羽毛的 `overrideValue`（玩家自選 0~8 覆蓋擲骰結果）原本只在 `computeInterjectedRoll` 深處驗證，但**驗證之前**就已經呼叫 `respondToPrompt`（消耗提示）跟移除道具——玩家送出缺漏或超出範圍的 `overrideValue`，道具就永久消失，擲骰也不會有結果。修復：在 `game:diceChoiceRespond` 的**最前面**（`respondToPrompt` 之前，提示狀態都還完整保留時）先驗證 `overrideValue`，驗證失敗直接回錯誤讓玩家可以重新送出正確的值。**通用教訓：任何「先扣資源、後驗證輸入」的順序都要反過來——驗證永遠要在消耗/移除任何東西之前**
+- **Important（已修復）：新的暫停狀態（`pendingRollChoice`）沒有清掉舊的暫停狀態（`pendingChoice`），兩者同時存在會讓房間永久卡死**。`handleRollChoicePending` 建立 `pendingRollChoice` 時沒有把既有的 `pendingChoice` 清空——如果一張卡片的 `choice` 效果選項本身又包含一個會跳出道具介入的 `dice_check`（目前沒有卡片這樣寫，但架構上可行），兩個暫停狀態會同時存在，導致回應其中一個會讓另一個指向一個已經不存在的提示，永久卡死房間（`game:move`/`game:selectAction`/`game:endTurn`/`game:useStairs` 全部被 `ROLL_CHOICE_IN_PROGRESS` 擋死，逾時計時器的防呆分支也沒有清掉卡死的狀態）。修復：建立新暫停狀態時明確清空舊的，逾時的提早return分支也要防呆補清。**通用教訓：任何新增的「暫停等待玩家回應」狀態，都要檢查會不會跟既有的暫停狀態共存衝突，不能只顧自己這一個狀態**
+- **確立的規則**：這次是本專案第二次新增獨立的「暫停等待玩家回應」狀態（第一次是 M2c-2 的 `pendingChoice`），兩次都不是靠「重用既有欄位」而是「開一個新的、平行的欄位＋各自獨立的逾時計時器 map＋各自獨立的 socket 回應事件」——這是刻意的架構選擇（兩種暫停的「恢復邏輯」本質不同），但也代表每次新增暫停狀態都要重新檢查「這個新狀態會不會跟其他既有的暫停狀態衝突」，不會自動免疫
+
 **M2c-3 盤點期間發現的架構缺口（已跟開發者確認方向，記錄供 M3 或未來小任務參考）**：
 - **傷害系統完全沒有實作，且不只是 M3 combat 需要，好幾張 M2 階段就會抽到的事件/預兆卡也需要**（駭人尖叫、蜘蛛失敗分支、濕滑的地板、天花板塌陷、噬咬）。**開發者已定案的設計**：多點傷害＝跳出 N 次單點選擇視窗（N＝傷害總點數），每次讓玩家選「力量或速度」（肉體傷害）／「知識或意志」（精神傷害）其中一項扣 1 點，且每次視窗都要顯示兩個候選屬性**當下**的級別與實際數值（角色屬性是刻度制，降級不代表數值一定下降，且邪祟後降到最低級別＝死亡，玩家需要真實數據才能判斷）。**逾時規則**：只要其中一點逾時（不管第幾點），從那一點開始（含當次）剩下的全部點數，改用 8/1 規則書原案「儘量平均分配，無法平分則給數值較高的屬性」批次處理，不再繼續逐點跳窗。需要新增：(1) 新效果類型 `damage`（`damageType`+`amount`，`amount` 可能是固定數字或卡片內部先擲一次獨立骰子決定）；(2) `effectResolverManager` 的 `pendingChoice` 要能記住「連續提示鏈」的進度（第幾點/還剩幾點/傷害類型），不是只記一個待解決選擇；(3) 提示廣播要能即時查詢並附上兩個候選屬性的當下級別+數值，不是卡片作者預先寫死的選項。**確認放在 M3 實作**（駭人尖叫等目前卡在這個缺口的卡片，`needsCustomLogic:true` 空著等 M3）
 - **房間「結束回合被動加成」跟「離開房間前考驗」都沒有觸發點**：`rooms.json` 裡禮拜堂/圖書室/食品儲藏室/健身房已經有 `effects`（`onceOnlyPerPlayer:true`），塔橋/雜亂的房間/藤蔓糾纏的溫室的文字是「離開房間前要考驗」——這兩種都不是「進房自動觸發」也不是「玩家主動操作」，目前完全沒有對應的觸發點，`onceOnlyPerPlayer` 欄位在程式碼裡也完全沒被讀取。**開發者已確認**：這是需要新增程式碼的獨立小任務，不算在 M2c-3 內容撰寫範圍內，有空再處理，不影響其他內容撰寫
@@ -69,18 +76,21 @@
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-無設計層面阻塞。`summon-control-and-item-drop` 已全部完成並合併進 `main`（worktree／分支皆已清理），目前工作目錄就是 `main`。
+無設計層面阻塞。`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection-part-a` 皆已完成並合併進 `main`（worktree／分支皆已清理），目前工作目錄就是 `main`。
 
 **舊的 worktree 清理問題已解決**：`.claude/worktrees/m2c4-m2c5-action-and-haunt` 已不存在（`git worktree list`/`git branch -a` 皆確認），不需要再處理。
 
 **commit `52cdd1d` 的歷史備註（僅供之後對照 commit 歷史時參考，非待辦）**：該筆提交因操作疏失把「`modifiers.js` 的 `removeWhen` 改可選」這個程式碼修正跟「M2c-3 第一批內容草稿」合併成同一筆——功能跟測試都正確，只是 commit 訊息只提到程式碼修正沒提到內容。
 
+**`data/cards/item-cards.json` 尾端有 2 筆空白佔位資料**（`id`/`name`/`text` 都是空字串）——本次全分支審查合併時發現，已確認這是**分支開始前就存在**的既有資料（不是這次改動造成的），維持原樣沒有動它，僅記錄供之後留意。
+
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 讀最近一次工作階段範圍即可
-2. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；房間結束回合/離開考驗的觸發點是獨立小任務，有空再補；通靈板整張延後到 M3
-3. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單（**現在也會包含預兆牌**，見上方除錯注意事項）、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「結束回合」按鈕與行動選單（目前除錯頁面只有最小可用版本）
-4. **執行順序已跟開發者確認**：M2c-3 → M2d，依序完成，不要打亂
-5. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（新機制，注意不再是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
+2. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；通靈板整張延後到 M3；`item_008`（中世紀鎧甲，減傷＋防偷竊）也綁在 M3 傷害/偷竊機制上
+3. **`dice-interjection` Part B（`leaveCheck` 路徑的道具介入）**：讓天使羽毛/詭異人偶也能用在塔橋/雜亂的房間/藤蔓糾纏的溫室這類「離開房間前考驗」，目前只有 `dice_check`（卡片/房間操作觸發）路徑做完，`leaveCheck` 路徑完全還沒接。`diceInterjection.js` 已刻意設計成無外部依賴的純函式，Part B 可以直接沿用 `findInterjectionOptions`/`resolveFinalRoll`，不用重寫。獨立計畫，等開發者排入順序
+4. **M2d（簡易使用者介面，新里程碑）**：取代目前 JSON 傾印風格的除錯頁面，至少涵蓋：房間地圖視覺化（`board.ground`/`board.upper` 的相對位置＋已開門方向）、目前所在房間標示、屬性刻度視覺化（`track`/`currentIndex`/`baseIndex` 用長條圖＋刻度呈現，不要只顯示原始數字）、自身道具清單（**現在也會包含預兆牌**，見上方除錯注意事項）、其他玩家的位置標示、公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「結束回合」按鈕與行動選單、完整的「擲骰道具介入」選擇畫面（目前除錯頁面都只有最小可用版本）
+5. **執行順序已跟開發者確認**：M2c-3 → M2d，依序完成，不要打亂（`dice-interjection` Part B 何時排入待開發者決定）
+6. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→隨機選角→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（注意不是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
 
 ## 關鍵設定 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Socket.IO（伺服器持有權威遊戲狀態）＋ React (Vite) 前端；純 JavaScript，不使用 TypeScript；單一程式碼庫同時支援區網與雲端部署
@@ -102,6 +112,9 @@
 - **`toggle_active` 效果類型（M2c-3，面具用，可泛用）**：背包道具項目多一個 `active` 布林欄位，`{itemId, activeEffects, inactiveEffects}` 依目前狀態套用其中一組並切換狀態，之後其他「有生效狀態」的道具可以直接沿用
 - **`persistent_modifier` 的 `blocksOpenDoor` 效果（M2c-3，電池耗盡用）**：`{hookType:"blocksOpenDoor"}`，`turnFlow.js` 的 `getAvailableDirections` 檢查到就不列出開新房間的選項，但已存在的相鄰房間仍可移動
 - **犬靈操控切換＋道具給予/遺留/撿取（已全部完成並合併進 `main`）**：玩家物件新增 `summons` 欄位（單一物件不是陣列，`type` 欄位分辨召喚物種類，之後可擴充不限犬靈，`undefined`／`null`＝無召喚物；`{type, floor, x, y, actionPoints, carryingItemId}`）跟 `summonUsedThisTurn` 布林欄位（一回合限一次切換，`advanceTurn` 於離開玩家身上重置，兩者都是 lazy-optional，`createPlayer` 不初始化）；房間動態狀態（`gameState.board` 裡的房間物件，不是靜態 `rooms.json`）新增 `droppedItems` 陣列。新效果類型 `switch_control`（`{summonType, actionPoints}`，建立 `summons`，含 `INVALID_SWITCH_CONTROL_EFFECT`/`SUMMON_ALREADY_ACTIVE`/`SUMMON_ALREADY_USED_THIS_TURN` 三種拒絕情境）。`turnFlow.js` 新增 `moveSummon`/`selectSummonAction`（操控召喚物期間限定 移動/撿取/遺留/消散，消散＝純狀態切換不算結束回合，行動力歸零不影響消散）；`selectAction` 的 `item` 動作新增 `mode: 'give'|'leave'|'pickup'`（預設/`'use'`＝原本邏輯，`leave`/`pickup` 都會保留道具物件本身的狀態，不會重建成只剩 `{id}`）。`socketHandlers.js` 的 `game:move`/`game:selectAction`/`game:useStairs` 依 `player.summons` 是否存在分流／擋下。**新增 `activatedOnUse` 卡片旗標**（`resolveCardDraw` 看到就跳過抽卡當下的效果解析，只在玩家之後主動用 `game:selectAction actionType:'item'` 使用時才解析）——這是全分支審查抓到的通用機制，任何「持有後才主動使用」的卡片都要記得標，不是犬靈專屬（詳見上方除錯注意事項的 Critical 案例）。詳見 [設計文件](docs/superpowers/specs/2026-08-09-summon-control-and-item-drop-design.md)、[實作計畫](docs/superpowers/plans/2026-08-10-summon-control-and-item-drop.md)
+- **房間「結束回合被動加成」（`onceOnlyPerPlayer`，已合併進 `main`）**：房間 `effects` 裡的 `stat_change` 效果可以帶 `onceOnlyPerPlayer:true`，`game:endTurn` 結束回合時會檢查玩家所在房間，套用尚未領過的加成，記錄進玩家新欄位 `player.roomBonusesReceived`（房間 id 陣列，lazy-optional）——每人每間房限一次，不限這次結束回合是不是第一次進這間房
+- **房間「離開前考驗」（`leaveCheck`，已合併進 `main`）**：房間內容新增 `leaveCheck: {stat, min}` 欄位（塔橋/雜亂的房間/藤蔓糾纏的溫室），`moveToRoom`（`turnFlow.js`）新增參數，離開房間前（不管是移動到已知房間還是開新門）先用該屬性當下數值擲骰考驗，通過才正常移動；沒通過扣 1 點行動力（跟正常移動花費一樣，不會多扣），原地不動，行動力夠可以當回合重試；開新門失敗**不會**抽卡也不會歸零行動力，只有真的開門成功才會
+- **可被道具介入的擲骰（`dice-interjection-part-a`，已合併進 `main`，只涵蓋 `dice_check` 路徑）**：卡片新增頂層欄位 `diceInterjection`（`{scope:"any"|"eventTriggered", bonusDice?, override?, cost?, consumesItem}`，跟 `effects` 平行，不是塞進 `effects` 陣列），宣告這張道具能介入「別人正在進行的擲骰」。`dice_check` 擲骰前（`effectResolver.js` 的 `handleDiceCheck`）會掃描玩家背包，透過 `context.itemCatalog`（呼叫端從 `content.cards.items` 準備好往下傳，`effectResolver.js` 本身不直接讀內容目錄）找符合條件的道具，有的話**不擲骰**，改跳出新的獨立暫停狀態 `pendingRollChoice`（跟既有 `pendingChoice` 平行、各自獨立的逾時計時器 map 與 socket 回應事件 `game:diceChoiceRespond`，兩者絕對不能共用同一個欄位），玩家選好（或逾時預設不使用）後接續原本的擲骰／`tiers` 評估邏輯。純邏輯部分（`findInterjectionOptions`/`resolveFinalRoll`）獨立成 `server/src/game/diceInterjection.js`，刻意不依賴 `gameState`/`content`，供之後的 Part B（`leaveCheck` 路徑）直接沿用。`player.diceInterjectionUsedThisTurn`（道具 id 陣列，lazy-optional）追蹤「這回合已經用過」的非消耗品道具，`advanceTurn` 對離開玩家重置。**重要教訓（詳見上方除錯注意事項）**：任何會消耗玩家資源（扣道具、扣行動力）的動作，驗證輸入永遠要排在消耗之前；任何新增的暫停狀態都要主動清空可能共存的其他暫停狀態，不會自動免疫。詳見 [設計文件](docs/superpowers/specs/2026-08-10-dice-interjection-design.md)、[實作計畫](docs/superpowers/plans/2026-08-10-dice-interjection-part-a.md)
 - **卡牌/房間內容分工**：agent 依 `card-mechanics-reference.md` 草擬 `effects` JSON，開發者審核修正（跟房間 `doors`/角色數值「開發者自己手填」不同，因為這是聲明式 schema 轉換）
 - **MVP 兩個劇本**：劇本1〈神鬼痴漢 The Mummy Walks〉、劇本10〈闔家團圓 Family Gathering〉
 - **未來階段**：Phase 2 為 AI 玩家（呼叫 Claude API 決策，選角色順序排真人之後、數量不可超過真人數量）；Phase 3+ 為原創劇本
