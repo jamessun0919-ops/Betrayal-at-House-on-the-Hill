@@ -143,7 +143,8 @@
     "drawType": "omen",
     "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
     "effects": [],
-    "needsCustomLogic": true
+    "leaveCheck": { "stat": "might", "min": 3 },
+    "needsCustomLogic": false
   },
   {
     "id": "room_kitchen",
@@ -332,7 +333,8 @@
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於3才能離開",
     "effects": [],
-    "needsCustomLogic": true
+    "leaveCheck": { "stat": "speed", "min": 4 },
+    "needsCustomLogic": false
   },
   {
     "id": "room_atrium",
@@ -368,7 +370,8 @@
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於4才能離開",
     "effects": [],
-    "needsCustomLogic": true
+    "leaveCheck": { "stat": "speed", "min": 5 },
+    "needsCustomLogic": false
   },
   {
     "id": "room_baby_room",
