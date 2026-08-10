@@ -1451,6 +1451,52 @@ test('game:selectAction item: uses a held consumable item on self and removes it
   httpServer.close();
 });
 
+test('game:selectAction item: a dice_check effect can see the player\'s itemCatalog-eligible held items via context (regression guard for context threading)', async () => {
+  // This test doesn't assert the full rollChoice flow (Task 7's job) -- it
+  // only proves item-catalog data actually reaches handleDiceCheck through
+  // game:selectAction's resolveEffects call, by observing that holding a
+  // matching item changes the dice_check from "resolves immediately" to
+  // "does not resolve immediately" (still pending after the ack).
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_003',
+          name: '測試道具',
+          effects: [{
+            type: 'dice_check',
+            diceCount: 2,
+            tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+          }],
+          category: 'general',
+        },
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [], consumesItem: false },
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const noEffectResolvedTimer = new Promise((resolve) => setTimeout(() => resolve('timeout'), 300));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const outcome = await Promise.race([effectResolvedPromise, noEffectResolvedTimer]);
+  // Holding item_006 (a matching diceInterjection item) means the dice_check
+  // must NOT have resolved immediately -- if context.itemCatalog wasn't
+  // threaded through, it would have rolled right away and emitted effectResolved.
+  expect(outcome).toBe('timeout');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item: throws ITEM_NOT_HELD when the player does not have the item', async () => {
   const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
 

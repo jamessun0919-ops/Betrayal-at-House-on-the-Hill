@@ -179,7 +179,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 
         if (result.pendingCardDraw) {
           try {
-            const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts);
+            const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts, content);
             if (drawOutcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
             }
@@ -252,8 +252,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           try {
             const resolverEntry = getResolver(effectResolverManager, roomCode);
             const targetForEffects = result.targetPlayerId || playerId;
-            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
-            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items });
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content);
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
             }
@@ -313,7 +313,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
         const nextPlayerId = endTurn(gameState, playerId);
         try {
-          applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts);
+          applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts, content);
         } catch (bonusErr) {
           // Same rationale as the resolveCardDraw catch below -- a bad room
           // bonus definition must not prevent the turn from having already
@@ -349,8 +349,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
         const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
-        const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now() });
-        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+        const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items });
+        const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content);
         if (resolveOutcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: resolveOutcome.drawnCards });
         }
@@ -428,7 +428,7 @@ function findRoomDefinition(content, roomId) {
   );
 }
 
-function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts) {
+function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts, content) {
   if (!roomDefinition || !Array.isArray(roomDefinition.effects)) {
     return;
   }
@@ -442,12 +442,12 @@ function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, p
     return;
   }
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now() });
-  handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition.id, effectResult, effectChoiceTimeouts, false);
+  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now(), itemCatalog: content.cards.items });
+  handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition.id, effectResult, effectChoiceTimeouts, false, content);
   player.roomBonusesReceived = [...received, roomDefinition.id];
 }
 
-function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts) {
+function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts, content) {
   const deckField = DECK_FIELD_BY_TYPE[deckType];
   if (!deckField) {
     throw new Error('UNKNOWN_DECK_TYPE');
@@ -483,15 +483,19 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   }
 
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, { now: Date.now() });
-  return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts);
+  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, {
+    now: Date.now(),
+    itemCatalog: content.cards.items,
+    sourceDeckType: deckType,
+  });
+  return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts, false, content);
 }
 
 // Returns {pending: boolean} so callers know whether the turn should advance
 // now or wait until the choice this call may have just opened gets resolved
 // (see M2c-2 final review, Critical C1: advancing the turn while a choice is
 // still pending let a second card draw collide with the first).
-function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false) {
+function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false, content = null) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   if (effectResult.pending) {
     resolverEntry.pendingChoice = {
@@ -510,7 +514,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     });
     const delayMs = Math.max(effectResult.deadline - Date.now(), 0);
     const handle = setTimeout(() => {
-      handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCode, effectResult.promptId, effectChoiceTimeouts);
+      handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCode, effectResult.promptId, effectChoiceTimeouts, content);
     }, delayMs);
     effectChoiceTimeouts.set(roomCode, handle);
     return { pending: true };
@@ -550,7 +554,7 @@ function clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts) {
   }
 }
 
-function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCode, promptId, effectChoiceTimeouts) {
+function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCode, promptId, effectChoiceTimeouts, content) {
   try {
     const resolverEntry = getResolver(effectResolverManager, roomCode);
     if (!resolverEntry || !resolverEntry.pendingChoice) return;
@@ -562,8 +566,8 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     }
     io.to(roomCode).emit('game:promptResolved', result);
     const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
-    const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now() });
-    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
+    const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items });
+    const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content);
     io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
   } catch (err) {
     console.error('effect choice timeout error', err);
