@@ -9,8 +9,8 @@
       { "min": 1, "max": 3, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] },
       { "min": 0, "max": 0, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -2 }] }
     ]
-  }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_004", "name": "犬靈", "text": "玩家的力量及意志上升一個級別，如果失去犬靈的追隨，玩家的意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取物品，犬靈不可被丟棄、竊盜或轉交", "effects": [{ "type": "switch_control", "summonType": "spiritDog", "actionPoints": 6 }], "category": "general", "needsCustomLogic": false },
+  }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
+  { "id": "omen_004", "name": "犬靈", "text": "玩家的力量及意志上升一個級別，如果失去犬靈的追隨，玩家的意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取物品，犬靈不可被丟棄、竊盜或轉交", "effects": [{ "type": "switch_control", "summonType": "spiritDog", "actionPoints": 6 }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
   { "id": "omen_005", "name": "女孩", "text": "玩家的意志和知識上升一個級別．如果失去女孩的追隨，知識和意志下降一個級別。不可被偷竊、丟棄和轉交", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }], "category": "general", "needsCustomLogic": false },
   { "id": "omen_006", "name": "聖符", "text": "玩家的意志上升兩個級別，若玩家失去聖符，玩家的意志下降兩個級別", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 2 }], "category": "general", "needsCustomLogic": false },
   { "id": "omen_007", "name": "瘋漢", "text": "瘋漢跟隨著玩家，力量上升兩個級別，意志下降兩個級別。若失去瘋漢追隨，力量下降兩個級別，意志上升兩個級別。不可被偷竊、丟棄及轉交", "effects": [{ "type": "stat_change", "stat": "might", "delta": 2 }, { "type": "stat_change", "stat": "sanity", "delta": -2 }], "category": "general", "needsCustomLogic": false },
@@ -26,7 +26,7 @@
       }] },
       { "min": 0, "max": 3, "effects": [] }
     ]
-  }], "category": "general", "needsCustomLogic": false },
+  }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
   { "id": "omen_009", "name": "徽章", "text": "玩家不受五芒星堂、地窖及墓園的影響，通過上述三個房間時不需要進行考驗", "effects": [], "category": "general", "needsCustomLogic": false },
   { "id": "omen_010", "name": "戒指", "text": "玩家在自身的回合可以選擇以意志進行襲擊，如果襲擊成功，敵方受到精神損傷而非肉體損傷，對於無意志的目標無法使用", "effects": [], "category": "weapon", "needsCustomLogic": true },
   { "id": "omen_011", "name": "頭骨", "text": "當玩家受到精神損傷時，可以選擇改受肉體損傷", "effects": [], "category": "general", "needsCustomLogic": true },

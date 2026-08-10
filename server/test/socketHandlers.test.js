@@ -1903,6 +1903,67 @@ test('game:selectAction item mode:leave then mode:pickup round-trips an item thr
   httpServer.close();
 });
 
+test('drawing an activatedOnUse omen adds it to inventory without resolving its effects', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [], items: [],
+      omens: [{
+        id: 'omen_004',
+        name: '犬靈',
+        effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }],
+        activatedOnUse: true,
+      }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  const drawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const drawn = await drawnPromise;
+
+  expect(drawn.cardId).toBe('omen_004');
+  expect(player.inventory).toEqual([{ id: 'omen_004' }]);
+  // The card says "當玩家使用..." -- drawing it must NOT seize control of a summon.
+  expect(player.summons).toBeFalsy();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('an activatedOnUse omen resolves its effects only when the player later uses it via game:selectAction', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], items: [],
+      omens: [{
+        id: 'omen_004',
+        name: '犬靈',
+        effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }],
+        activatedOnUse: true,
+      }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  expect(player.summons).toBeFalsy();
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  expect(player.summons).toBeTruthy();
+  expect(player.summons.type).toBe('spiritDog');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('a player controlling a summon moves the summon via game:move, leaving the player\'s own position untouched', async () => {
   const content = makeContent({
     cards: {

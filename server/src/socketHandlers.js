@@ -442,6 +442,13 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     }
   }
 
+  if (card.activatedOnUse) {
+    // This card's effects are only meant to fire when the player later
+    // chooses to use it (game:selectAction actionType:'item') -- not the
+    // instant it's drawn. The card is already in inventory (above); stop here.
+    return { pending: false };
+  }
+
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, card.effects, { now: Date.now() });
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts);
