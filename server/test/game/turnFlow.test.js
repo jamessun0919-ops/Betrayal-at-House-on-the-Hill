@@ -1,5 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { resetActionPoints, getStatValue } = require('../../src/game/playerEntity');
+const { coordKey } = require('../../src/game/boardGenerator');
 const {
   getAvailableDirections,
   moveToRoom,
@@ -322,6 +323,66 @@ test('selectAction item: throws TARGET_NOT_IN_ROOM when the target is elsewhere,
   expect(() =>
     selectAction(gameState, 'p1', 'item', { itemId: 'item_003', targetPlayerId: 'p2', itemCanTargetOthers: true })
   ).toThrow('TARGET_NOT_IN_ROOM');
+});
+
+test('selectAction item mode:give transfers the item to a same-room target player', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_003' });
+  const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  other.floor = player.floor;
+  other.x = player.x;
+  other.y = player.y;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'p2' });
+  expect(result).toEqual({ kind: 'item', mode: 'give', itemId: 'item_003', targetPlayerId: 'p2' });
+  expect(player.inventory).toEqual([]);
+  expect(other.inventory).toEqual([{ id: 'item_003' }]);
+  expect(player.actionPoints).toBe(3); // addPlayer resets AP to speed value (4, per makeStats' speed baseIndex) minus the 1 spent here
+});
+
+test('selectAction item mode:give throws TARGET_NOT_IN_ROOM when the target is elsewhere', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_003' });
+  const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  other.floor = player.floor;
+  other.x = player.x + 99;
+  other.y = player.y;
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'p2' })
+  ).toThrow('TARGET_NOT_IN_ROOM');
+});
+
+test('selectAction item mode:leave removes the item from inventory and adds it to the current room\'s droppedItems', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_003' });
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'leave' });
+  expect(result).toEqual({ kind: 'item', mode: 'leave', itemId: 'item_003' });
+  expect(player.inventory).toEqual([]);
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('selectAction item mode:leave throws ITEM_NOT_HELD when the player does not hold it', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'not_held', mode: 'leave' })
+  ).toThrow('ITEM_NOT_HELD');
+});
+
+test('selectAction item mode:pickup moves a dropped item from the room into inventory', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  room.droppedItems.push({ id: 'item_003' });
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'pickup' });
+  expect(result).toEqual({ kind: 'item', mode: 'pickup', itemId: 'item_003' });
+  expect(player.inventory).toEqual([{ id: 'item_003' }]);
+  expect(room.droppedItems).toEqual([]);
+});
+
+test('selectAction item mode:pickup throws ITEM_NOT_IN_ROOM when the room has no such dropped item', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'pickup' })
+  ).toThrow('ITEM_NOT_IN_ROOM');
 });
 
 test('selectAction room_action: succeeds when hasRoomAction is true', () => {

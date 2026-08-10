@@ -86,6 +86,53 @@ function moveToRoom(gameState, playerId, direction) {
   };
 }
 
+function getRoomAt(gameState, floor, x, y) {
+  return gameState.board[floor].get(coordKey(x, y));
+}
+
+function giveItemAction(gameState, player, itemId, targetPlayerId) {
+  const index = player.inventory.findIndex((item) => item.id === itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_HELD');
+  }
+  const targetPlayer = requirePlayer(gameState, targetPlayerId);
+  if (
+    targetPlayer.floor !== player.floor ||
+    targetPlayer.x !== player.x ||
+    targetPlayer.y !== player.y
+  ) {
+    throw new Error('TARGET_NOT_IN_ROOM');
+  }
+  const [item] = player.inventory.splice(index, 1);
+  targetPlayer.inventory.push(item);
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'give', itemId, targetPlayerId };
+}
+
+function leaveItemAction(gameState, player, itemId) {
+  const index = player.inventory.findIndex((item) => item.id === itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_HELD');
+  }
+  player.inventory.splice(index, 1);
+  const room = getRoomAt(gameState, player.floor, player.x, player.y);
+  room.droppedItems.push({ id: itemId });
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'leave', itemId };
+}
+
+function pickupItemAction(gameState, player, itemId) {
+  const room = getRoomAt(gameState, player.floor, player.x, player.y);
+  const index = room.droppedItems.findIndex((item) => item.id === itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_IN_ROOM');
+  }
+  room.droppedItems.splice(index, 1);
+  player.inventory.push({ id: itemId });
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'pickup', itemId };
+}
+
 function selectAction(gameState, playerId, actionType, options = {}) {
   const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
@@ -99,7 +146,16 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   }
 
   if (actionType === 'item') {
-    const { itemId, targetPlayerId } = options;
+    const { itemId, targetPlayerId, mode } = options;
+    if (mode === 'give') {
+      return giveItemAction(gameState, player, itemId, targetPlayerId);
+    }
+    if (mode === 'leave') {
+      return leaveItemAction(gameState, player, itemId);
+    }
+    if (mode === 'pickup') {
+      return pickupItemAction(gameState, player, itemId);
+    }
     if (!player.inventory.some((item) => item.id === itemId)) {
       throw new Error('ITEM_NOT_HELD');
     }
