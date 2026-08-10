@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, selectAction, useStairs, isTurnOver, advanceTurn } = require('./game/turnFlow');
+const { moveToRoom, selectAction, useStairs, endTurn } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
@@ -167,11 +167,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           }
         }
 
-        let stillResolving = false;
         if (result.pendingCardDraw) {
           try {
             const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts);
-            stillResolving = drawOutcome.pending;
             if (drawOutcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
             }
@@ -181,9 +179,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             // see M2c-2 final review, Critical C1.
             console.error('resolveCardDraw error', drawErr);
           }
-        }
-        if (!stillResolving) {
-          advanceTurnIfOver(gameState, playerId);
         }
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
@@ -235,14 +230,12 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const result = selectAction(gameState, playerId, actionType, selectOptions);
         ack(result);
 
-        let stillResolving = false;
         if (sourceEffects) {
           try {
             const resolverEntry = getResolver(effectResolverManager, roomCode);
             const targetForEffects = result.targetPlayerId || playerId;
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now() });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied);
-            stillResolving = outcome.pending;
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
             }
@@ -253,9 +246,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
         }
 
-        if (!stillResolving) {
-          advanceTurnIfOver(gameState, playerId);
-        }
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:selectAction error', err);
@@ -286,6 +276,29 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
+    socket.on('game:endTurn', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+          return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
+        }
+        const nextPlayerId = endTurn(gameState, playerId);
+        ack({ nextPlayerId });
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:endTurn error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
     socket.on('game:effectPromptRespond', (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {
@@ -309,9 +322,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
         const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now() });
         const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
-        if (!resolveOutcome.pending) {
-          advanceTurnIfOver(gameState, choicePlayerId);
-        }
         if (resolveOutcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: resolveOutcome.drawnCards });
         }
@@ -374,13 +384,6 @@ function clearCharacterSelectTimeout(roomCode, characterSelectTimeouts) {
   if (handle) {
     clearTimeout(handle);
     characterSelectTimeouts.delete(roomCode);
-  }
-}
-
-function advanceTurnIfOver(gameState, playerId) {
-  const player = getPlayer(gameState, playerId);
-  if (isTurnOver(player)) {
-    advanceTurn(gameState);
   }
 }
 
@@ -506,9 +509,6 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
     const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now() });
     const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied);
-    if (!resolveOutcome.pending) {
-      advanceTurnIfOver(gameState, playerId);
-    }
     io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
   } catch (err) {
     console.error('effect choice timeout error', err);

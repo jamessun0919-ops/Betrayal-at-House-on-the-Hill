@@ -632,16 +632,114 @@ test('game:useStairs is rejected when the player is not standing at the stairs l
   httpServer.close();
 });
 
-test('when a move exhausts action points, the turn automatically advances to the next player', async () => {
+test('game:endTurn advances the turn even when the current player still has unspent action points', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+
+  const updatePromise = new Promise((resolve) => otherClient.once('game:stateUpdate', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBeUndefined();
+  expect(result.nextPlayerId).not.toBe(currentPlayerId);
+
+  const update = await updatePromise;
+  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  const newCurrentPlayer = update.players.find((p) => p.playerId === update.turnOrder[update.currentPlayerIndex]);
+  expect(newCurrentPlayer.actionPoints).toBeGreaterThan(0); // reset by advanceTurn
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn rejects a caller who is not the current turn player', async () => {
+  const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
+
+  const result = await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('NOT_YOUR_TURN');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn is rejected while an effect choice is pending', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_002',
+        name: '測試選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '選擇要下降哪項',
+          options: [
+            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+          ],
+          timeoutMs: 20000,
+          defaultOptionId: 'opt_might',
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await pendingChoicePromise;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:endTurn rejects the caller while they are controlling an active summon', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).summons = {
+    type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null,
+  };
+
+  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(result.error).toBe('SUMMON_ACTIVE');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('when a move exhausts action points, the turn does not auto-advance -- game:endTurn is required', async () => {
   const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
 
   const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // zeroes AP
   const update = await updatePromise;
 
-  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
-  // The new current player's action points must have been reset (advanceTurn's job).
-  const newCurrentPlayer = update.players.find((p) => p.playerId === update.turnOrder[update.currentPlayerIndex]);
+  // AP is zero, but the turn must stay with the same player until they
+  // explicitly end it -- see Task 5's manual-end-turn mechanism.
+  expect(update.turnOrder[update.currentPlayerIndex]).toBe(currentPlayerId);
+  const me = update.players.find((p) => p.playerId === currentPlayerId);
+  expect(me.actionPoints).toBe(0);
+
+  // otherClient may still have an unconsumed copy of the stateUpdate broadcast
+  // from the move above sitting in its event queue -- a plain .once() here could
+  // catch that stale broadcast instead of the one from game:endTurn (same race
+  // class as setUpStartedGame's game:promptResolved handling above). Use a
+  // persistent, filtered listener instead so a stale event is ignored.
+  const nextUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
+  const newCurrentPlayer = nextUpdate.players.find((p) => p.playerId === nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]);
   expect(newCurrentPlayer.actionPoints).toBeGreaterThan(0);
 
   clientA.close();
@@ -934,7 +1032,7 @@ test('game:move that opens a room whose card requires a choice does not advance 
   httpServer.close();
 });
 
-test('the turn advances only after a pending effect choice is resolved via game:effectPromptRespond', async () => {
+test('resolving a pending effect choice does not by itself advance the turn -- game:endTurn is still required', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
     cards: {
@@ -956,30 +1054,39 @@ test('the turn advances only after a pending effect choice is resolved via game:
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
 
   const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   const pendingChoice = await pendingChoicePromise;
 
-  const updatePromise = new Promise((resolve) => {
-    currentClient.on('game:stateUpdate', (data) => {
-      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
-    });
-  });
+  const respondedUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
   await new Promise((resolve) => {
     currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
   });
+  const respondedUpdate = await respondedUpdatePromise;
+  expect(respondedUpdate.turnOrder[respondedUpdate.currentPlayerIndex]).toBe(currentPlayerId);
 
-  const update = await updatePromise;
-  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  // The choice is resolved now, so EFFECT_CHOICE_IN_PROGRESS no longer blocks
+  // game:endTurn -- proves resolving the choice actually cleared the gate.
+  // (Persistent filtered listener, not .once() -- see the race-class comment
+  // on the first game:endTurn test above.)
+  const nextUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
 
   clientA.close();
   clientB.close();
   httpServer.close();
 });
 
-test('the turn advances only after a pending effect choice times out', async () => {
+test('a pending effect choice that times out still requires game:endTurn to advance the turn', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
     cards: {
@@ -1001,17 +1108,29 @@ test('the turn advances only after a pending effect choice times out', async () 
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
 
-  const updatePromise = new Promise((resolve) => {
+  const timedOutUpdatePromise = new Promise((resolve) => {
     currentClient.on('game:stateUpdate', (data) => {
-      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+      const me = data.players.find((p) => p.playerId === currentPlayerId);
+      if (me.stats.might.currentIndex < me.stats.might.baseIndex) resolve(data);
     });
   });
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const timedOutUpdate = await timedOutUpdatePromise;
+  expect(timedOutUpdate.turnOrder[timedOutUpdate.currentPlayerIndex]).toBe(currentPlayerId);
 
-  const update = await updatePromise;
-  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  // Persistent filtered listener, not .once() -- see the race-class comment on
+  // the first game:endTurn test above.
+  const nextUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
 
   clientA.close();
   clientB.close();
@@ -1066,20 +1185,33 @@ test('a real effectPromptRespond before the deadline cancels the scheduled timeo
   httpServer.close();
 });
 
-test('game:move into a room with an unknown drawType does not crash the room and still advances state', async () => {
+test('game:move into a room with an unknown drawType does not crash the room, and the turn still ends normally via game:endTurn', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'unknown_deck_type' }],
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
 
   const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
   const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   expect(result.error).toBeUndefined(); // moveToRoom itself succeeded
 
   const update = await updatePromise;
-  // Despite the resolveCardDraw failure (UNKNOWN_DECK_TYPE), the turn still
-  // advances and the room stays in sync -- see M2c-2 final review Important I3.
-  expect(update.turnOrder[update.currentPlayerIndex]).not.toBe(currentPlayerId);
+  // Despite the resolveCardDraw failure (UNKNOWN_DECK_TYPE), the room stays in
+  // sync and nothing crashes -- see M2c-2 final review Important I3. The turn
+  // itself no longer auto-advances (Task 5), so confirm it's still endable.
+  expect(update.turnOrder[update.currentPlayerIndex]).toBe(currentPlayerId);
+
+  // Persistent filtered listener, not .once() -- see the race-class comment on
+  // the first game:endTurn test above.
+  const nextUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
+  const nextUpdate = await nextUpdatePromise;
+  expect(nextUpdate.turnOrder[nextUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
 
   clientA.close();
   clientB.close();
@@ -1115,7 +1247,7 @@ test('an event-deck card requiring a choice defers the turn the same way an item
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
 
   const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   const firstUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
@@ -1127,14 +1259,19 @@ test('an event-deck card requiring a choice defers the turn the same way an item
   const blockedMove = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
   expect(blockedMove.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
 
-  const advancedUpdatePromise = new Promise((resolve) => {
-    currentClient.on('game:stateUpdate', (data) => {
-      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
-    });
-  });
   await new Promise((resolve) => {
     currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
   });
+
+  // Persistent filtered listener, not .once() -- see the race-class comment on
+  // the first game:endTurn test above.
+  const advancedUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
   const advancedUpdate = await advancedUpdatePromise;
   expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
 
@@ -1165,7 +1302,7 @@ test('an omen-deck card requiring a choice defers the turn the same way an item-
       }],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
 
   const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   const firstUpdatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
@@ -1177,14 +1314,19 @@ test('an omen-deck card requiring a choice defers the turn the same way an item-
   const blockedSelectAction = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item' }, resolve));
   expect(blockedSelectAction.error).toBe('EFFECT_CHOICE_IN_PROGRESS');
 
-  const advancedUpdatePromise = new Promise((resolve) => {
-    currentClient.on('game:stateUpdate', (data) => {
-      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
-    });
-  });
   await new Promise((resolve) => {
     currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
   });
+
+  // Persistent filtered listener, not .once() -- see the race-class comment on
+  // the first game:endTurn test above.
+  const advancedUpdatePromise = new Promise((resolve) => {
+    otherClient.on('game:stateUpdate', (data) => {
+      if (data.turnOrder[data.currentPlayerIndex] !== currentPlayerId) resolve(data);
+    });
+  });
+  const endResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endResult.error).toBeUndefined();
   const advancedUpdate = await advancedUpdatePromise;
   expect(advancedUpdate.turnOrder[advancedUpdate.currentPlayerIndex]).not.toBe(currentPlayerId);
 
@@ -1318,14 +1460,10 @@ test('game:selectAction room_action: resolves the current room\'s effects', asyn
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
 
-  // Opening the door to room_new zeroes AP and ends the turn immediately
-  // (confirmed rule: entering a brand-new room never leaves AP for further
-  // actions the same turn -- a room's "operation" waits until the player's
-  // next turn). Simulate that next turn having come back around to this
-  // player, already standing in the now-open room_new with fresh AP.
+  // Manually restore some actionPoints so there's a room action to perform
+  // -- opening the door already spent them all on the move itself.
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
   const gameState = getGameState(gameManager, roomCode);
-  gameState.currentPlayerIndex = gameState.turnOrder.indexOf(currentPlayerId);
   getPlayer(gameState, currentPlayerId).actionPoints = 1;
 
   const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
