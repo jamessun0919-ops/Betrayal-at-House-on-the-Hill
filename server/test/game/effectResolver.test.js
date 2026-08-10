@@ -377,6 +377,127 @@ test('resolveEffects dice_check throws INVALID_DICE_CHECK_COUNT when neither sta
   ).toThrow('INVALID_DICE_CHECK_COUNT');
 });
 
+test('resolveEffects dice_check with no matching interjection items rolls immediately (unchanged behavior)', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 2,
+      tiers: [{ min: 4, max: 4, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+    },
+  ], { rng, itemCatalog: [] });
+  expect(result.pending).toBe(false);
+  expect(gameState.players.get('p1').stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
+});
+
+test('resolveEffects dice_check with a matching interjection item held pauses and returns rollChoice pending', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_006' });
+  const itemCatalog = [{
+    id: 'item_006',
+    name: '詭異人偶',
+    diceInterjection: { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false },
+  }];
+  const effect = {
+    type: 'dice_check',
+    diceCount: 2,
+    tiers: [{ min: 0, max: 8, effects: [] }],
+  };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [effect], { itemCatalog });
+  expect(result.pending).toBe(true);
+  expect(result.rollChoice).toBe(true);
+  expect(result.baseCount).toBe(2);
+  expect(result.options).toEqual([{ itemId: 'item_006', name: '詭異人偶', diceInterjection: itemCatalog[0].diceInterjection }]);
+  expect(result.effect).toBe(effect);
+  // Nothing rolled or applied yet -- still waiting on the player's choice.
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex);
+});
+
+test('resolveEffects dice_check resumed with interjectionChoice:null (skipped) rolls normally with no bonus', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 2,
+      tiers: [{ min: 4, max: 4, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+    },
+  ], { rng, interjectionChoice: null }); // itemCatalog irrelevant -- scan is skipped once interjectionChoice is defined
+  expect(result.pending).toBe(false);
+  expect(gameState.players.get('p1').stats.might.currentIndex).toBe(3);
+});
+
+test('resolveEffects dice_check resumed with a chosen bonusDice item applies its cost, adds dice, and marks it used', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_006' });
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const diceInterjection = { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 2,
+      tiers: [{ min: 8, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+    },
+  ], { rng, interjectionChoice: { itemId: 'item_006', diceInterjection, overrideValue: undefined } });
+  expect(result.pending).toBe(false);
+  expect(player.stats.might.currentIndex).toBe(3); // tier matched sum=8 -> (2+2 dice)*2=8
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost applied
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']); // not consumable -- tracked as used
+  expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
+});
+
+test('resolveEffects dice_check resumed with a chosen override item returns the override value directly and removes the consumable item', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_005' });
+  const diceInterjection = { scope: 'any', override: true, consumesItem: true };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 2,
+      tiers: [
+        { min: 5, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+        { min: 0, max: 4, effects: [] },
+      ],
+    },
+  ], {
+    rng: () => { throw new Error('should not roll when overriding'); },
+    interjectionChoice: { itemId: 'item_005', diceInterjection, overrideValue: 6 },
+  });
+  expect(result.pending).toBe(false);
+  expect(player.stats.might.currentIndex).toBe(3); // override 6 -> matched the 5-8 tier
+  expect(player.inventory).toEqual([]); // consumable item removed
+});
+
+test('resolveEffects dice_check does not leak interjectionChoice into a nested effect resolved from the matched tier', () => {
+  // Regression guard: if the matched tier's own effects happened to contain
+  // another dice_check, it must not silently reuse the outer interjection
+  // decision -- it needs its own fresh scan (context.interjectionChoice
+  // must be undefined again for it, not the outer resumed value).
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const rng = jest.fn().mockReturnValue(0.0); // every die -> face 0 for the inner check
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 1,
+      tiers: [{
+        min: 0, max: 8,
+        effects: [{
+          type: 'dice_check',
+          diceCount: 1,
+          tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'knowledge', delta: 1 }] }],
+        }],
+      }],
+    },
+  ], { rng, interjectionChoice: null, itemCatalog: [] }); // itemCatalog: [] proves the inner check re-scanned (found nothing) rather than skipping
+  expect(result.pending).toBe(false);
+  expect(player.stats.knowledge.currentIndex).toBe(player.stats.knowledge.baseIndex + 1);
+});
+
 test('resolveEffects choice creates a pending prompt and returns the full options with nested effects', () => {
   const gameState = makeGameStateWithPlayer();
   const promptState = createPromptState();

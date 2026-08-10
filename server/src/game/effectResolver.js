@@ -5,6 +5,7 @@ const { coordKey } = require('./boardGenerator');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
 const { createPrompt } = require('./promptState');
 const { hasCards, drawCard } = require('./cardDeck');
+const { findInterjectionOptions, resolveFinalRoll } = require('./diceInterjection');
 
 const DECK_FIELD_BY_TYPE = { item: 'itemDeck', event: 'eventDeck', omen: 'omenDeck' };
 
@@ -95,6 +96,31 @@ function handlePersistentModifier(gameState, playerId, effect) {
   return { pending: false };
 }
 
+function computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice, context) {
+  if (!interjectionChoice) {
+    const adjustedCount = Math.max(1, Math.min(8, applyModifiers(baseCount, modifiers, 'onBeforeRoll', context)));
+    const rolled = rollDice(adjustedCount, context.rng);
+    return applyModifiers(rolled, modifiers, 'onAfterRoll', context);
+  }
+  const player = requirePlayer(gameState, playerId);
+  const { itemId, diceInterjection, overrideValue } = interjectionChoice;
+  if (Array.isArray(diceInterjection.cost) && diceInterjection.cost.length > 0) {
+    resolveEffects(gameState, promptState, playerId, diceInterjection.cost, context);
+  }
+  if (diceInterjection.consumesItem) {
+    removeItem(player, itemId);
+  } else {
+    player.diceInterjectionUsedThisTurn = [...(player.diceInterjectionUsedThisTurn || []), itemId];
+  }
+  if (diceInterjection.override) {
+    return resolveFinalRoll(baseCount, diceInterjection, overrideValue, context.rng);
+  }
+  const boostedCount = baseCount + (diceInterjection.bonusDice || 0);
+  const adjustedCount = Math.max(1, Math.min(8, applyModifiers(boostedCount, modifiers, 'onBeforeRoll', context)));
+  const rolled = rollDice(adjustedCount, context.rng);
+  return applyModifiers(rolled, modifiers, 'onAfterRoll', context);
+}
+
 function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   const room = getRoomForPlayer(gameState, player);
@@ -105,11 +131,20 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
     throw new Error('INVALID_DICE_CHECK_COUNT');
   }
 
-  const adjustedCount = Math.max(1, Math.min(8, applyModifiers(baseCount, modifiers, 'onBeforeRoll', context)));
-  const rolled = rollDice(adjustedCount, context.rng);
-  const finalSum = applyModifiers(rolled, modifiers, 'onAfterRoll', context);
+  if (context.interjectionChoice === undefined) {
+    const itemCatalog = context.itemCatalog || [];
+    const options = findInterjectionOptions(player, itemCatalog, context.sourceDeckType);
+    if (options.length > 0) {
+      return { pending: true, rollChoice: true, baseCount, options, effect };
+    }
+  }
+  const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, context.interjectionChoice || null, context);
+  // Strip interjectionChoice before recursing into the matched tier's own
+  // effects -- it belongs only to *this* dice_check, not to any dice_check
+  // nested inside the tier's effects (which needs its own fresh scan).
+  const { interjectionChoice, ...restContext } = context;
   const tier = evaluateTiers(finalSum, effect.tiers);
-  return resolveEffects(gameState, promptState, playerId, tier.effects, context);
+  return resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
 }
 
 function handleDrawCard(gameState, playerId, effect) {
