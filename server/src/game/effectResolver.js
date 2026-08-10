@@ -59,6 +59,19 @@ function handleToggleActive(gameState, promptState, playerId, effect, context) {
   return resolveEffects(gameState, promptState, playerId, effectsToApply, context);
 }
 
+function handleSwitchControl(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  player.summons = {
+    type: effect.summonType,
+    floor: player.floor,
+    x: player.x,
+    y: player.y,
+    actionPoints: effect.actionPoints,
+    carryingItemId: null,
+  };
+  return { pending: false };
+}
+
 function handlePersistentModifier(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   if (effect.appliesTo !== 'player' && effect.appliesTo !== 'room') {
@@ -182,6 +195,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
+  switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
   draw_card: (gameState, promptState, playerId, effect) => handleDrawCard(gameState, playerId, effect),
   take_previewed_card: (gameState, promptState, playerId, effect) => handleTakePreviewedCard(gameState, playerId, effect),

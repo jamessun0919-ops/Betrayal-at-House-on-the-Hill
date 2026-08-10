@@ -128,6 +128,25 @@ test('resolveEffects toggle_active throws ITEM_NOT_HELD when the player does not
   ).toThrow('ITEM_NOT_HELD');
 });
 
+test('resolveEffects switch_control creates player.summons at the player\'s current position', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 3;
+  player.y = -2;
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
+  ]);
+  expect(player.summons).toEqual({
+    type: 'spiritDog',
+    floor: 'ground',
+    x: 3,
+    y: -2,
+    actionPoints: 6,
+    carryingItemId: null,
+  });
+});
+
 test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {
   const gameState = makeGameStateWithPlayer('p1', {
     items: [
