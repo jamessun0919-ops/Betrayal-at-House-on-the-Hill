@@ -66,16 +66,6 @@
     "needsCustomLogic": true
   },
   {
-    "id": "item_007",
-    "name": "幸運兔腳",
-    "description": "",
-    "text": "每當玩家擲骰子後可以選擇使用此物品，選擇重新投擲其中一顆，以重新投擲後的數字為結果，每回合限使用一次。",
-    "effects": [],
-    "category": "general",
-    "canTargetOthers": false,
-    "needsCustomLogic": true
-  },
-  {
     "id": "item_008",
     "name": "中世紀鎧甲",
     "description": "",
