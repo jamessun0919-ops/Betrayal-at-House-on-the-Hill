@@ -10,6 +10,7 @@ test('startResolver creates an entry with a promptState and no pending choice', 
   const entry = startResolver(manager, 'ROOM1');
   expect(entry.promptState).toEqual({ pending: null });
   expect(entry.pendingChoice).toBeNull();
+  expect(entry.pendingRollChoice).toBeNull();
   expect(getResolver(manager, 'ROOM1')).toBe(entry);
 });
 
