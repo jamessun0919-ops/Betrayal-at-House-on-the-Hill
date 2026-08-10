@@ -14,7 +14,7 @@ function coordKey(x, y) {
 }
 
 function placeFixedRoom(grid, roomId, x, y) {
-  grid.set(coordKey(x, y), { roomId, x, y, doorSides: ALL_SIDES.slice() });
+  grid.set(coordKey(x, y), { roomId, x, y, doorSides: ALL_SIDES.slice(), droppedItems: [] });
 }
 
 function createBoard(startingRooms) {
@@ -85,6 +85,7 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
     x: newCoord.x,
     y: newCoord.y,
     doorSides: Array.from(doorSides),
+    droppedItems: [],
   };
   grid.set(key, placedRoom);
   return placedRoom;

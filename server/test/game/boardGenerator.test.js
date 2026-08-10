@@ -106,6 +106,18 @@ test('placeNewRoom throws INVALID_FROM_COORD for a malformed fromCoord', () => {
   ).toThrow('INVALID_FROM_COORD');
 });
 
+test('createBoard places starting rooms with an empty droppedItems array', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const entranceHall = board.ground.get('0,0');
+  expect(entranceHall.droppedItems).toEqual([]);
+});
+
+test('placeNewRoom creates a room with an empty droppedItems array', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placedRoom = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'east', { id: 'room_new', doors: 4 });
+  expect(placedRoom.droppedItems).toEqual([]);
+});
+
 test('createBoard throws MISSING_STARTING_ROOM when a required starting room is missing', () => {
   const incompleteRooms = [
     { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
