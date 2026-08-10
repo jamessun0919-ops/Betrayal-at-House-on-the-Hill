@@ -1,0 +1,87 @@
+const { findInterjectionOptions, resolveFinalRoll } = require('../../src/game/diceInterjection');
+
+function makeCatalog() {
+  return [
+    { id: 'item_005', name: '天使羽毛', diceInterjection: { scope: 'any', override: true, consumesItem: true } },
+    {
+      id: 'item_006',
+      name: '詭異人偶',
+      diceInterjection: {
+        scope: 'any',
+        bonusDice: 2,
+        cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }],
+        consumesItem: false,
+      },
+    },
+    { id: 'item_010', name: '蠟燭', diceInterjection: { scope: 'eventTriggered', bonusDice: 1, consumesItem: false } },
+    { id: 'item_003', name: '治療藥膏' }, // 沒有 diceInterjection 的一般道具，對照組
+  ];
+}
+
+test('findInterjectionOptions returns held items with a matching scope', () => {
+  const player = { inventory: [{ id: 'item_005' }, { id: 'item_003' }] };
+  const options = findInterjectionOptions(player, makeCatalog(), undefined);
+  expect(options).toEqual([
+    { itemId: 'item_005', name: '天使羽毛', diceInterjection: makeCatalog()[0].diceInterjection },
+  ]);
+});
+
+test('findInterjectionOptions excludes eventTriggered items unless sourceDeckType is "event"', () => {
+  const player = { inventory: [{ id: 'item_010' }] };
+  expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([]);
+  expect(findInterjectionOptions(player, makeCatalog(), 'item')).toEqual([]);
+  const eventOptions = findInterjectionOptions(player, makeCatalog(), 'event');
+  expect(eventOptions).toEqual([{ itemId: 'item_010', name: '蠟燭', diceInterjection: makeCatalog()[2].diceInterjection }]);
+});
+
+test('findInterjectionOptions excludes a non-consumable item already used this turn', () => {
+  const player = { inventory: [{ id: 'item_006' }], diceInterjectionUsedThisTurn: ['item_006'] };
+  expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([]);
+});
+
+test('findInterjectionOptions still includes a consumable item even if its id happens to be in diceInterjectionUsedThisTurn', () => {
+  // consumesItem items are removed from inventory on use, not tracked via
+  // diceInterjectionUsedThisTurn -- this proves the "used this turn" filter
+  // only applies to non-consumable items.
+  const player = { inventory: [{ id: 'item_005' }], diceInterjectionUsedThisTurn: ['item_005'] };
+  expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([
+    { itemId: 'item_005', name: '天使羽毛', diceInterjection: makeCatalog()[0].diceInterjection },
+  ]);
+});
+
+test('findInterjectionOptions ignores held items with no diceInterjection field', () => {
+  const player = { inventory: [{ id: 'item_003' }] };
+  expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([]);
+});
+
+test('findInterjectionOptions throws INVALID_ITEM_CATALOG when itemCatalog is not an array', () => {
+  const player = { inventory: [] };
+  expect(() => findInterjectionOptions(player, null, undefined)).toThrow('INVALID_ITEM_CATALOG');
+});
+
+test('resolveFinalRoll with no chosen interjection rolls baseCount dice, clamped to [1,8]', () => {
+  const rng = () => 0.99; // every die -> face 2
+  expect(resolveFinalRoll(3, null, undefined, rng)).toBe(6); // 3 dice * 2
+  expect(resolveFinalRoll(0, null, undefined, rng)).toBe(2); // clamped up to 1 die
+  expect(resolveFinalRoll(10, null, undefined, rng)).toBe(16); // clamped down to 8 dice
+});
+
+test('resolveFinalRoll with a bonusDice interjection adds to the dice count before rolling', () => {
+  const rng = () => 0.99; // every die -> face 2
+  const di = { bonusDice: 2 };
+  expect(resolveFinalRoll(3, di, undefined, rng)).toBe(10); // (3+2) dice * 2
+});
+
+test('resolveFinalRoll with an override interjection returns the override value directly, ignoring rng', () => {
+  const rng = () => { throw new Error('should not be called'); };
+  const di = { override: true };
+  expect(resolveFinalRoll(3, di, 5, rng)).toBe(5);
+});
+
+test('resolveFinalRoll throws INVALID_OVERRIDE_VALUE for an out-of-range or non-integer override value', () => {
+  const di = { override: true };
+  expect(() => resolveFinalRoll(3, di, 9, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
+  expect(() => resolveFinalRoll(3, di, -1, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
+  expect(() => resolveFinalRoll(3, di, 2.5, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
+  expect(() => resolveFinalRoll(3, di, undefined, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
+});
