@@ -301,6 +301,17 @@ function advanceTurn(gameState) {
   return nextPlayerId;
 }
 
+function endTurn(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  if (player.summons) {
+    throw new Error('SUMMON_ACTIVE');
+  }
+  return advanceTurn(gameState);
+}
+
 function canUseStairs(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const grid = gameState.board[player.floor];
@@ -346,6 +357,7 @@ module.exports = {
   isTurnOver,
   getCurrentTurnPlayerId,
   advanceTurn,
+  endTurn,
   canUseStairs,
   useStairs,
 };

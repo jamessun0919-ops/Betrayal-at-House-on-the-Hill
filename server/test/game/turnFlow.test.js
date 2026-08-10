@@ -10,6 +10,7 @@ const {
   isTurnOver,
   getCurrentTurnPlayerId,
   advanceTurn,
+  endTurn,
   canUseStairs,
   useStairs,
 } = require('../../src/game/turnFlow');
@@ -233,6 +234,31 @@ test('advanceTurn resets the next player action points to their speed stat value
   expect(advanceTurn(gameState)).toBe('p2');
   expect(player2.actionPoints).toBe(getStatValue(player2, 'speed'));
   expect(player2.actionPoints).toBe(4);
+});
+
+test('endTurn advances the turn even when the current player still has unspent actionPoints', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.actionPoints = 3; // deliberately not exhausted
+  const result = endTurn(gameState, 'p1');
+  expect(result).toBe('p2');
+  expect(gameState.turnOrder[gameState.currentPlayerIndex]).toBe('p2');
+});
+
+test('endTurn throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  expect(() => endTurn(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+});
+
+test('endTurn throws SUMMON_ACTIVE when the player has an active summon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  expect(() => endTurn(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
 });
 
 test('canUseStairs returns true in the Grand Staircase room on the ground floor', () => {
