@@ -310,6 +310,14 @@ test('useStairs throws NOT_YOUR_TURN when called by a player who is not the curr
   expect(() => useStairs(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
 });
 
+test('useStairs throws SUMMON_ACTIVE when the player is controlling a summon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.x = -4;
+  player.y = 0; // Grand Staircase -- stairs would otherwise be available
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  expect(() => useStairs(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
+});
+
 test('selectAction item: succeeds when the player holds the item, defaults target to self', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   player.inventory.push({ id: 'item_003' });
@@ -387,6 +395,14 @@ test('selectAction item mode:leave removes the item from inventory and adds it t
   expect(player.inventory).toEqual([]);
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
   expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('selectAction item mode:leave preserves the item object\'s extra fields (e.g. an activated mask\'s active flag)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'omen_008', active: true });
+  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'leave' });
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  expect(room.droppedItems).toEqual([{ id: 'omen_008', active: true }]);
 });
 
 test('selectAction item mode:leave throws ITEM_NOT_HELD when the player does not hold it', () => {
@@ -516,8 +532,11 @@ test('advanceTurn clears the outgoing player\'s summons as a safety net', () => 
   gameState.currentPlayerIndex = 0;
   addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 3, carryingItemId: null };
+  player.summonUsedThisTurn = true;
   advanceTurn(gameState);
   expect(player.summons).toBeNull();
+  // The once-per-turn switch allowance resets for the outgoing player's next turn.
+  expect(player.summonUsedThisTurn).toBe(false);
 });
 
 test('advanceTurn drops the outgoing summon\'s carried item into its room instead of destroying it', () => {

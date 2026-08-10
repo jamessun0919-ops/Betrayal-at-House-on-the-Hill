@@ -145,6 +145,52 @@ test('resolveEffects switch_control creates player.summons at the player\'s curr
     actionPoints: 6,
     carryingItemId: null,
   });
+  expect(player.summonUsedThisTurn).toBe(true);
+});
+
+test('resolveEffects switch_control throws SUMMON_ALREADY_USED_THIS_TURN on a second switch in the same turn', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const effect = { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 };
+  resolveEffects(gameState, createPromptState(), 'p1', [effect]);
+  // Dissipate the first summon so only the once-per-turn flag can block the retry.
+  player.summons = null;
+  expect(() => resolveEffects(gameState, createPromptState(), 'p1', [effect])).toThrow(
+    'SUMMON_ALREADY_USED_THIS_TURN'
+  );
+});
+
+test('resolveEffects switch_control throws SUMMON_ALREADY_ACTIVE when a summon is already out', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
+    ])
+  ).toThrow('SUMMON_ALREADY_ACTIVE');
+});
+
+test('resolveEffects switch_control throws INVALID_SWITCH_CONTROL_EFFECT for a missing or non-string summonType', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', actionPoints: 6 }])
+  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', summonType: '', actionPoints: 6 }])
+  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
+});
+
+test('resolveEffects switch_control throws INVALID_SWITCH_CONTROL_EFFECT for missing or non-positive actionPoints', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', summonType: 'spiritDog' }])
+  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'switch_control', summonType: 'spiritDog', actionPoints: 0 },
+    ])
+  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
 });
 
 test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {

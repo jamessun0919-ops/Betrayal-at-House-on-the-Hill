@@ -193,9 +193,9 @@ function leaveItemAction(gameState, player, itemId) {
   if (index === -1) {
     throw new Error('ITEM_NOT_HELD');
   }
-  player.inventory.splice(index, 1);
+  const [item] = player.inventory.splice(index, 1);
   const room = getRoomAt(gameState, player.floor, player.x, player.y);
-  room.droppedItems.push({ id: itemId });
+  room.droppedItems.push(item);
   player.actionPoints -= 1;
   return { kind: 'item', mode: 'leave', itemId };
 }
@@ -293,6 +293,7 @@ function advanceTurn(gameState) {
       room.droppedItems.push({ id: summon.carryingItemId });
     }
     outgoingPlayer.summons = null; // safety net -- should already be null before a turn can end
+    outgoingPlayer.summonUsedThisTurn = false;
   }
   gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;
   const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
@@ -325,14 +326,16 @@ function canUseStairs(gameState, playerId) {
 }
 
 function useStairs(gameState, playerId) {
-  requirePlayer(gameState, playerId);
+  const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
     throw new Error('NOT_YOUR_TURN');
+  }
+  if (player.summons) {
+    throw new Error('SUMMON_ACTIVE');
   }
   if (!canUseStairs(gameState, playerId)) {
     throw new Error('STAIRS_NOT_AVAILABLE');
   }
-  const player = requirePlayer(gameState, playerId);
   const targetFloor = player.floor === 'ground' ? 'upper' : 'ground';
   const targetRoomId =
     player.floor === 'ground' ? gameState.board.stairsLink.upperRoomId : gameState.board.stairsLink.groundRoomId;

@@ -61,6 +61,18 @@ function handleToggleActive(gameState, promptState, playerId, effect, context) {
 
 function handleSwitchControl(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
+  if (typeof effect.summonType !== 'string' || effect.summonType.length === 0) {
+    throw new Error('INVALID_SWITCH_CONTROL_EFFECT');
+  }
+  if (!Number.isInteger(effect.actionPoints) || effect.actionPoints < 1) {
+    throw new Error('INVALID_SWITCH_CONTROL_EFFECT');
+  }
+  if (player.summons) {
+    throw new Error('SUMMON_ALREADY_ACTIVE');
+  }
+  if (player.summonUsedThisTurn) {
+    throw new Error('SUMMON_ALREADY_USED_THIS_TURN');
+  }
   player.summons = {
     type: effect.summonType,
     floor: player.floor,
@@ -69,6 +81,7 @@ function handleSwitchControl(gameState, playerId, effect) {
     actionPoints: effect.actionPoints,
     carryingItemId: null,
   };
+  player.summonUsedThisTurn = true;
   return { pending: false };
 }
 
