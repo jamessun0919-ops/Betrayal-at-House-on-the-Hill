@@ -910,8 +910,8 @@ test('game:move into a room whose card effects include a choice broadcasts game:
   httpServer.close();
 });
 
-async function setUpStartedGameWithContent(content) {
-  const { httpServer, port, gameManager } = await startTestServer(content);
+async function setUpStartedGameWithContent(content, options) {
+  const { httpServer, port, gameManager } = await startTestServer(content, options);
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
@@ -2147,3 +2147,193 @@ test('game:selectAction actionType:dissipate clears the summon and does not end 
   clientB.close();
   httpServer.close();
 });
+
+function makeDiceInterjectionContent(overrides = {}) {
+  return makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_003',
+          name: '測試道具',
+          effects: [{
+            type: 'dice_check',
+            diceCount: 2,
+            tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+          }],
+          category: 'general',
+        },
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false },
+        },
+      ],
+    },
+    ...overrides,
+  });
+}
+
+test('game:selectAction item: a dice_check with an eligible held item broadcasts game:diceChoicePending instead of resolving immediately', async () => {
+  const content = makeDiceInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const pending = await pendingPromise;
+  expect(pending.playerId).toBe(currentPlayerId);
+  expect(pending.options).toEqual([{ itemId: 'item_006', name: '詭異人偶', diceInterjection: content.cards.items.find((i) => i.id === 'item_006').diceInterjection }]);
+  expect(typeof pending.promptId).toBe('string');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond with an item optionId applies its cost/bonus and resolves the original dice_check', async () => {
+  const content = makeDiceInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const pending = await pendingPromise;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const respondResult = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_006' }, resolve)
+  );
+  expect(respondResult.error).toBeUndefined();
+  await effectResolvedPromise;
+
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost applied
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']);
+  expect(player.inventory).toEqual([{ id: 'item_003' }, { id: 'item_006' }]); // non-consumable, still held
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond with optionId:"__skip__" resolves the dice_check with no bonus', async () => {
+  const content = makeDiceInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const pending = await pendingPromise;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: '__skip__' }, resolve));
+  await effectResolvedPromise;
+
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex); // no cost -- item never used
+  expect(player.diceInterjectionUsedThisTurn || []).toEqual([]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond rejects an optionId that isn\'t one of the offered options', async () => {
+  const content = makeDiceInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  const pending = await pendingPromise;
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'not_a_real_item' }, resolve)
+  );
+  expect(result.error).toBe('INVALID_PROMPT_OPTION');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond rejects when there is no active roll choice', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: 'not_real', optionId: '__skip__' }, resolve)
+  );
+  expect(result.error).toBe('NO_ACTIVE_ROLL_CHOICE');
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a pending roll choice blocks game:move/game:selectAction/game:endTurn/game:useStairs with ROLL_CHOICE_IN_PROGRESS', async () => {
+  const content = makeDiceInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  await pendingPromise;
+
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(moveResult.error).toBe('ROLL_CHOICE_IN_PROGRESS');
+  const selectActionResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'attack' }, resolve));
+  expect(selectActionResult.error).toBe('ROLL_CHOICE_IN_PROGRESS');
+  const endTurnResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endTurnResult.error).toBe('ROLL_CHOICE_IN_PROGRESS');
+  const useStairsResult = await new Promise((resolve) => currentClient.emit('game:useStairs', {}, resolve));
+  expect(useStairsResult.error).toBe('ROLL_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 3000);
+
+test('a roll choice that times out resolves with no item used (default skip)', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_003',
+          name: '測試道具',
+          effects: [{
+            type: 'dice_check',
+            diceCount: 2,
+            tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+          }],
+          category: 'general',
+        },
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false },
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content, { rollChoiceTimeoutMs: 50 });
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_003' }, { id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
+  await pendingPromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await resolvedPromise;
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex); // timed out -- no item used, no cost
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 2000);
