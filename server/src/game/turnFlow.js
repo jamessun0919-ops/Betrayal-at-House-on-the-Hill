@@ -4,6 +4,7 @@ const { drawRoom, hasRoomForFloor } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
 const { movePlayerTo, resetActionPoints, getStatValue } = require('./playerEntity');
 const { rollDice } = require('./effectPipeline');
+const { findInterjectionOptions } = require('./diceInterjection');
 
 const ACTION_TYPES = ['item', 'attack', 'room_action'];
 
@@ -42,7 +43,7 @@ function getAvailableDirections(gameState, playerId) {
   return results;
 }
 
-function moveToRoom(gameState, playerId, direction, leaveCheck = null, rng = Math.random) {
+function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptions = {}) {
   const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
     throw new Error('NOT_YOUR_TURN');
@@ -62,8 +63,20 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rng = Mat
     // check first. A failed check costs the same 1 AP a normal move
     // attempt would, and never draws/places a new room -- the player never
     // actually left, so nothing about the door they tried is revealed.
-    const diceCount = getStatValue(player, leaveCheck.stat);
-    const rolled = rollDice(diceCount, rng);
+    const { itemCatalog, resolvedRoll, rng } = rollOptions;
+    let rolled;
+    if (resolvedRoll !== undefined) {
+      rolled = resolvedRoll;
+    } else {
+      const options = findInterjectionOptions(player, itemCatalog || [], null);
+      if (options.length > 0) {
+        // Mirrors handleDiceCheck's pending shape -- caller opens a
+        // pendingRollChoice and resumes with a resolvedRoll instead.
+        return { kind: 'leaveCheckPending', rollChoice: true, options, leaveCheck, direction };
+      }
+      const diceCount = getStatValue(player, leaveCheck.stat);
+      rolled = rollDice(diceCount, rng || Math.random);
+    }
     if (rolled < leaveCheck.min) {
       player.actionPoints -= 1;
       return { kind: 'leaveCheckFailed', rolled, required: leaveCheck.min };

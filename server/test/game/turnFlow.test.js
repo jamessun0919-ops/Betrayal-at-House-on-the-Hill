@@ -144,7 +144,7 @@ test('moveToRoom with a leaveCheck: passing the roll moves the player and costs 
   gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
   const rng = () => 0.99; // every die -> face 2; might value 3 -> sum 6, passes min:3
-  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, rng);
+  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng });
   expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
   expect(player.x).toBe(0);
   expect(player.y).toBe(-1);
@@ -156,14 +156,14 @@ test('moveToRoom with a leaveCheck: failing the roll blocks the move, costs exac
   gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
   const failRng = () => 0; // every die -> face 0; might value 3 -> sum 0, fails min:3
-  const failResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, failRng);
+  const failResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng: failRng });
   expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
   expect(player.x).toBe(0); // unmoved
   expect(player.y).toBe(0);
   expect(player.actionPoints).toBe(startingAP - 1);
 
   const passRng = () => 0.99;
-  const retryResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, passRng);
+  const retryResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng: passRng });
   expect(retryResult).toEqual({ kind: 'move', x: 0, y: -1 });
   expect(player.actionPoints).toBe(startingAP - 2);
 });
@@ -172,17 +172,51 @@ test('moveToRoom with a leaveCheck also gates opening a new door: failure does n
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, drawType: 'item', floor: 'ground' }]);
   const startingAP = player.actionPoints;
   const failRng = () => 0;
-  const failResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, failRng);
+  const failResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, { rng: failRng });
   expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
   expect(player.x).toBe(0); // unmoved -- no room was drawn or placed
   expect(player.y).toBe(0);
   expect(player.actionPoints).toBe(startingAP - 1); // not zeroed -- opening never happened
 
   const passRng = () => 0.99;
-  const passResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, passRng);
+  const passResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, { rng: passRng });
   expect(passResult.kind).toBe('open_door');
   expect(player.x).toBe(1);
   expect(player.actionPoints).toBe(0); // successful door-open still zeroes AP as normal
+});
+
+test('moveToRoom with a leaveCheck: an eligible interjection item pauses without rolling, moving, or spending action points', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  player.inventory.push({ id: 'item_006' });
+  const itemCatalog = [
+    { id: 'item_006', name: '詭異人偶', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } },
+  ];
+  const startingAP = player.actionPoints;
+  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { itemCatalog });
+  expect(result).toEqual({
+    kind: 'leaveCheckPending',
+    rollChoice: true,
+    options: [{ itemId: 'item_006', name: '詭異人偶', diceInterjection: itemCatalog[0].diceInterjection }],
+    leaveCheck: { stat: 'might', min: 3 },
+    direction: 'north',
+  });
+  expect(player.x).toBe(0); // unmoved
+  expect(player.y).toBe(0);
+  expect(player.actionPoints).toBe(startingAP); // nothing spent yet
+});
+
+test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning and internal rolling, even with an eligible item held', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  player.inventory.push({ id: 'item_006' });
+  const itemCatalog = [
+    { id: 'item_006', name: '詭異人偶', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } },
+  ];
+  const startingAP = player.actionPoints;
+  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { resolvedRoll: 6, itemCatalog });
+  expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
+  expect(player.actionPoints).toBe(startingAP - 1);
 });
 
 test('getAvailableDirections omits directions where neighbor room exists but has no door facing back', () => {
