@@ -613,6 +613,51 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
   httpServer.close();
 });
 
+test('game:move with an eligible interjection item held on a leaveCheck room pauses for a roll choice instead of resolving immediately', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false },
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_006' });
+  const startingAP = player.actionPoints;
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(result.error).toBeUndefined();
+  expect(result).toEqual({ kind: 'leaveCheckPending' });
+
+  const pending = await pendingPromise;
+  expect(pending.playerId).toBe(currentPlayerId);
+  expect(pending.options).toEqual([
+    { itemId: 'item_006', name: '詭異人偶', diceInterjection: content.cards.items[0].diceInterjection },
+  ]);
+  expect(typeof pending.promptId).toBe('string');
+  expect(player.x).toBe(0); // nothing moved yet
+  expect(player.actionPoints).toBe(startingAP); // nothing spent yet
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move rejects a caller who is not the current turn player', async () => {
   const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
 

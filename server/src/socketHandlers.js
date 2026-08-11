@@ -20,7 +20,7 @@ const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
-const { addItem, removeItem } = require('./game/playerEntity');
+const { addItem, removeItem, getStatValue } = require('./game/playerEntity');
 const { checkRemoveConditions } = require('./game/modifiers');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
@@ -165,36 +165,16 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         const currentRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
         const currentRoomDefinition = findRoomDefinition(content, currentRoom.roomId);
         const leaveCheck = currentRoomDefinition ? currentRoomDefinition.leaveCheck : null;
-        const result = moveToRoom(gameState, playerId, direction, leaveCheck);
+        const result = moveToRoom(gameState, playerId, direction, leaveCheck, { itemCatalog: content.cards.items });
+
+        if (result.kind === 'leaveCheckPending') {
+          handleLeaveCheckRollPending(io, effectResolverManager, gameState, roomCode, playerId, result, rollChoiceTimeouts, rollChoiceTimeoutMs, effectChoiceTimeouts, content);
+          ack({ kind: 'leaveCheckPending' });
+          return;
+        }
+
         ack(result);
-
-        // Any modifier gated on "meets another player" (e.g. 電池耗盡) clears
-        // once the mover shares a room with someone -- check everyone now
-        // standing there, not just the mover, since it could be the other
-        // player's modifier that clears.
-        const mover = getPlayer(gameState, playerId);
-        const roommates = [...gameState.players.values()].filter(
-          (p) => p.floor === mover.floor && p.x === mover.x && p.y === mover.y
-        );
-        if (roommates.length > 1) {
-          for (const roommate of roommates) {
-            checkRemoveConditions(roommate, { type: 'meetsAnotherPlayer' });
-          }
-        }
-
-        if (result.pendingCardDraw) {
-          try {
-            const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
-            if (drawOutcome.drawnCards) {
-              socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
-            }
-          } catch (drawErr) {
-            // A card-effect resolution failure (e.g. malformed content) must not
-            // prevent the turn from advancing and the room from staying in sync —
-            // see M2c-2 final review, Critical C1.
-            console.error('resolveCardDraw error', drawErr);
-          }
-        }
+        finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:move error', err);
@@ -497,6 +477,69 @@ function findRoomDefinition(content, roomId) {
     content.rooms.find((r) => r.id === roomId) ||
     content.startingRooms.find((r) => r.id === roomId)
   );
+}
+
+function finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
+  // Any modifier gated on "meets another player" (e.g. 電池耗盡) clears
+  // once the mover shares a room with someone -- check everyone now
+  // standing there, not just the mover, since it could be the other
+  // player's modifier that clears.
+  const mover = getPlayer(gameState, playerId);
+  const roommates = [...gameState.players.values()].filter(
+    (p) => p.floor === mover.floor && p.x === mover.x && p.y === mover.y
+  );
+  if (roommates.length > 1) {
+    for (const roommate of roommates) {
+      checkRemoveConditions(roommate, { type: 'meetsAnotherPlayer' });
+    }
+  }
+
+  if (result.pendingCardDraw) {
+    try {
+      const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+      if (socket && drawOutcome.drawnCards) {
+        socket.emit('game:cardsDrawn', { cards: drawOutcome.drawnCards });
+      }
+    } catch (drawErr) {
+      // A card-effect resolution failure (e.g. malformed content) must not
+      // prevent the turn from advancing and the room from staying in sync --
+      // see M2c-2 final review, Critical C1.
+      console.error('resolveCardDraw error', drawErr);
+    }
+  }
+}
+
+function handleLeaveCheckRollPending(io, effectResolverManager, gameState, roomCode, playerId, moveResult, rollChoiceTimeouts, rollChoiceTimeoutMs, effectChoiceTimeouts, content) {
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const optionIds = moveResult.options.map((o) => o.itemId).concat('__skip__');
+  const prompt = createPrompt(resolverEntry.promptState, {
+    type: 'dice_interjection',
+    targetPlayerId: playerId,
+    description: '要不要使用道具介入這次擲骰？',
+    options: optionIds,
+    timeoutMs: rollChoiceTimeoutMs,
+    now: Date.now(),
+  });
+  resolverEntry.pendingRollChoice = {
+    playerId,
+    promptId: prompt.promptId,
+    deadline: prompt.deadline,
+    options: moveResult.options,
+    resumeKind: 'leaveCheck',
+    resumeContext: { direction: moveResult.direction, leaveCheck: moveResult.leaveCheck },
+  };
+  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
+  io.to(roomCode).emit('game:diceChoicePending', {
+    playerId,
+    promptId: prompt.promptId,
+    options: moveResult.options,
+    deadline: prompt.deadline,
+  });
+  const delayMs = Math.max(prompt.deadline - Date.now(), 0);
+  const handle = setTimeout(() => {
+    handleRollChoiceTimeout(io, effectResolverManager, gameState, roomCode, prompt.promptId, rollChoiceTimeouts, effectChoiceTimeouts, content, rollChoiceTimeoutMs);
+  }, delayMs);
+  rollChoiceTimeouts.set(roomCode, handle);
 }
 
 function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
