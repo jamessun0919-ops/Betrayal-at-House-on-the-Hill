@@ -5,7 +5,7 @@ test('createRoom creates a room with the host as first player', () => {
   const { roomCode, playerId } = manager.createRoom('Alice', 'socket-1');
 
   expect(roomCode).toMatch(/^[A-Z]{4}$/);
-  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice' }]);
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice', isHost: true }]);
 });
 
 test('joinRoom adds a second player to an existing room', () => {
@@ -29,7 +29,7 @@ test('leaveRoom removes a player, and removes the room once empty', () => {
   const { playerId: bobId } = manager.joinRoom(roomCode, 'Bob', 'socket-2');
 
   manager.leaveRoom(roomCode, bobId);
-  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice' }]);
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice', isHost: true }]);
 
   manager.leaveRoom(roomCode, playerId);
   expect(manager.getPlayers(roomCode)).toEqual([]);
@@ -46,7 +46,7 @@ test('findRoomByPlayerId finds the room a player belongs to, or null', () => {
 test('createRoom trims a valid name with surrounding whitespace', () => {
   const manager = new LobbyManager();
   const { roomCode, playerId } = manager.createRoom('  Alice  ', 'socket-1');
-  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice' }]);
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name: 'Alice', isHost: true }]);
 });
 
 test.each([
@@ -65,7 +65,7 @@ test('createRoom accepts a name at the 20-character length cap', () => {
   const manager = new LobbyManager();
   const name = 'a'.repeat(20);
   const { roomCode, playerId } = manager.createRoom(name, 'socket-1');
-  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name }]);
+  expect(manager.getPlayers(roomCode)).toEqual([{ playerId, name, isHost: true }]);
 });
 
 test('joinRoom rejects an invalid name', () => {
@@ -86,4 +86,62 @@ test('isHost returns true only for the player who created the room', () => {
 test('isHost returns false for an unknown room code', () => {
   const manager = new LobbyManager();
   expect(manager.isHost('ZZZZ', 'anyone')).toBe(false);
+});
+
+test('getPlayers marks isHost true only for the host', () => {
+  const manager = new LobbyManager();
+  const { roomCode, playerId: hostId } = manager.createRoom('Alice', 'socket-1');
+  const { playerId: bobId } = manager.joinRoom(roomCode, 'Bob', 'socket-2');
+
+  const players = manager.getPlayers(roomCode);
+  expect(players.find((p) => p.playerId === hostId).isHost).toBe(true);
+  expect(players.find((p) => p.playerId === bobId).isHost).toBe(false);
+});
+
+test('getHostName returns the host player\'s name', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  manager.joinRoom(roomCode, 'Bob', 'socket-2');
+
+  expect(manager.getHostName(roomCode)).toBe('Alice');
+});
+
+test('getHostName returns null for an unknown room code', () => {
+  const manager = new LobbyManager();
+  expect(manager.getHostName('ZZZZ')).toBeNull();
+});
+
+test('closeRoom removes the room entirely', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  manager.closeRoom(roomCode);
+  expect(manager.getPlayers(roomCode)).toEqual([]);
+  expect(manager.isHost(roomCode, 'anyone')).toBe(false);
+});
+
+test('listJoinableRooms excludes rooms the isRoomInProgress callback flags', () => {
+  const manager = new LobbyManager();
+  const { roomCode: openRoom } = manager.createRoom('Alice', 'socket-1');
+  const { roomCode: startedRoom } = manager.createRoom('Bob', 'socket-2');
+
+  const result = manager.listJoinableRooms((roomCode) => roomCode === startedRoom, 6);
+  expect(result).toEqual([{ roomCode: openRoom, hostName: 'Alice', playerCount: 1, maxPlayers: 6 }]);
+});
+
+test('listJoinableRooms excludes rooms that are already at maxPlayers', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  manager.joinRoom(roomCode, 'Bob', 'socket-2');
+
+  const result = manager.listJoinableRooms(() => false, 2);
+  expect(result).toEqual([]);
+});
+
+test('listJoinableRooms reports playerCount and maxPlayers for an open room', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  manager.joinRoom(roomCode, 'Bob', 'socket-2');
+
+  const result = manager.listJoinableRooms(() => false, 6);
+  expect(result).toEqual([{ roomCode, hostName: 'Alice', playerCount: 2, maxPlayers: 6 }]);
 });

@@ -70,6 +70,7 @@ class LobbyManager {
     return Array.from(room.players.entries()).map(([playerId, p]) => ({
       playerId,
       name: p.name,
+      isHost: playerId === room.hostPlayerId,
     }));
   }
 
@@ -84,6 +85,28 @@ class LobbyManager {
     const room = this.rooms.get(roomCode);
     if (!room) return false;
     return room.hostPlayerId === playerId;
+  }
+
+  getHostName(roomCode) {
+    const room = this.rooms.get(roomCode);
+    if (!room) return null;
+    const host = room.players.get(room.hostPlayerId);
+    return host ? host.name : null;
+  }
+
+  closeRoom(roomCode) {
+    this.rooms.delete(roomCode);
+  }
+
+  listJoinableRooms(isRoomInProgress, maxPlayers) {
+    const result = [];
+    for (const [roomCode, room] of this.rooms.entries()) {
+      if (isRoomInProgress(roomCode)) continue;
+      const playerCount = room.players.size;
+      if (playerCount >= maxPlayers) continue;
+      result.push({ roomCode, hostName: this.getHostName(roomCode), playerCount, maxPlayers });
+    }
+    return result;
   }
 }
 
