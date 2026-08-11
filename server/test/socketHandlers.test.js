@@ -658,6 +658,118 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
   httpServer.close();
 });
 
+function makeLeaveCheckInterjectionContent() {
+  return makeContent({
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        {
+          id: 'item_006',
+          name: '詭異人偶',
+          diceInterjection: { scope: 'any', bonusDice: 2, cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }], consumesItem: false },
+        },
+      ],
+    },
+  });
+}
+
+test('game:diceChoiceRespond with an item optionId resolves a pending leaveCheck: applies cost and completes the move on a pass', async () => {
+  const content = makeLeaveCheckInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await pendingPromise;
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // every die -> face 2
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const respondResult = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_006' }, resolve)
+  );
+  rngSpy.mockRestore();
+  expect(respondResult.error).toBeUndefined();
+  await updatePromise;
+
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost applied
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']);
+  // might(3) + bonusDice(2) = 4 dice, each face 2 -> sum 8, passes min 3 -> opens the door east
+  expect(player.x).toBe(1);
+  expect(player.actionPoints).toBe(0); // open_door zeroes AP, same as a normal door-open
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond with optionId:"__skip__" resolves a pending leaveCheck with no bonus applied', async () => {
+  const content = makeLeaveCheckInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_006' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await pendingPromise;
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 3 dice (no bonus), each face 2 -> sum 6, passes min 3
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: '__skip__' }, resolve)
+  );
+  rngSpy.mockRestore();
+  await updatePromise;
+
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex); // no cost -- item never used
+  expect(player.diceInterjectionUsedThisTurn || []).toEqual([]);
+  expect(player.x).toBe(1);
+  expect(player.actionPoints).toBe(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:diceChoiceRespond resolves a pending leaveCheck that still fails after the bonus roll: cost is still paid, move is blocked, and exactly 1 action point is spent', async () => {
+  const content = makeLeaveCheckInterjectionContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_006' });
+  const startingAP = player.actionPoints;
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await pendingPromise;
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> face 0, sum 0, fails min 3 even with the bonus dice
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  const respondResult = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_006' }, resolve)
+  );
+  rngSpy.mockRestore();
+  expect(respondResult.error).toBeUndefined();
+  await updatePromise;
+
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost paid even though the roll failed
+  expect(player.x).toBe(0); // unmoved -- no room was drawn or placed
+  expect(player.actionPoints).toBe(startingAP - 1); // exactly 1 AP, not double-charged
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move rejects a caller who is not the current turn player', async () => {
   const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
 

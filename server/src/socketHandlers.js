@@ -17,7 +17,7 @@ const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
-const { resolveEffects, resolveChoiceOption } = require('./game/effectResolver');
+const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
 const { addItem, removeItem, getStatValue } = require('./game/playerEntity');
@@ -396,7 +396,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           ? { itemId: chosenOption.itemId, diceInterjection: chosenOption.diceInterjection, overrideValue }
           : null;
 
-        const outcome = resumeRollChoice(io, effectResolverManager, gameState, roomCode, choicePlayerId, resumeKind, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+        const outcome = resumeRollChoice(io, effectResolverManager, gameState, roomCode, choicePlayerId, resumeKind, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, socket);
         if (outcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
         }
@@ -697,7 +697,10 @@ function handleRollChoicePending(io, effectResolverManager, gameState, roomCode,
   return { pending: true };
 }
 
-function resumeRollChoice(io, effectResolverManager, gameState, roomCode, playerId, resumeKind, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
+function resumeRollChoice(io, effectResolverManager, gameState, roomCode, playerId, resumeKind, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, socket = null) {
+  if (resumeKind === 'leaveCheck') {
+    return resumeLeaveCheckRollChoice(io, socket, effectResolverManager, gameState, roomCode, playerId, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+  }
   if (resumeKind !== 'diceCheck') {
     throw new Error('UNSUPPORTED_ROLL_CHOICE_RESUME_KIND');
   }
@@ -706,6 +709,27 @@ function resumeRollChoice(io, effectResolverManager, gameState, roomCode, player
   const context = { now: Date.now(), interjectionChoice, itemCatalog: content.cards.items, sourceDeckType };
   const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, [effect], context);
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+}
+
+function resumeLeaveCheckRollChoice(io, socket, effectResolverManager, gameState, roomCode, playerId, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const { direction, leaveCheck } = resumeContext;
+  const player = getPlayer(gameState, playerId);
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  const modifiers = [...(player.modifiers || []), ...(room.modifiers || [])];
+  const diceCount = getStatValue(player, leaveCheck.stat);
+  const finalRoll = computeInterjectedRoll(
+    gameState,
+    resolverEntry.promptState,
+    playerId,
+    diceCount,
+    modifiers,
+    interjectionChoice,
+    { now: Date.now(), itemCatalog: content.cards.items, rng: Math.random }
+  );
+  const result = moveToRoom(gameState, playerId, direction, leaveCheck, { resolvedRoll: finalRoll });
+  finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+  return { pending: false };
 }
 
 function clearRollChoiceTimeout(roomCode, rollChoiceTimeouts) {
