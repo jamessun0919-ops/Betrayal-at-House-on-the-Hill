@@ -86,13 +86,13 @@
     "id": "item_009",
     "name": "魔術方塊",
     "description": "",
-    "text": "玩家在其回合內可以進行知識考驗，骰數大於等於六：抽取兩張物品牌，魔術方塊消失。骰數０至五：沒有事情發生",
+    "text": "玩家在其回合內可以進行知識考驗，骰數大於等於五：抽取兩張物品牌，魔術方塊消失。骰數０至五：沒有事情發生",
     "effects": [{
       "type": "dice_check",
       "stat": "knowledge",
       "tiers": [
-        { "min": 6, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
-        { "min": 0, "max": 5, "effects": [] }
+        { "min": 5, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
+        { "min": 0, "max": 4, "effects": [] }
       ]
     }],
     "category": "consumable",
@@ -131,10 +131,55 @@
     "needsCustomLogic": true
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
+    "id": "item_013",
+    "name": "腎上腺素藥劑",
+    "description": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的任一項或多項能力低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
     "text": "",
+    "effects": [
+      { "type": "stat_change", "stat": "might", "restoreToBase": true },
+      { "type": "stat_change", "stat": "speed", "restoreToBase": true },
+      { "type": "stat_change", "stat": "knowledge", "restoreToBase": true },
+      { "type": "stat_change", "stat": "sanity", "restoreToBase": true }
+    ],
+    "category": "consumable",
+    "canTargetOthers": true,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_014",
+    "name": "維修工具組",
+    "description": "",
+    "text": "包含了螺絲起子、老虎鉗等簡易維修工具，也許在某些房間中會使用到",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_015",
+    "name": "古老的金幣",
+    "description": "",
+    "text": "看上去是一件歷史悠久的古物，如果能順利逃生的話，也許可以變賣不少錢。",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_016",
+    "name": "礦泉水",
+    "description": "",
+    "text": "可以用來解渴的一罐礦泉水，也許有其他用處",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_017",
+    "name": "壓縮餅乾",
+    "description": "",
+    "text": "可以用來充飢的一小包壓縮餅乾，看上去不太美味",
     "effects": [],
     "category": "general",
     "canTargetOthers": false,
@@ -150,4 +195,5 @@
     "canTargetOthers": false,
     "needsCustomLogic": false
   }
+    
 ]

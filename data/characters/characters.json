@@ -1,80 +1,104 @@
 [
   {
     "id": "char_001",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "長者",
+    "filename":"oldman.png",
+    "gender": "male",
+    "age": 64,
+    "tall":165,
+    "occupation": "神父",
+    "itemID":"item_005",
+    "itemname":"天使羽毛",
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [2,2,2,3,3,3,3,4], "baseIndex": 4, "skullIndex": 0 },
+      "speed": { "track": [2,2,3,3,4,4,4,5], "baseIndex": 4, "skullIndex": 0 },
+      "knowledge": { "track": [5,5,5,6,7,7,8,8], "baseIndex": 3, "skullIndex": 0 },
+      "sanity": { "track": [5,5,6,7,7,7,8,8], "baseIndex": 2, "skullIndex": 0 }
     }
   },
   {
     "id": "char_002",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "看護",
+    "filename":"nurse.png",
+    "gender": "female",
+    "age": 52,
+    "tall":165,
+    "occupation": "看護",
+    "itemID":"item_003",
+    "itemname":"治療藥膏",
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [2,3,3,3,4,4,5,6], "baseIndex": 4, "skullIndex": 0 },
+      "speed": { "track": [3,3,4,4,4,5,5,5], "baseIndex": 4, "skullIndex": 0 },
+      "knowledge": { "track": [4,4,4,5,5,5,5,6], "baseIndex": 3, "skullIndex": 0 },
+      "sanity": { "track": [4,4,5,5,6,6,7,7], "baseIndex": 3, "skullIndex": 0 }
     }
   },
   {
     "id": "char_003",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "伐木工",
+    "filename":"Lumberjack.png",
+    "gender": "male",
+    "age": 32,
+    "tall":180,
+    "occupation": "伐木工",
+    "itemID":null,
+    "itemname":null,
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [4,4,5,5,6,7,7,8], "baseIndex": 4, "skullIndex": 0 },
+      "speed": { "track": [4,4,4,5,5,5,6,6], "baseIndex": 4, "skullIndex": 0 },
+      "knowledge": { "track": [3,4,4,4,5,5,5,6], "baseIndex": 3, "skullIndex": 0 },
+      "sanity": { "track": [3,3,4,4,5,5,5,6], "baseIndex": 3, "skullIndex": 0 }
     }
   },
   {
     "id": "char_004",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "警察",
+    "filename":"police.png",
+    "gender": "female",
+    "age": 35,
+    "tall":172,
+    "occupation": "警察",
+    "itemID":"item_001",
+    "itemname":"左輪手槍",
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [4,4,5,5,6,6,7,7], "baseIndex": 3, "skullIndex": 0 },
+      "speed": { "track": [4,5,5,6,6,6,7,7], "baseIndex": 3, "skullIndex": 0 },
+      "knowledge": { "track": [4,4,5,5,5,6,6,7], "baseIndex": 3, "skullIndex": 0 },
+      "sanity": { "track": [3,4,4,4,5,5,6,6], "baseIndex": 3, "skullIndex": 0 }
     }
   },
   {
     "id": "char_005",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "運動員",
+    "filename":"HighScholl.png",
+    "gender": "male",
+    "age": 18,
+    "tall":175,
+    "occupation": "高中生",
+    "itemID":null,
+    "itemname":null,
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [4,4,4,5,6,6,7,7], "baseIndex": 3, "skullIndex": 0 },
+      "speed": { "track": [4,5,5,6,6,7,7,8], "baseIndex": 3, "skullIndex": 0 },
+      "knowledge": { "track": [4,4,5,5,6,6,7,7], "baseIndex": 2, "skullIndex": 0 },
+      "sanity": { "track": [3,3,4,4,4,5,5,5], "baseIndex": 2, "skullIndex": 0 }
     }
   },
   {
     "id": "char_006",
-    "codename": "",
-    "gender": "",
-    "age": null,
-    "occupation": "",
+    "codename": "小女孩",
+    "filename":"girl.png",
+    "gender": "female",
+    "age": 12,
+    "tall":151,
+    "occupation": "小學生",
+    "itemID":"item_009",
+    "itemname":"魔術方塊",
     "stats": {
-      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
-      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+      "might": { "track": [3,3,3,3,4,4,4,5], "baseIndex": 3, "skullIndex": 0 },
+      "speed": { "track": [4,4,5,5,6,6,7,8], "baseIndex": 3, "skullIndex": 0 },
+      "knowledge": { "track": [3,4,4,5,5,6,6,7], "baseIndex": 2, "skullIndex": 0 },
+      "sanity": { "track": [4,4,4,5,5,5,6,6], "baseIndex": 3, "skullIndex": 0 }
     }
   }
 ]

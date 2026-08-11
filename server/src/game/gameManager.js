@@ -1,4 +1,5 @@
 const { createGameState, addPlayer } = require('./gameState');
+const { addItem } = require('./playerEntity');
 
 function shuffle(array) {
   const result = array.slice();
@@ -25,11 +26,14 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
     if (!character) {
       throw new Error('UNKNOWN_CHARACTER');
     }
-    addPlayer(gameState, {
+    const newPlayer = addPlayer(gameState, {
       playerId: player.playerId,
       name: player.name,
       stats: character.stats,
     });
+    if (character.itemID) {
+      addItem(newPlayer, { id: character.itemID });
+    }
   }
   // Turn order is independent of character-pick order — a fresh, separate
   // shuffle, per the developer's explicit ruling (see M2b design doc §3).

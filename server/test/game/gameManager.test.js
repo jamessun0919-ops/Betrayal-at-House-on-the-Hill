@@ -107,6 +107,23 @@ test('GAME_ALREADY_STARTED throws and original gameState remains unmodified and 
   expect(gameState2.players.size).toBe(2);
 });
 
+test('startGame grants a player the starting item declared on their character (itemID)', () => {
+  const manager = createGameManager();
+  const characters = makeCharacters();
+  characters[0].itemID = 'item_005';
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({ characters }));
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_005' }]);
+});
+
+test('startGame leaves inventory empty when the character has no itemID (null or omitted)', () => {
+  const manager = createGameManager();
+  const characters = makeCharacters();
+  characters[1].itemID = null;
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({ characters }));
+  expect(gameState.players.get('p1').inventory).toEqual([]);
+  expect(gameState.players.get('p2').inventory).toEqual([]);
+});
+
 test('startGame passes cards through to createGameState so the decks are populated', () => {
   const manager = createGameManager();
   const gameState = startGame(manager, 'ROOM1', baseStartArgs({
