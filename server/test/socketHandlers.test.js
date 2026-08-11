@@ -702,7 +702,7 @@ test('game:diceChoiceRespond with an item optionId resolves a pending leaveCheck
 
   expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost applied
   expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']);
-  // might(3) + bonusDice(2) = 4 dice, each face 2 -> sum 8, passes min 3 -> opens the door east
+  // might(3) + bonusDice(2) = 5 dice, each face 2 -> sum 10, passes min 3 -> opens the door east
   expect(player.x).toBe(1);
   expect(player.actionPoints).toBe(0); // open_door zeroes AP, same as a normal door-open
 

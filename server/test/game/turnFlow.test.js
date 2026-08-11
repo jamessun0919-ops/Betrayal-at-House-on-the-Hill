@@ -206,6 +206,20 @@ test('moveToRoom with a leaveCheck: an eligible interjection item pauses without
   expect(player.actionPoints).toBe(startingAP); // nothing spent yet
 });
 
+test('moveToRoom with a leaveCheck: a room-level onBeforeRoll modifier affects the direct (non-interjected) roll', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  // The modifier lives on the player's CURRENT room (the one being left),
+  // matching resumeLeaveCheckRollChoice's `gameState.board[player.floor].get(coordKey(player.x, player.y))`.
+  const currentRoom = gameState.board.ground.get(coordKey(0, 0));
+  currentRoom.modifiers = [{ effects: [{ hookType: 'onBeforeRoll', delta: -1 }] }];
+  // might value is 3 (baseIndex). Without the modifier, 3 dice at face 2 -> sum 6, passes min:5.
+  // With the -1 onBeforeRoll modifier, 2 dice at face 2 -> sum 4, fails min:5.
+  const rng = () => 0.99; // every die -> face 2
+  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 5 }, { rng });
+  expect(result).toEqual({ kind: 'leaveCheckFailed', rolled: 4, required: 5 });
+});
+
 test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning and internal rolling, even with an eligible item held', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });

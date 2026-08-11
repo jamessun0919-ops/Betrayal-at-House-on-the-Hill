@@ -3,7 +3,7 @@ const { canMoveBetween, placeNewRoom, coordKey, DIRECTION_DELTA } = require('./b
 const { drawRoom, hasRoomForFloor } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
 const { movePlayerTo, resetActionPoints, getStatValue } = require('./playerEntity');
-const { rollDice } = require('./effectPipeline');
+const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
 
 const ACTION_TYPES = ['item', 'attack', 'room_action'];
@@ -74,8 +74,11 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
         // pendingRollChoice and resumes with a resolvedRoll instead.
         return { kind: 'leaveCheckPending', rollChoice: true, options, leaveCheck, direction };
       }
+      const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+      const modifiers = [...(player.modifiers || []), ...(room.modifiers || [])];
       const diceCount = getStatValue(player, leaveCheck.stat);
-      rolled = rollDice(diceCount, rng || Math.random);
+      const adjustedCount = Math.max(1, Math.min(8, applyModifiers(diceCount, modifiers, 'onBeforeRoll', {})));
+      rolled = applyModifiers(rollDice(adjustedCount, rng || Math.random), modifiers, 'onAfterRoll', {});
     }
     if (rolled < leaveCheck.min) {
       player.actionPoints -= 1;
