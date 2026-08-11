@@ -291,6 +291,95 @@ test('disconnecting removes the player and broadcasts the updated list', async (
   httpServer.close();
 });
 
+test('lobby:leave by a non-host player removes only that player and broadcasts the updated list', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode: created.roomCode, playerName: 'Bob' }, resolve));
+
+  const updatePromise = new Promise((resolve) => {
+    clientA.on('lobby:players', (update) => {
+      if (update.players.length === 1) resolve(update);
+    });
+  });
+  const leaveResult = await new Promise((resolve) => clientB.emit('lobby:leave', {}, resolve));
+  expect(leaveResult.error).toBeUndefined();
+
+  const update = await updatePromise;
+  expect(update.players.map((p) => p.name)).toEqual(['Alice']);
+
+  // clientB is free to create/join a new room now that its socket.data was cleared.
+  const rejoin = await new Promise((resolve) => clientB.emit('lobby:create', { playerName: 'Bob2' }, resolve));
+  expect(rejoin.error).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('lobby:leave rejects a socket that is not currently in any room', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const client = ioClient(url);
+  const result = await new Promise((resolve) => client.emit('lobby:leave', {}, resolve));
+  expect(result.error).toBe('NOT_IN_ROOM');
+
+  client.close();
+  httpServer.close();
+});
+
+test('lobby:leave by the host closes the room: every remaining player receives lobby:closed and can create/join a new room', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode: created.roomCode, playerName: 'Bob' }, resolve));
+
+  const closedPromise = new Promise((resolve) => clientB.once('lobby:closed', resolve));
+  const leaveResult = await new Promise((resolve) => clientA.emit('lobby:leave', {}, resolve));
+  expect(leaveResult.error).toBeUndefined();
+  await closedPromise;
+
+  // Both sockets' data were cleared -- both are free to create a new room.
+  const bobRejoin = await new Promise((resolve) => clientB.emit('lobby:create', { playerName: 'Bob2' }, resolve));
+  expect(bobRejoin.error).toBeUndefined();
+  const aliceRejoin = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice2' }, resolve));
+  expect(aliceRejoin.error).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('the host disconnecting (not an explicit lobby:leave) also closes the room for everyone else', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode: created.roomCode, playerName: 'Bob' }, resolve));
+
+  const closedPromise = new Promise((resolve) => clientB.once('lobby:closed', resolve));
+  clientA.close(); // host disconnects without an explicit lobby:leave
+  await closedPromise;
+
+  const bobRejoin = await new Promise((resolve) => clientB.emit('lobby:create', { playerName: 'Bob2' }, resolve));
+  expect(bobRejoin.error).toBeUndefined();
+
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:startCharacterSelect full flow: host triggers, both players get prompted in turn, game starts', async () => {
   const { httpServer, port } = await startTestServer();
   const url = `http://localhost:${port}`;

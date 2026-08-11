@@ -418,11 +418,33 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
-    socket.on('disconnect', () => {
+    socket.on('lobby:leave', async (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      const { roomCode, playerId } = socket.data;
+      if (!roomCode || !playerId) {
+        return ack({ error: 'NOT_IN_ROOM' });
+      }
+      if (lobbyManager.isHost(roomCode, playerId)) {
+        await closeLobbyRoom(io, lobbyManager, roomCode);
+      } else {
+        lobbyManager.leaveRoom(roomCode, playerId);
+        socket.leave(roomCode);
+        socket.data.roomCode = null;
+        socket.data.playerId = null;
+        broadcastPlayers(io, lobbyManager, roomCode);
+      }
+      ack({});
+    });
+
+    socket.on('disconnect', async () => {
       const { roomCode, playerId } = socket.data;
       if (roomCode && playerId) {
-        lobbyManager.leaveRoom(roomCode, playerId);
-        broadcastPlayers(io, lobbyManager, roomCode);
+        if (lobbyManager.isHost(roomCode, playerId)) {
+          await closeLobbyRoom(io, lobbyManager, roomCode);
+        } else {
+          lobbyManager.leaveRoom(roomCode, playerId);
+          broadcastPlayers(io, lobbyManager, roomCode);
+        }
       }
     });
   });
@@ -847,6 +869,20 @@ function serializeCharacterSelection(characterSelectionState) {
     })),
     characters: characterSelectionState.characters,
   };
+}
+
+async function closeLobbyRoom(io, lobbyManager, roomCode) {
+  const sockets = await io.in(roomCode).fetchSockets();
+  // Broadcast before any socket leaves the io room: once a socket calls
+  // .leave(roomCode), io.to(roomCode).emit(...) can no longer reach it, so
+  // emitting after the leave loop would drop lobby:closed for everyone.
+  io.to(roomCode).emit('lobby:closed', {});
+  for (const s of sockets) {
+    s.data.roomCode = null;
+    s.data.playerId = null;
+    s.leave(roomCode);
+  }
+  lobbyManager.closeRoom(roomCode);
 }
 
 function broadcastPlayers(io, lobbyManager, roomCode) {
