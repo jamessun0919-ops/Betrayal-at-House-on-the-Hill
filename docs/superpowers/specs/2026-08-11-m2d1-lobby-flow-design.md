@@ -144,7 +144,7 @@ async function closeLobbyRoom(io, lobbyManager, roomCode) {
 
 `LobbyManager` 對應新增 `closeRoom(roomCode) { this.rooms.delete(roomCode); }`。
 
-**前端行為**：收到 `lobby:closed` 廣播的所有客戶端（房主自己觸發 `lobby:leave` 的那個 ack 已經足夠讓房主自己重置畫面，不需要額外監聽；其餘玩家靠這個廣播事件）一律清空本地狀態、導回開頭頁面。
+**前端行為**：房主自己的 socket 在 `closeLobbyRoom` 廣播 `lobby:closed` 的當下仍在該 io room 內（emit 發生在 leave 迴圈之前），所以房主自己的客戶端也會收到這個廣播；前端刻意依賴這個廣播（而不是 `lobby:leave` 的 ack）來驅動房主自己的畫面轉場，避免 ack 與廣播兩個轉場互相搶跑。收到 `lobby:closed` 廣播的所有客戶端一律清空本地狀態、導回開頭頁面。
 
 ## 前端
 

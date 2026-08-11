@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { translateError } from './errorMessages';
 
 export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed, onLeft, onCharacterSelectStarted }) {
   const [players, setPlayers] = useState([]);
@@ -30,7 +31,7 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed
   function handleLeave() {
     socket.emit('lobby:leave', {}, (res) => {
       if (res && res.error) {
-        setError(res.error);
+        setError(translateError(res.error));
         return;
       }
       // The host's own socket also receives the lobby:closed broadcast (it's
@@ -45,7 +46,7 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed
 
   function handleReady() {
     socket.emit('game:startCharacterSelect', {}, (res) => {
-      if (res && res.error) setError(res.error);
+      if (res && res.error) setError(translateError(res.error));
     });
   }
 

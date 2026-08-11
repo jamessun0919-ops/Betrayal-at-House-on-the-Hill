@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { translateError } from './errorMessages';
 
 export default function LobbyListScreen({ socket, name, onJoined, onBack }) {
   const [rooms, setRooms] = useState([]);
@@ -10,7 +11,7 @@ export default function LobbyListScreen({ socket, name, onJoined, onBack }) {
     socket.emit('lobby:list', {}, (res) => {
       setLoading(false);
       if (res && res.error) {
-        setError(res.error);
+        setError(translateError(res.error));
         return;
       }
       setError('');
@@ -25,7 +26,7 @@ export default function LobbyListScreen({ socket, name, onJoined, onBack }) {
   function handleJoin(roomCode) {
     socket.emit('lobby:join', { roomCode, playerName: name }, (res) => {
       if (res && res.error) {
-        setError(res.error);
+        setError(translateError(res.error));
         return;
       }
       onJoined(res.roomCode, res.playerId);
