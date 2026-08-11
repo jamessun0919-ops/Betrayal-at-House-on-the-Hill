@@ -76,6 +76,16 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
+    socket.on('lobby:list', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      const maxPlayers = content.characters.length;
+      const rooms = lobbyManager.listJoinableRooms(
+        (roomCode) => Boolean(getCharacterSelection(characterSelectionManager, roomCode) || getGameState(gameManager, roomCode)),
+        maxPlayers
+      );
+      ack({ rooms });
+    });
+
     socket.on('game:startCharacterSelect', (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {

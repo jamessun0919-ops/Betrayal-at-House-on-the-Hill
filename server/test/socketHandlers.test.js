@@ -431,6 +431,46 @@ test('lobby:join is rejected with ROOM_IN_PROGRESS once character selection has 
   httpServer.close();
 });
 
+test('lobby:list returns open rooms with host name and player count, excluding full or in-progress rooms', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const openRoom = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+
+  const clientB = ioClient(url);
+  const startedRoom = await new Promise((resolve) => clientB.emit('lobby:create', { playerName: 'Carol' }, resolve));
+  const clientC = ioClient(url);
+  await new Promise((resolve) => clientC.emit('lobby:join', { roomCode: startedRoom.roomCode, playerName: 'Dave' }, resolve));
+  await new Promise((resolve) => clientB.emit('game:startCharacterSelect', {}, resolve));
+
+  const result = await new Promise((resolve) => clientC.emit('lobby:list', {}, resolve));
+
+  expect(result.error).toBeUndefined();
+  expect(result.rooms).toEqual([
+    { roomCode: openRoom.roomCode, hostName: 'Alice', playerCount: 1, maxPlayers: 2 },
+  ]);
+  expect(result.rooms.find((r) => r.roomCode === startedRoom.roomCode)).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  clientC.close();
+  httpServer.close();
+});
+
+test('lobby:list can be called by a socket not currently in any room', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const client = ioClient(url);
+  const result = await new Promise((resolve) => client.emit('lobby:list', {}, resolve));
+  expect(result.error).toBeUndefined();
+  expect(result.rooms).toEqual([]);
+
+  client.close();
+  httpServer.close();
+});
+
 test('character selection timeout auto-assigns a character and continues the flow', async () => {
   const { httpServer, port } = await startTestServer(makeContent(), { characterSelectTimeoutMs: 50 });
   const url = `http://localhost:${port}`;
