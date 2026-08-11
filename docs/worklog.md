@@ -469,3 +469,27 @@
 **開發者交代備忘事項**：
 - 下一階段工作：M2c-3 其餘卡片（傷害系統/通靈板/中世紀鎧甲，都卡在 M3）或 `dice-interjection` Part B（`leaveCheck` 路徑）或 M2d，開發者尚未排定順序
 
+## 2026-08-11 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者「早安」開新 session，讀取 Handover 後選定執行 `dice-interjection` Part B（`leaveCheck` 路徑的道具介入）
+- 用 `brainstorming` skill 討論設計：確認直接擴充既有 `pendingRollChoice` 機制（新增 `resumeKind:'leaveCheck'`，不另建新機制）、`game:move` 觸發介入詢問時 ack 回傳 `{kind:'leaveCheckPending'}`（沒有既有先例可循，明確跟開發者確認）、`leaveCheck` 的擲骰完全重用 Part A 寫好的 `computeInterjectedRoll`（含道具代價、持續性修正），設計文件寫完提交
+- 用 `writing-plans` skill 轉成 4 任務實作計畫，用 `subagent-driven-development` 在獨立 worktree 執行；worktree 是從 `origin/main` 建立，發現設計文件與計畫文件其實還沒推送（前一階段疏漏），先在主副本補推、merge 進 worktree 分支後才繼續
+- 4 個任務全數一次通過個別審查：export `computeInterjectedRoll`、`moveToRoom` 兩階段化（含破壞性簽章變更）、`game:move` 開啟 leaveCheck 的 `pendingRollChoice`（抽出共用的 `finishMoveResult`）、`resumeRollChoice` 新增 `leaveCheck` 分支
+- 全分支最終審查（最強模型）：整合面（兩個 `resumeKind` 分支互不干擾、無死鎖、`game:move` 重構行為等價）確認良好，但抓到 1 個 Important——leaveCheck 直接擲骰路徑（沒有道具介入時）沒有套用房間/玩家的持續性修正（modifier），但介入/逾時路徑（透過 `computeInterjectedRoll`）會套用，兩條路徑不一致（現行出貨內容還踩不到，屬潛伏性缺陷）。跟開發者確認方向：套用（讓兩條路徑一致，也符合設計文件本來就寫的「完全重用」）。派 subagent 一次修完（含一個新的鑑別性測試）＋一筆測試註解算術錯誤，scoped re-review 確認全數修復、無新問題，399/399 測試穩定
+- 用 `finishing-a-development-branch` 合併：`ExitWorktree` 退回主副本、merge、測試確認。worktree 的實體資料夾刪不掉（Windows 檔案鎖定，找不到實際佔用程序，可能是 OneDrive/防毒軟體），git 端（worktree 註冊＋分支）已經正常清理乾淨，只是磁碟殘留一個空殼資料夾，記錄下來不擋流程
+- 更新 Handover.md：`dice-interjection-part-b` 段落改為已完成並合併，新增全分支審查發現的教訓（新路徑重用既有邏輯時要檢查跟舊路徑的一致性，不能只顧新路徑本身正確）
+
+**完成項目**：
+- `dice-interjection-part-b`（天使羽毛/詭異人偶可介入 `leaveCheck` 離開房間前考驗）已完成並合併進 `main`，`dice-interjection` 全部功能（Part A + Part B）至此完整
+- [docs/superpowers/specs/2026-08-11-dice-interjection-part-b-design.md](superpowers/specs/2026-08-11-dice-interjection-part-b-design.md)、[docs/superpowers/plans/2026-08-11-dice-interjection-part-b.md](superpowers/plans/2026-08-11-dice-interjection-part-b.md) 已撰寫並提交
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- 全分支審查再次證明「只審查新路徑本身」不夠——leaveCheck 的 modifier 不一致問題，是因為新的介入路徑重用了 `computeInterjectedRoll`（含 modifier 邏輯），但沒人回頭檢查舊的直接路徑要不要跟著補齊，形成新的不一致，跟上一階段「新暫停狀態要檢查跟舊狀態共存」是同一類「合併多個變更後才會浮現」的問題
+- worktree 資料夾清不掉的 Windows 檔案鎖定問題，原因不明，未深入排查（不影響 git 狀態或功能）
+
+**開發者交代備忘事項**：
+- `dice-interjection`（Part A + Part B）全部完成，下一階段工作待開發者決定：M2c-3 其餘卡片（仍卡在 M3 傷害系統）或 M2d（簡易使用者介面）
+- `.claude/worktrees/dice-interjection-part-b/` 資料夾清不掉，有空時可以手動確認並刪除
+
