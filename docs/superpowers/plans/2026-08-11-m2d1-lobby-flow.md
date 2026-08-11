@@ -888,7 +888,13 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed
         setError(res.error);
         return;
       }
-      onLeft();
+      // The host's own socket also receives the lobby:closed broadcast (it's
+      // still in the io room at the moment closeLobbyRoom emits it) -- let
+      // that handler drive the transition via onClosed() instead of calling
+      // onLeft() here too, or the two would race to pick the next screen.
+      if (!isHost) {
+        onLeft();
+      }
     });
   }
 
