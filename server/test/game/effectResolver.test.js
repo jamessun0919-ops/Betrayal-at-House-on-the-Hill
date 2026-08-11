@@ -1,4 +1,4 @@
-const { resolveEffects, resolveChoiceOption } = require('../../src/game/effectResolver');
+const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('../../src/game/effectResolver');
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { createPromptState, respondToPrompt } = require('../../src/game/promptState');
 
@@ -621,6 +621,32 @@ test('resolveEffects appliedCount is 0 when the matched dice_check tier has no e
     },
   ], { rng });
   expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('computeInterjectedRoll is exported and applies a chosen interjection\'s cost/bonus directly', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_006' });
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const diceInterjection = {
+    scope: 'any',
+    bonusDice: 2,
+    cost: [{ type: 'stat_change', stat: 'sanity', delta: -1 }],
+    consumesItem: false,
+  };
+  const result = computeInterjectedRoll(
+    gameState,
+    createPromptState(),
+    'p1',
+    2,
+    [],
+    { itemId: 'item_006', diceInterjection, overrideValue: undefined },
+    { rng }
+  );
+  expect(result).toBe(8); // (2 base + 2 bonus) dice, each face 2 -> sum 8
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex - 1); // cost applied
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']); // not consumable -- tracked as used
+  expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
 });
 
 test('resolveEffects appliedCount is 0 for an empty effects array', () => {

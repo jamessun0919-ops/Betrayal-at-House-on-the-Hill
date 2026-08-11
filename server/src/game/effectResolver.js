@@ -281,4 +281,4 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   return output;
 }
 
-module.exports = { resolveEffects, resolveChoiceOption };
+module.exports = { resolveEffects, resolveChoiceOption, computeInterjectedRoll };
