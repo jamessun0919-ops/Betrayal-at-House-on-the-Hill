@@ -411,7 +411,7 @@ cp img/selected.png client/public/images/selected.png
   filter: brightness(1.3);
 }
 
-.cs-portrait-button img {
+.cs-portrait-img {
   height: 100%;
   width: auto;
   display: block;
@@ -429,7 +429,11 @@ cp img/selected.png client/public/images/selected.png
 }
 ```
 
-**補充修正（第一版執行時發現）**：`.cs-portrait-button` 原本只有 `flex: 0 0 auto`（沒有明確的 `width`），是靠內容（肖像 `<img>`，`height:100%; width:auto`）撐開寬度。`.cs-locked-badge` 是絕對定位元素，`width:100%` 要能正確算出來，需要父層有一個「明確」的寬度可以參照——`.cs-portrait-button` 靠內容撐開的寬度不算明確寬度，導致瀏覽器算不出 `.cs-locked-badge` 的 `width:100%`，退回用圖片本身的原始長寬比反推寬度，結果徽章寬度變成跟按鈕實際寬度完全不成比例（跑版溢出到隔壁角色）。已經在上面的 `.cs-portrait-button` 規則加上 `width: fit-content;`，讓按鈕自己有明確寬度可以讓 `.cs-locked-badge` 的 `width:100%` 正確參照。
+（肖像 `<img>` 在 JSX 裡要加上 `className="cs-portrait-img"`，見下方 Step 3 更新後的程式碼；`.cs-locked-badge` 的 `<img>` 維持原樣，不要也加 `cs-portrait-img`）
+
+**補充修正 v2（第一版 `width: fit-content` 修法經 implementer 實測證明無效，重新定位真正根因）**：原本的 `.cs-portrait-button img`（不分 class，抓「這個按鈕底下所有的 `<img>`」）跟 `.cs-locked-badge` 兩條規則其實都會套用到「已被選擇」徽章這個 `<img>` 元素身上（它同時符合兩條選擇器）。CSS 優先權比較：`.cs-portrait-button img`＝1 個 class＋1 個標籤＝優先權 (0,1,1)；`.cs-locked-badge`＝1 個 class＝優先權 (0,1,0)。(0,1,1) > (0,1,0)，所以**不管來源順序、也不管 `.cs-portrait-button` 的寬度是不是「明確」，`width: auto` 這條規則永遠贏，`.cs-locked-badge` 的 `width: 100%` 從頭到尾沒有機會生效**——這完全解釋了 implementer 實測到的現象（徽章寬度＝其自身高度×原始長寬比，就是 `width:auto` 的行為，不是 `width:100%`），也解釋了為什麼幫 `.cs-portrait-button` 加 `width: fit-content` 完全沒有改善（那條規則從一開始就沒被用到，問題不在「父層寬度夠不夠明確」，而在選擇器優先權衝突）。
+
+修法：把「只抓肖像圖」跟「只抓徽章圖」的選擇器徹底分開，不要讓兩條規則同時符合同一個元素。已經把 `.cs-portrait-button img` 改成 `.cs-portrait-img`（只用一個專屬 class 選取肖像圖，不再用「抓所有子孫 `<img>`」的寫法），`.cs-locked-badge` 維持不變——這樣兩條規則的選擇對象完全不重疊，`.cs-locked-badge` 的 `width:100%` 不會再被蓋掉。`.cs-portrait-button` 上的 `width: fit-content` 予以保留（無害，且移除也不會讓事情變好，之前的實測已經證明它跟這個 bug 無關）。
 
 - [ ] **Step 3：實作角色列**
 
@@ -470,7 +474,7 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
               style={{ height: `${heightVh}vh` }}
               onClick={() => setOpenCharacterId(c.id)}
             >
-              <img src={`/images/${c.filename}`} alt={c.codename} />
+              <img className="cs-portrait-img" src={`/images/${c.filename}`} alt={c.codename} />
               {isLocked && <img className="cs-locked-badge" src="/images/selected.png" alt="已被選擇" />}
             </button>
           );
@@ -633,7 +637,7 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
                 setOpenCharacterId(c.id);
               }}
             >
-              <img src={`/images/${c.filename}`} alt={c.codename} />
+              <img className="cs-portrait-img" src={`/images/${c.filename}`} alt={c.codename} />
               {isLocked && <img className="cs-locked-badge" src="/images/selected.png" alt="已被選擇" />}
             </button>
           );
