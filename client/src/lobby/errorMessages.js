@@ -5,6 +5,9 @@ const ERROR_MESSAGES = {
   ROOM_IN_PROGRESS: '這個大廳已經開始遊戲了，無法加入',
   NOT_IN_ROOM: '您目前不在任何房間內',
   TOO_FEW_PLAYERS: '至少需要 2 位玩家才能開始',
+  CHARACTER_SELECT_NOT_YOUR_TURN: '還沒輪到你選擇',
+  UNKNOWN_CHARACTER: '找不到這個角色',
+  CHARACTER_ALREADY_TAKEN: '這個角色已經被選走了',
 };
 
 export function translateError(code) {

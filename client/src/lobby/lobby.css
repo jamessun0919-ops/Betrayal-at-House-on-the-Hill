@@ -224,3 +224,23 @@
   object-fit: contain;
   pointer-events: none;
 }
+
+.cs-stat-card {
+  gap: 1rem;
+}
+
+.cs-stat-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.cs-card-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: center;
+}
