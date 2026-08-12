@@ -396,6 +396,7 @@ cp img/selected.png client/public/images/selected.png
 
 .cs-portrait-button {
   flex: 0 0 auto;
+  width: fit-content;
   border: none;
   background: none;
   padding: 0;
@@ -427,6 +428,8 @@ cp img/selected.png client/public/images/selected.png
   pointer-events: none;
 }
 ```
+
+**補充修正（第一版執行時發現）**：`.cs-portrait-button` 原本只有 `flex: 0 0 auto`（沒有明確的 `width`），是靠內容（肖像 `<img>`，`height:100%; width:auto`）撐開寬度。`.cs-locked-badge` 是絕對定位元素，`width:100%` 要能正確算出來，需要父層有一個「明確」的寬度可以參照——`.cs-portrait-button` 靠內容撐開的寬度不算明確寬度，導致瀏覽器算不出 `.cs-locked-badge` 的 `width:100%`，退回用圖片本身的原始長寬比反推寬度，結果徽章寬度變成跟按鈕實際寬度完全不成比例（跑版溢出到隔壁角色）。已經在上面的 `.cs-portrait-button` 規則加上 `width: fit-content;`，讓按鈕自己有明確寬度可以讓 `.cs-locked-badge` 的 `width:100%` 正確參照。
 
 - [ ] **Step 3：實作角色列**
 
