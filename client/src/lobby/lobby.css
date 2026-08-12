@@ -208,7 +208,7 @@
   filter: brightness(1.3);
 }
 
-.cs-portrait-button img {
+.cs-portrait-img {
   height: 100%;
   width: auto;
   display: block;

@@ -32,7 +32,7 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
               style={{ height: `${heightVh}vh` }}
               onClick={() => setOpenCharacterId(c.id)}
             >
-              <img src={`/images/${c.filename}`} alt={c.codename} />
+              <img className="cs-portrait-img" src={`/images/${c.filename}`} alt={c.codename} />
               {isLocked && <img className="cs-locked-badge" src="/images/selected.png" alt="已被選擇" />}
             </button>
           );
