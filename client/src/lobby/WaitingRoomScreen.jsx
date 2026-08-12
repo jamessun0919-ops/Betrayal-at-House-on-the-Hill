@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { translateError } from './errorMessages';
 
-export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed, onLeft, onCharacterSelectStarted }) {
+export default function WaitingRoomScreen({ socket, roomCode, playerId, onLeft }) {
   const [players, setPlayers] = useState([]);
   const [error, setError] = useState('');
 
@@ -9,21 +9,11 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed
     function onPlayers(data) {
       setPlayers(data.players);
     }
-    function onLobbyClosed() {
-      onClosed();
-    }
-    function onCharacterSelectUpdate() {
-      onCharacterSelectStarted();
-    }
     socket.on('lobby:players', onPlayers);
-    socket.on('lobby:closed', onLobbyClosed);
-    socket.on('game:characterSelectUpdate', onCharacterSelectUpdate);
     return () => {
       socket.off('lobby:players', onPlayers);
-      socket.off('lobby:closed', onLobbyClosed);
-      socket.off('game:characterSelectUpdate', onCharacterSelectUpdate);
     };
-  }, [socket, onClosed, onCharacterSelectStarted]);
+  }, [socket]);
 
   const me = players.find((p) => p.playerId === playerId);
   const isHost = Boolean(me && me.isHost);
@@ -35,9 +25,9 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onClosed
         return;
       }
       // The host's own socket also receives the lobby:closed broadcast (it's
-      // still in the io room at the moment closeLobbyRoom emits it) -- let
-      // that handler drive the transition via onClosed() instead of calling
-      // onLeft() here too, or the two would race to pick the next screen.
+      // still in the io room at the moment closeLobbyRoom emits it) -- the
+      // orchestrator's own lobby:closed listener drives the host's own
+      // transition, so don't also call onLeft() here or the two would race.
       if (!isHost) {
         onLeft();
       }
