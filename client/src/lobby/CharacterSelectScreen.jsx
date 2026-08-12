@@ -10,8 +10,18 @@ const STAT_LABELS = [
   ['sanity', '意志'],
 ];
 
-function CharacterStatCard({ character, isMyTurn, isLocked, onFlip, onExit, onConfirm, error }) {
+function CharacterStatCard({ character, isMyTurn, isLocked, isMine, onFlip, onExit, onConfirm, error }) {
   const canConfirm = isMyTurn && !isLocked;
+  let statusMessage = null;
+  if (!canConfirm) {
+    if (isMine) {
+      statusMessage = '已選擇這個角色，等待其他玩家選擇中...';
+    } else if (isLocked) {
+      statusMessage = '這個角色已經被選走了';
+    } else {
+      statusMessage = '其他玩家選擇中，請稍後';
+    }
+  }
   return (
     <div className="lobby-modal-overlay">
       <div className="lobby-modal cs-stat-card">
@@ -26,9 +36,8 @@ function CharacterStatCard({ character, isMyTurn, isLocked, onFlip, onExit, onCo
         </ul>
         <p>初始攜帶物品：{character.itemname || '無'}</p>
         {error && <p className="lobby-error">{error}</p>}
-        {!canConfirm && (
-          <p className="lobby-error">{isLocked ? '這個角色已經被選走了' : '其他玩家選擇中，請稍後'}</p>
-        )}
+        {isMine && statusMessage && <p className="cs-status-banner">{statusMessage}</p>}
+        {!isMine && statusMessage && <p className="lobby-error">{statusMessage}</p>}
         <div className="cs-card-buttons">
           <button className="lobby-button" onClick={() => onFlip(-1)}>左翻</button>
           <button className="lobby-button" onClick={() => onFlip(1)}>右翻</button>
@@ -103,6 +112,7 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
           character={openCharacter}
           isMyTurn={isMyTurn}
           isLocked={lockedCharacterIds.includes(openCharacterId)}
+          isMine={Boolean(myAssignment && myAssignment.characterId === openCharacterId)}
           onFlip={handleFlip}
           onExit={() => setOpenCharacterId(null)}
           onConfirm={handleConfirm}
