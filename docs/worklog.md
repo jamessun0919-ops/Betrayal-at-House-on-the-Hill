@@ -521,3 +521,29 @@
 - M2D2（角色選擇正式畫面）待開發者補角色圖片後，由開發者自己提出畫面規劃再討論（`img/` 資料夾裡其實已經有 6 張角色圖＋Gate.png，但依開發者要求先不動）
 - 除了 M2D2，下一階段工作待開發者決定：M2c-3 其餘卡片（仍卡在 M3 傷害系統）或繼續 M2D 系列
 
+## 2026-08-12 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者「早安」開新 session，讀取 Handover 後，開發者先請 agent 檢查開發者手動修改的 `data/cards/item-cards.json`／`data/characters/characters.json` 兩份檔案，補齊對應效果程式碼——修好 4 處遺漏逗號的 JSON 語法錯誤；`item_013`（腎上腺素藥劑）確認 4 項屬性皆 `restoreToBase`，`category` 由 `general` 訂正為 `consumable`；`item_014`~`017` 確認維持無效果；新增「角色宣告的起始道具在遊戲開始時自動放入背包」機制（`gameManager.js` 的 `startGame`）。直接在 `main` 上 TDD 完成並提交（`f841361`）
+- 開啟本機測試伺服器（`.claude/launch.json` 新設定 `server`/`client` 兩組），讓開發者手動驗證 M2D1 流程；開發者確認功能正常，要求測試伺服器保持開啟供後續角色選擇階段使用
+- 開發者提出 M2D2（角色選擇正式畫面）完整規劃（六角色橫向排開、hover/點擊浮出加亮、身高比例縮放、點擊跳出屬性資料卡、左翻/右翻/退出/確定選擇），用 `brainstorming` skill 討論確認細節：維持輪流制但允許自由瀏覽（只有確定選擇被輪到才亮起）、點擊與 hover 觸發同樣效果、最高角色（180cm）基準 2/3 螢幕高度其餘按比例縮小、優先實作高度縮放（允許橫向滑動看完 6 個，不強求塞進單一螢幕）。設計文件寫完提交（[spec](superpowers/specs/2026-08-12-m2d2-character-select-design.md)）
+- 轉成 3 任務實作計畫（[plan](superpowers/plans/2026-08-12-m2d2-character-select.md)），用 `subagent-driven-development` 在獨立 worktree 執行。Task 1（協調層重構＋`DebugGameScreen` 重新接上 `game:started`）、Task 2（角色畫廊列）、Task 3（屬性資料卡 modal＋確認流程）依序執行，過程中 3 次計畫修正（Task 1 的一次性事件被搶先消費問題；Task 2 的鎖定徽章寬度異常，第一輪假設容器寬度不明確、被 implementer 用獨立靜態 CSS repro 實測證偽，第二輪才抓到真正原因是選擇器特異性衝突；Task 3 的按鈕禁用文字誤將「未輪到」跟「角色已被選走」用同一句訊息表達），皆逐一跟開發者確認方向後修正
+- 全分支最終審查途中，第一次 Agent 呼叫因 session 額度不足被中止（"resets 12:40pm"），開發者指示「請繼續執行因未額度不足而中止的工作」，重新完整派工一次成功跑完。審查發現 2 個 Important（狀態訊息缺第 3 種「自己已選」分支；6 張角色圖合計約 37MB 即將進 git 歷史），派 subagent 一次修完（新增 `isMine` 分支＋PowerShell 縮圖到約 600px 寬／約 4.5MB），scoped re-review 通過，412/412 測試全綠
+- 用 `finishing-a-development-branch` 合併回 `main`；因中斷造成的長時間空窗，回來後發現先前保持開啟的兩個測試伺服器（3001/5173）已經完全消失（節點行程／連接埠監聽都查無），主動重啟並回報開發者，開發者手動驗證確認 M2D2 功能正確
+- 開發者反應版面需求：「角色圖片去背後再放置入角色選擇畫面」。用本機既有工具（Pillow/numpy/scipy，皆已安裝，無需新依賴或連網）試驗去背：色彩距離門檻＋邊界連通 flood-fill 在遊戲內實際顯示尺寸下效果乾淨，但殘留腳下陰影殘影＋右下角浮水印圖示兩處小瑕疵；嘗試提高門檻或改用鄰接色彩容忍度擴散去背，皆因這批 AI 生成人像的膚色亮度太接近灰色背板而啃食到臉部/手部，確認是素材本身限制。提供實際顯示尺寸的預覽圖給開發者參考，開發者決定自行處理去背並提供新圖檔，agent 這邊維持現狀不動作
+- 開發者確認提交 `characters.json` 尚未提交的 `tall` 微調（警察 172→170、高中生 175→170、小女孩 151→150），並收工
+
+**完成項目**：
+- item-cards.json JSON 語法修正、`item_013` 效果補齊、角色起始道具機制，已提交（`f841361`）
+- M2D2（角色選擇正式畫面）已完成並合併進 `main`：[docs/superpowers/specs/2026-08-12-m2d2-character-select-design.md](superpowers/specs/2026-08-12-m2d2-character-select-design.md)、[docs/superpowers/plans/2026-08-12-m2d2-character-select.md](superpowers/plans/2026-08-12-m2d2-character-select.md) 已撰寫並提交
+- `characters.json` 的 `tall` 微調已提交（`14a4c36`）
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- 全分支審查 Agent 呼叫途中被 session 額度限制中止，重新完整派工一次才跑完；恢復後發現保持開啟的測試伺服器完全消失（很可能是底層沙箱環境在長時間中斷期間被回收），主動重啟並透明回報，未預設仍在執行
+- 角色圖片去背受限於素材本身（AI 生成人像膚色亮度與灰色攝影棚背板接近），簡單色彩門檻類方法無法在「不啃食膚色」跟「完整清除陰影/浮水印」之間兩全，判斷需要 ML 分割才能真正乾淨處理，已如實回報並交由開發者自行處理
+
+**開發者交代備忘事項**：
+- 角色圖片去背由開發者自行處理後提供新圖檔，agent 屆時協助替換 `client/public/images/` 並重新縮圖
+- 下一階段工作待開發者決定：M2c-3 其餘卡片（仍卡在 M3 傷害系統）或 M2D3（遊戲進行中畫面）
+
