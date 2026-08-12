@@ -20,6 +20,7 @@ export default function LobbyScreen() {
   const [disconnected, setDisconnected] = useState(false);
   const [characterSelectState, setCharacterSelectState] = useState(null);
   const [prompt, setPrompt] = useState(null);
+  const [gameStartedPayload, setGameStartedPayload] = useState(null);
 
   useEffect(() => {
     const socket = createSocket();
@@ -34,7 +35,10 @@ export default function LobbyScreen() {
       // updates (someone else picking) just refresh the data in place.
       setScreen((prev) => (prev === 'waitingRoom' ? 'characterSelect' : prev));
     });
-    socket.on('game:started', () => setScreen('playing'));
+    socket.on('game:started', (data) => {
+      setGameStartedPayload(data);
+      setScreen('playing');
+    });
     return () => socket.close();
   }, []);
 
@@ -138,7 +142,12 @@ export default function LobbyScreen() {
       )}
 
       {screen === 'playing' && (
-        <DebugGameScreen socket={socketRef.current} roomCode={roomCode} playerId={playerId} />
+        <DebugGameScreen
+          socket={socketRef.current}
+          roomCode={roomCode}
+          playerId={playerId}
+          initialGameState={gameStartedPayload}
+        />
       )}
     </div>
   );

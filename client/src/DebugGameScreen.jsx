@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
 
-export default function DebugGameScreen({ socket, roomCode, playerId }) {
-  const [phase, setPhase] = useState('character_select');
+export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
+  const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
   const [prompt, setPrompt] = useState(null);
   const [characterSelectState, setCharacterSelectState] = useState(null);
-  const [gameState, setGameState] = useState(null);
+  const [gameState, setGameState] = useState(initialGameState || null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
   const [lastPendingAction, setLastPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
