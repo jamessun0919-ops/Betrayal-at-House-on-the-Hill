@@ -23,8 +23,43 @@
 **Files:**
 - Modify: `client/src/LobbyScreen.jsx`
 - Modify: `client/src/lobby/WaitingRoomScreen.jsx`
+- Modify: `client/src/DebugGameScreen.jsx`（見下方「補充修正」，僅新增一個可選 prop，不改動既有行為）
 - Create: `client/src/lobby/CharacterSelectScreen.jsx`（本任務先建立最小骨架，Task 2/3 補完內容）
 - Delete: `client/src/lobby/CharacterSelectPlaceholder.jsx`（被 `CharacterSelectScreen.jsx` 取代，沒有其他地方引用它）
+
+**補充修正（Task 1 審查發現）**：`game:started` 是一次性事件，伺服器只廣播一次。`DebugGameScreen.jsx` 自己內部也有一個 `useEffect` 監聽同一個 `game:started` 事件來決定要不要顯示遊戲畫面（`onStarted` 把 `phase` 設成 `'playing'`）——但協調層 `LobbyScreen.jsx` 的頂層監聽器會先收到這個事件（用來決定要不要把 `screen` 切到 `'playing'`、進而讓 `DebugGameScreen` 第一次掛載），等 `DebugGameScreen` 真的掛載、註冊好自己的監聽器時，這個一次性事件早就已經發生過、不會重播，`DebugGameScreen` 會永遠卡在自己預設的 `'character_select'` 內部狀態，畫面出不去。
+
+修法：協調層額外把收到的 `game:started` payload 存起來，當作 `initialGameState` prop 傳給 `DebugGameScreen`；`DebugGameScreen` 新增這個可選 prop，用它決定初始 `phase`/`gameState`（沒有這個 prop 時行為跟現在完全一樣，向下相容）。
+
+在 `LobbyScreen.jsx` 的 Step 1 程式碼裡，`const [prompt, setPrompt] = useState(null);` 之後多加一行：
+
+```js
+  const [gameStartedPayload, setGameStartedPayload] = useState(null);
+```
+
+把 `socket.on('game:started', () => setScreen('playing'));` 改成：
+
+```js
+    socket.on('game:started', (data) => {
+      setGameStartedPayload(data);
+      setScreen('playing');
+    });
+```
+
+把 JSX 裡的 `{screen === 'playing' && (<DebugGameScreen socket={socketRef.current} roomCode={roomCode} playerId={playerId} />)}` 改成：
+
+```jsx
+      {screen === 'playing' && (
+        <DebugGameScreen
+          socket={socketRef.current}
+          roomCode={roomCode}
+          playerId={playerId}
+          initialGameState={gameStartedPayload}
+        />
+      )}
+```
+
+修改 `client/src/DebugGameScreen.jsx`：函式簽章 `export default function DebugGameScreen({ socket, roomCode, playerId })` 改成 `export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState })`；`const [phase, setPhase] = useState('character_select');` 改成 `const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');`；`const [gameState, setGameState] = useState(null);` 改成 `const [gameState, setGameState] = useState(initialGameState || null);`。其餘 `DebugGameScreen.jsx` 內容（含它自己既有的 `game:started` 監聽器）完全不動——那個監聽器在這個事件已經被協調層消耗過的情況下自然不會再被觸發，是良性的死程式碼，不用移除。
 
 **Interfaces:**
 - Consumes：既有 `game:prompt`／`game:promptResolved`／`game:characterSelectUpdate`／`game:started`／`lobby:closed` 廣播（payload 形狀不變）
