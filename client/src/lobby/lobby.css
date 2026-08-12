@@ -193,6 +193,7 @@
 
 .cs-portrait-button {
   flex: 0 0 auto;
+  width: fit-content;
   border: none;
   background: none;
   padding: 0;
