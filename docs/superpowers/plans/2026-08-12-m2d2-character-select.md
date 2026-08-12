@@ -558,7 +558,8 @@ const STAT_LABELS = [
   ['sanity', '意志'],
 ];
 
-function CharacterStatCard({ character, canConfirm, onFlip, onExit, onConfirm, error }) {
+function CharacterStatCard({ character, isMyTurn, isLocked, onFlip, onExit, onConfirm, error }) {
+  const canConfirm = isMyTurn && !isLocked;
   return (
     <div className="lobby-modal-overlay">
       <div className="lobby-modal cs-stat-card">
@@ -573,7 +574,9 @@ function CharacterStatCard({ character, canConfirm, onFlip, onExit, onConfirm, e
         </ul>
         <p>初始攜帶物品：{character.itemname || '無'}</p>
         {error && <p className="lobby-error">{error}</p>}
-        {!canConfirm && <p className="lobby-error">其他玩家選擇中，請稍後</p>}
+        {!canConfirm && (
+          <p className="lobby-error">{isLocked ? '這個角色已經被選走了' : '其他玩家選擇中，請稍後'}</p>
+        )}
         <div className="cs-card-buttons">
           <button className="lobby-button" onClick={() => onFlip(-1)}>左翻</button>
           <button className="lobby-button" onClick={() => onFlip(1)}>右翻</button>
@@ -646,7 +649,8 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
       {openCharacter && (
         <CharacterStatCard
           character={openCharacter}
-          canConfirm={isMyTurn && !lockedCharacterIds.includes(openCharacterId)}
+          isMyTurn={isMyTurn}
+          isLocked={lockedCharacterIds.includes(openCharacterId)}
           onFlip={handleFlip}
           onExit={() => setOpenCharacterId(null)}
           onConfirm={handleConfirm}
@@ -659,6 +663,8 @@ export default function CharacterSelectScreen({ socket, playerId, characterSelec
 ```
 
 （`ERROR_MESSAGES`/`translateError` 需要補上 `CHARACTER_SELECT_NOT_YOUR_TURN`／`UNKNOWN_CHARACTER`／`CHARACTER_ALREADY_TAKEN` 三個既有伺服器錯誤碼的中文訊息——見 Step 3）
+
+**補充修正（審查發現）**：`CharacterStatCard` 原本只用一個 `canConfirm` 布林值，「沒輪到你」跟「輪到你但角色已被選走」這兩種完全不同的情境會顯示同一句「其他玩家選擇中，請稍後」——後者這句話是錯的（輪到你了，問題是這張角色被選走了，不是要你等別人）。已改成分別傳入 `isMyTurn`／`isLocked` 兩個布林值，卡片內部自己算 `canConfirm` 並依實際原因分開顯示訊息（角色已被選走時顯示「這個角色已經被選走了」）。上面的程式碼已經是修正後的版本。
 
 - [ ] **Step 3：`errorMessages.js` 補上角色選擇相關錯誤碼**
 
