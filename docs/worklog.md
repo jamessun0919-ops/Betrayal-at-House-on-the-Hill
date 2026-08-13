@@ -573,3 +573,28 @@
 - 其餘 30 間房間（約 47 張圖）的變動變數 prompt，留到後端計畫完成、前端骨架計畫開始前後再處理
 - 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
 
+## 2026-08-13 第 2 次工作階段
+
+**當日工作內容**：
+- 開發者「午安」開新階段，指示先完成剩餘 30 間房間（46 張圖）的美術圖 prompt，再進行後端計畫。Agent 依既有規則產出完成，寫入 [docs/superpowers/specs/2026-08-13-m2d3-room-art-prompts.md](superpowers/specs/2026-08-13-m2d3-room-art-prompts.md) 並提交
+- 用 `subagent-driven-development` 執行 M2D3 後端資料串接計畫（3 任務）：Task 1 派工時誤用 `isolation:"worktree"` 參數，implementer 落在孤立分支上無法執行 bash/git，agent 驗證該 diff 正確後手動搬移到正確 worktree、重新驗證、提交，後續改回正常派工不再發生。3 個任務全數一次通過個別審查；全分支最終審查抓到 1 個 Important（沒有整合測試同時驗證三項新資料一起出現在 `game:started` payload，是各任務審查者各自看不到的死角）＋幾個 Minor，一次修完並通過 scoped re-review，418/418 測試全綠，Fast-forward 合併回 `main` 並推送
+- 開發者多輪來回規劃「起始大門廳」的房間圖：一開始構想單一 3x1 大房間（agent 指出跟現有引擎「每間房固定佔 1 格」的模型不相容），開發者改為三個 1x1 房間縱向堆疊（對外大門／中央鎧甲走廊／樓梯側含地下室鎖梯）＋二樓平台，逐一提供對應 prompt；過程中一次語意不清（「下方」被提到兩次、內容矛盾），agent 停下確認清楚位置才繼續；開發者回報生成的樓梯視覺不像「往下通往一樓」，agent 分析俯視角度深度暗示不足的問題並修正 prompt
+- 開發者要求把兩門房間的「隨機分配門」改為「固定相鄰/相對」，由開發者自行在 `rooms.json` 填寫。Agent 判斷範圍小、機制單一，直接在 `main` 用 TDD 實作新的 `doorPattern` 欄位（`doorLayout.js`/`boardGenerator.js`），426/426 測試全綠並提交，回報欄位規格給開發者
+- 開發者回報已填完 `rooms.json` 的 `doorPattern`，請 agent 檢查完整性並同步修剪 prompt 檔案。Agent 發現禮拜堂欄位漏一個逗號導致整份 JSON 語法錯誤，直接修正；確認全部 17 間 2 門房間欄位完整無誤後，把 [room-art-prompts.md](superpowers/specs/2026-08-13-m2d3-room-art-prompts.md) 16 間 2 門房間各自只保留對應 `doorPattern` 的那組 prompt（46 張→30 張），測試套件確認無連帶影響，提交推送
+
+**完成項目**：
+- M2D3 後端資料串接計畫已完成並合併進 `main`：[docs/superpowers/plans/2026-08-13-m2d3-backend-data-wiring.md](superpowers/plans/2026-08-13-m2d3-backend-data-wiring.md)
+- 剩餘 30 間房間的美術圖 prompt 已產出並提交
+- 起始大門廳（3 個 1x1 房間＋二樓平台）的美術圖 prompt 已提供
+- `doorPattern` 欄位機制（`server/src/game/doorLayout.js`、`boardGenerator.js`）已實作並合併
+- `rooms.json` JSON 語法錯誤已修正，`doorPattern` 欄位完整性已確認
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- SDD Task 1 派工時誤用 `isolation:"worktree"` 導致 implementer 工作落在孤立分支——已診斷並手動修復，後續任務改回正常派工方式；這是這次階段唯一的操作失誤，記錄供之後留意
+- 「起始大門廳」規劃過程中一次語意不清、兩次無意義的佔位 `AskUserQuestion` 誤觸，皆已在對話中確認/致歉並繼續，未造成實質影響
+
+**開發者交代備忘事項**：
+- 下階段開始時，討論套用已生成的房間圖片，建立遊戲開始階段畫面（M2D3 前端骨架，這次後端資料已就緒）
+- 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
+
