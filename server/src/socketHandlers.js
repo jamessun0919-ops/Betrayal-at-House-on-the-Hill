@@ -855,7 +855,10 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   });
   startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
-  io.to(roomCode).emit('game:started', serializeGameState(gameState));
+  io.to(roomCode).emit('game:started', {
+    ...serializeGameState(gameState),
+    roomContent: { rooms: content.rooms, startingRooms: content.startingRooms },
+  });
 }
 
 function serializeCharacterSelection(characterSelectionState) {

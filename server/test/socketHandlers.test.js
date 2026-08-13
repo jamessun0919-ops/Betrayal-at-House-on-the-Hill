@@ -442,6 +442,15 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
   const startedPayload = await gameStarted;
   expect(startedPayload.players).toHaveLength(2);
   expect(startedPayload.turnOrder.slice().sort()).toEqual([aliceId, bobId].sort());
+  expect(startedPayload.roomContent).toEqual({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
+    startingRooms: [
+      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
+      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
+      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+    ],
+  });
 
   clientA.close();
   clientB.close();
