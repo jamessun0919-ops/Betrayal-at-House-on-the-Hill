@@ -58,6 +58,21 @@ test('placeNewRoom resolves conflicts against an already-placed neighbor', () =>
   expect(placed.doorSides).not.toContain('north');
 });
 
+test('placeNewRoom passes roomDefinition.doorPattern through to the door layout for doors:2', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Moving south from (0,0) lands the new room at (0,1); its entry side
+  // (facing back toward where the player came from) is north.
+  for (let i = 0; i < 20; i++) {
+    const placed = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'south', {
+      id: `room_opposite_${i}`,
+      doors: 2,
+      doorPattern: 'opposite',
+    });
+    expect(placed.doorSides.slice().sort()).toEqual(['north', 'south']);
+    board.ground.delete(coordKey(0, 1));
+  }
+});
+
 test('placeNewRoom throws INVALID_ROOM_DOORS for a malformed door count', () => {
   const board = createBoard(STARTING_ROOMS);
   expect(() =>

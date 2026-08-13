@@ -78,7 +78,12 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
 
   const entrySide = OPPOSITE_SIDE[direction];
   const getNeighborRequirement = makeNeighborRequirementReader(grid, newCoord);
-  const doorSides = computeDoorLayout(roomDefinition.doors, entrySide, getNeighborRequirement);
+  const doorSides = computeDoorLayout(
+    roomDefinition.doors,
+    entrySide,
+    getNeighborRequirement,
+    roomDefinition.doorPattern || null
+  );
 
   const placedRoom = {
     roomId: roomDefinition.id,

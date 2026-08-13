@@ -34,7 +34,7 @@ function combinations(array, k) {
   return result;
 }
 
-function computeDoorLayout(doorCount, entrySide, getNeighborRequirement) {
+function computeDoorLayout(doorCount, entrySide, getNeighborRequirement, doorPattern = null) {
   if (!Number.isInteger(doorCount) || doorCount < 1 || doorCount > 4) {
     throw new Error('INVALID_DOOR_COUNT');
   }
@@ -44,13 +44,29 @@ function computeDoorLayout(doorCount, entrySide, getNeighborRequirement) {
   if (typeof getNeighborRequirement !== 'function') {
     throw new Error('INVALID_NEIGHBOR_REQUIREMENT_FN');
   }
+  if (doorPattern !== null && doorPattern !== 'opposite' && doorPattern !== 'adjacent') {
+    throw new Error('INVALID_DOOR_PATTERN');
+  }
   const otherSides = SIDES.filter((side) => side !== entrySide);
+
+  // A declared doorPattern only disambiguates the 2-door case (opposite vs.
+  // adjacent are two genuinely different shapes that can't be reached from
+  // one another by rotation -- see the room-art generation prompt doc). For
+  // any other door count, or when no pattern is declared, every other side
+  // stays a candidate, preserving the original unrestricted behavior.
+  let candidateSides = otherSides;
+  if (doorCount === 2 && doorPattern) {
+    const opposite = OPPOSITE_SIDE[entrySide];
+    candidateSides = doorPattern === 'opposite'
+      ? otherSides.filter((side) => side === opposite)
+      : otherSides.filter((side) => side !== opposite);
+  }
 
   // Exhaustively try every distinct way to pick the extra doors (at most 3
   // possible sides, so at most 3 combinations), in random order, so a
   // satisfiable layout is never missed just because a shuffle-with-replacement
   // happened not to sample it within a fixed number of attempts.
-  const candidateCombos = shuffle(combinations(otherSides, doorCount - 1));
+  const candidateCombos = shuffle(combinations(candidateSides, doorCount - 1));
 
   for (const combo of candidateCombos) {
     const extraDoors = new Set(combo);

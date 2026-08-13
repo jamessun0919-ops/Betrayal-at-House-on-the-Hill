@@ -89,6 +89,54 @@ test('throws INVALID_NEIGHBOR_REQUIREMENT_VALUE when getNeighborRequirement retu
   );
 });
 
+test('doorPattern="opposite" always picks the side directly opposite the entry side', () => {
+  for (let i = 0; i < 20; i++) {
+    const layout = computeDoorLayout(2, 'north', noNeighbors(), 'opposite');
+    expect(layout).toEqual(new Set(['north', 'south']));
+  }
+});
+
+test('doorPattern="adjacent" never picks the side directly opposite the entry side', () => {
+  for (let i = 0; i < 30; i++) {
+    const layout = computeDoorLayout(2, 'north', noNeighbors(), 'adjacent');
+    expect(layout.has('north')).toBe(true);
+    expect(layout.has('south')).toBe(false);
+    expect(layout.size).toBe(2);
+  }
+});
+
+test('doorPattern is ignored when doorCount is not 2', () => {
+  const layout1 = computeDoorLayout(1, 'north', noNeighbors(), 'opposite');
+  expect(layout1).toEqual(new Set(['north']));
+
+  const layout4 = computeDoorLayout(4, 'north', noNeighbors(), 'adjacent');
+  expect(layout4).toEqual(new Set(['north', 'east', 'south', 'west']));
+});
+
+test('omitting doorPattern preserves the existing unrestricted random behavior', () => {
+  // No 4th argument at all -- must not throw, must behave exactly as before.
+  const layout = computeDoorLayout(2, 'north', noNeighbors());
+  expect(layout.has('north')).toBe(true);
+  expect(layout.size).toBe(2);
+});
+
+test('doorPattern="opposite" falls back to entry-only when the opposite side conflicts with a neighbor requirement', () => {
+  const getNeighborRequirement = (side) => (side === 'south' ? 'wall' : null);
+  const layout = computeDoorLayout(2, 'north', getNeighborRequirement, 'opposite');
+  expect(layout).toEqual(new Set(['north']));
+});
+
+test('doorPattern="adjacent" falls back to entry-only when both adjacent sides conflict with neighbor requirements', () => {
+  const getNeighborRequirement = (side) => (side === 'east' || side === 'west' ? 'wall' : null);
+  const layout = computeDoorLayout(2, 'north', getNeighborRequirement, 'adjacent');
+  expect(layout).toEqual(new Set(['north']));
+});
+
+test('throws INVALID_DOOR_PATTERN for an unrecognized doorPattern value', () => {
+  expect(() => computeDoorLayout(2, 'north', noNeighbors(), 'diagonal')).toThrow('INVALID_DOOR_PATTERN');
+  expect(() => computeDoorLayout(2, 'north', noNeighbors(), 'OPPOSITE')).toThrow('INVALID_DOOR_PATTERN');
+});
+
 test('regression: exhaustively finds the single satisfiable layout every time (no spurious fallback)', () => {
   // Only one of the three possible single-extra-door combinations for
   // doorCount=2 is conflict-free: extraDoors={south}.
