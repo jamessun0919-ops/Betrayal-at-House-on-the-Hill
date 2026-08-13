@@ -1,6 +1,6 @@
 const { createBoard } = require('./boardGenerator');
 const { createPlayer, resetActionPoints } = require('./playerEntity');
-const { createRoomDeck, isRoomDeckEmpty, getRemainingCount } = require('./roomDeck');
+const { createRoomDeck, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor } = require('./roomDeck');
 const { createCardDeck, hasCards, getRemainingCount: getCardRemainingCount } = require('./cardDeck');
 
 function createGameState(startingRooms, rooms, cards = {}) {
@@ -51,6 +51,8 @@ function serializeGameState(gameState) {
     roomDeck: {
       remainingCount: getRemainingCount(gameState.roomDeck),
       isEmpty: isRoomDeckEmpty(gameState.roomDeck),
+      hasRoomForGround: hasRoomForFloor(gameState.roomDeck, 'ground'),
+      hasRoomForUpper: hasRoomForFloor(gameState.roomDeck, 'upper'),
     },
     eventDeck: {
       remainingCount: getCardRemainingCount(gameState.eventDeck),

@@ -83,11 +83,26 @@ test('serializeGameState converts the board and players Maps into plain arrays',
   expect(JSON.parse(JSON.stringify(serialized)).players[0].playerId).toBe('p1');
 });
 
-test('serializeGameState exposes only remainingCount/isEmpty for the room deck, not its contents', () => {
-  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(3));
+test('serializeGameState exposes remainingCount/isEmpty/hasRoomForGround/hasRoomForUpper for the room deck, not its contents', () => {
+  const gameState = createGameState(STARTING_ROOMS, [
+    { id: 'room_a', doors: 2, floor: 'ground' },
+    { id: 'room_b', doors: 2, floor: 'upper' },
+  ]);
   const serialized = serializeGameState(gameState);
-  expect(serialized.roomDeck).toEqual({ remainingCount: 3, isEmpty: false });
+  expect(serialized.roomDeck).toEqual({
+    remainingCount: 2,
+    isEmpty: false,
+    hasRoomForGround: true,
+    hasRoomForUpper: true,
+  });
   expect(serialized.roomDeck.cards).toBeUndefined();
+});
+
+test('serializeGameState roomDeck hasRoomForGround/hasRoomForUpper reflect per-floor availability, not just overall emptiness', () => {
+  const gameState = createGameState(STARTING_ROOMS, [{ id: 'room_a', doors: 2, floor: 'ground' }]);
+  const serialized = serializeGameState(gameState);
+  expect(serialized.roomDeck.hasRoomForGround).toBe(true);
+  expect(serialized.roomDeck.hasRoomForUpper).toBe(false);
 });
 
 test('serializeGameState includes turnOrder/currentPlayerIndex when GameManager has set them, or null before that', () => {
