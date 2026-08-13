@@ -451,6 +451,8 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
   });
+  expect(startedPayload.roomDeck.hasRoomForGround).toBe(true);
+  expect(startedPayload.players[0].visitedRooms).toEqual([{ floor: 'ground', x: 0, y: 0 }]);
 
   clientA.close();
   clientB.close();

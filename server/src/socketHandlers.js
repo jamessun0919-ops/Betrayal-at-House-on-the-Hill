@@ -855,6 +855,10 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   });
   startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
+  // roomContent is only sent here (once) -- if a reconnect/resync event is
+  // ever added, it must also resend roomContent, or reconnecting clients
+  // will have no room names. Currently safe: there is no reconnect path,
+  // and lobby:join rejects ROOM_IN_PROGRESS once a game has started.
   io.to(roomCode).emit('game:started', {
     ...serializeGameState(gameState),
     roomContent: { rooms: content.rooms, startingRooms: content.startingRooms },
