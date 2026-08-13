@@ -48,6 +48,7 @@ function createPlayer({ playerId, name, floor, x, y, stats, actionPoints }) {
     stats: statTracks,
     actionPoints,
     inventory: [],
+    visitedRooms: [{ floor, x, y }],
   };
 }
 
@@ -113,6 +114,12 @@ function movePlayerTo(player, floor, x, y) {
   player.floor = floor;
   player.x = x;
   player.y = y;
+  const alreadyVisited = player.visitedRooms.some(
+    (r) => r.floor === floor && r.x === x && r.y === y
+  );
+  if (!alreadyVisited) {
+    player.visitedRooms.push({ floor, x, y });
+  }
 }
 
 function addItem(player, item) {

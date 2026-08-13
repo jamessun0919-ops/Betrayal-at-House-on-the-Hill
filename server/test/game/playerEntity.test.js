@@ -140,6 +140,30 @@ test('movePlayerTo updates floor and coordinates', () => {
   expect(player.y).toBe(-1);
 });
 
+test('createPlayer initializes visitedRooms with the starting position', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(player.visitedRooms).toEqual([{ floor: 'ground', x: 0, y: 0 }]);
+});
+
+test('movePlayerTo appends the new position to visitedRooms', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  movePlayerTo(player, 'ground', 1, 0);
+  expect(player.visitedRooms).toEqual([
+    { floor: 'ground', x: 0, y: 0 },
+    { floor: 'ground', x: 1, y: 0 },
+  ]);
+});
+
+test('movePlayerTo does not add a duplicate entry when returning to an already-visited room', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  movePlayerTo(player, 'ground', 1, 0);
+  movePlayerTo(player, 'ground', 0, 0);
+  expect(player.visitedRooms).toEqual([
+    { floor: 'ground', x: 0, y: 0 },
+    { floor: 'ground', x: 1, y: 0 },
+  ]);
+});
+
 test('createPlayer throws MISSING_STAT_DEFINITION if a required stat is missing', () => {
   const incompleteStats = {
     might: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
