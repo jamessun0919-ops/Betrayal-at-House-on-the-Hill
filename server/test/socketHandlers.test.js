@@ -452,7 +452,7 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
     ],
   });
   expect(startedPayload.roomDeck.hasRoomForGround).toBe(true);
-  expect(startedPayload.players[0].visitedRooms).toEqual([{ floor: 'ground', x: 0, y: 0 }]);
+  expect(startedPayload.players[0].visitedRooms).toEqual([{ floor: 'ground', x: 0, y: 1 }]);
 
   clientA.close();
   clientB.close();
@@ -716,7 +716,7 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
   expect(result.kind).toBe('open_door');
 
   const update = await updatePromise;
-  const movedPlayer = update.players.find((p) => p.x === 1 && p.y === 0);
+  const movedPlayer = update.players.find((p) => p.x === 1 && p.y === 1);
   expect(movedPlayer).toBeTruthy();
   expect(movedPlayer.actionPoints).toBe(0);
 
@@ -728,8 +728,8 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
 test('game:move applies a room\'s leaveCheck before allowing the player to move out, blocking on a failed roll', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
@@ -756,8 +756,8 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
 test('game:move with an eligible interjection item held on a leaveCheck room pauses for a roll choice instead of resolving immediately', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
@@ -801,8 +801,8 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
 function makeLeaveCheckInterjectionContent() {
   return makeContent({
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
@@ -1040,8 +1040,8 @@ test('game:endTurn rejects the caller while they are controlling an active summo
 test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the player ends their turn there', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
-      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
@@ -1054,7 +1054,7 @@ test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the 
   const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(result.error).toBeUndefined();
   expect(player.stats.sanity.currentIndex).toBe(baseSanity + 1);
-  expect(player.roomBonusesReceived).toEqual(['room_lobby_b']);
+  expect(player.roomBonusesReceived).toEqual(['room_lobby_a']);
 
   clientA.close();
   clientB.close();
@@ -1064,8 +1064,8 @@ test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the 
 test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the player has already received it', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
-      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
@@ -1081,7 +1081,7 @@ test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the 
   await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
   await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex + 1); // unchanged
-  expect(player.roomBonusesReceived).toEqual(['room_lobby_b']); // not duplicated
+  expect(player.roomBonusesReceived).toEqual(['room_lobby_a']); // not duplicated
 
   clientA.close();
   clientB.close();
@@ -2264,12 +2264,12 @@ test('game:move into a room with another player clears a meetsAnotherPlayer modi
   const currentPlayer = getPlayer(gameState, currentPlayerId);
   const otherPlayer = getPlayer(gameState, otherPlayerId);
 
-  // Pre-place an explored room east of the entrance hall (0,0) and put the
-  // other player there so the mover "meets" them on arrival.
-  gameState.board.ground.set('1,0', { roomId: 'room_manual', x: 1, y: 0, doorSides: ['north', 'east', 'south', 'west'] });
+  // Pre-place an explored room east of the player's starting room (room_lobby_a,
+  // 0,1) and put the other player there so the mover "meets" them on arrival.
+  gameState.board.ground.set('1,1', { roomId: 'room_manual', x: 1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   otherPlayer.floor = 'ground';
   otherPlayer.x = 1;
-  otherPlayer.y = 0;
+  otherPlayer.y = 1;
 
   attachModifier(currentPlayer, {
     effects: [{ hookType: 'blocksOpenDoor' }],
@@ -2397,17 +2397,17 @@ test('a player controlling a summon moves the summon via game:move, leaving the 
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.inventory.push({ id: 'omen_004' });
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
 
   await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
   expect(player.summons).toBeTruthy();
   const playerX = player.x;
   const playerY = player.y;
 
-  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'west' }, resolve));
   expect(moveResult.error).toBeUndefined();
-  expect(player.summons.x).toBe(0);
-  expect(player.summons.y).toBe(-1);
+  expect(player.summons.x).toBe(-1);
+  expect(player.summons.y).toBe(1);
   expect(player.x).toBe(playerX); // player's own position frozen
   expect(player.y).toBe(playerY);
 

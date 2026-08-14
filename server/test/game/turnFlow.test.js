@@ -53,10 +53,12 @@ test('getAvailableDirections lists an unexplored door as open_door when the deck
 
 test('getAvailableDirections lists a move to an already-explored, mutually-doored neighbor', () => {
   const { gameState } = makeGameStateWithPlayer();
-  // Manually place an explored, fully-doored room north of the entrance hall.
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  // Manually place an explored, fully-doored room west of the player's starting room
+  // (room_lobby_a). North is already the real, fixed room_lobby_b, so west is used
+  // here as open, undiscovered territory to freely place a synthetic neighbor.
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   const available = getAvailableDirections(gameState, 'p1');
-  expect(available.find((a) => a.direction === 'north')).toEqual({ direction: 'north', kind: 'move' });
+  expect(available.find((a) => a.direction === 'west')).toEqual({ direction: 'west', kind: 'move' });
 });
 
 test('getAvailableDirections omits open_door once the room deck is empty', () => {
@@ -71,11 +73,11 @@ test('getAvailableDirections omits open_door once the room deck is empty', () =>
 
 test('getAvailableDirections omits open_door for a player with a blocksOpenDoor modifier, but still lists moves to already-explored neighbors', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   player.modifiers = [{ effects: [{ hookType: 'blocksOpenDoor' }] }]; // e.g. 電池耗盡
   const available = getAvailableDirections(gameState, 'p1');
   expect(available.filter((a) => a.kind === 'open_door')).toEqual([]);
-  expect(available.find((a) => a.direction === 'north')).toEqual({ direction: 'north', kind: 'move' });
+  expect(available.find((a) => a.direction === 'west')).toEqual({ direction: 'west', kind: 'move' });
 });
 
 test('getAvailableDirections throws PLAYER_NOT_FOUND for an unknown player', () => {
@@ -85,12 +87,12 @@ test('getAvailableDirections throws PLAYER_NOT_FOUND for an unknown player', () 
 
 test('moveToRoom moves the player to an already-explored neighbor and deducts 1 action point', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
-  const result = moveToRoom(gameState, 'p1', 'north');
-  expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
-  expect(player.x).toBe(0);
-  expect(player.y).toBe(-1);
+  const result = moveToRoom(gameState, 'p1', 'west');
+  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(player.x).toBe(-1);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1);
 });
 
@@ -101,7 +103,7 @@ test('moveToRoom opens a door: draws a room, places it, moves the player, and ze
   expect(result.roomId).toBe('room_new');
   expect(result.pendingCardDraw).toEqual({ deck: 'item' });
   expect(player.x).toBe(1);
-  expect(player.y).toBe(0);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(0);
 });
 
@@ -116,55 +118,55 @@ test('moveToRoom throws INVALID_MOVE_DIRECTION for a direction not currently ava
   const player2 = addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
   gameState2.turnOrder = ['p1'];
   gameState2.currentPlayerIndex = 0;
-  moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,0), AP=0
+  moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,1), AP=0
   resetActionPoints(player2); // simulate starting a new turn
-  // North of (1,0) is unexplored and the deck is empty, so it's neither a
+  // North of (1,1) is unexplored and the deck is empty, so it's neither a
   // valid move (no room there) nor a valid door-open (no cards left).
   expect(() => moveToRoom(gameState2, 'p1', 'north')).toThrow('INVALID_MOVE_DIRECTION');
 });
 
 test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS when the player has 0 action points', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   player.actionPoints = 0;
-  expect(() => moveToRoom(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
+  expect(() => moveToRoom(gameState, 'p1', 'west')).toThrow('NOT_ENOUGH_ACTION_POINTS');
 });
 
 test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS before checking direction validity', () => {
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_only', doors: 4, floor: 'ground' }]);
   // Move east to exhaust the deck and set AP to 0
   moveToRoom(gameState, 'p1', 'east');
-  // AP is now 0, and we're at (1,0). North is unexplored and deck is empty (invalid direction).
+  // AP is now 0, and we're at (1,1). North is unexplored and deck is empty (invalid direction).
   // The check for NOT_ENOUGH_ACTION_POINTS should fire before INVALID_MOVE_DIRECTION.
   expect(() => moveToRoom(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
 });
 
 test('moveToRoom with a leaveCheck: passing the roll moves the player and costs exactly the normal 1 action point', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
   const rng = () => 0.99; // every die -> face 2; might value 3 -> sum 6, passes min:3
-  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng });
-  expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
-  expect(player.x).toBe(0);
-  expect(player.y).toBe(-1);
+  const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng });
+  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(player.x).toBe(-1);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1); // not double-charged
 });
 
 test('moveToRoom with a leaveCheck: failing the roll blocks the move, costs exactly 1 action point, and is retryable', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
   const failRng = () => 0; // every die -> face 0; might value 3 -> sum 0, fails min:3
-  const failResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng: failRng });
+  const failResult = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng: failRng });
   expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
   expect(player.x).toBe(0); // unmoved
-  expect(player.y).toBe(0);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1);
 
   const passRng = () => 0.99;
-  const retryResult = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { rng: passRng });
-  expect(retryResult).toEqual({ kind: 'move', x: 0, y: -1 });
+  const retryResult = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng: passRng });
+  expect(retryResult).toEqual({ kind: 'move', x: -1, y: 1 });
   expect(player.actionPoints).toBe(startingAP - 2);
 });
 
@@ -175,7 +177,7 @@ test('moveToRoom with a leaveCheck also gates opening a new door: failure does n
   const failResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, { rng: failRng });
   expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
   expect(player.x).toBe(0); // unmoved -- no room was drawn or placed
-  expect(player.y).toBe(0);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1); // not zeroed -- opening never happened
 
   const passRng = () => 0.99;
@@ -187,59 +189,59 @@ test('moveToRoom with a leaveCheck also gates opening a new door: failure does n
 
 test('moveToRoom with a leaveCheck: an eligible interjection item pauses without rolling, moving, or spending action points', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   player.inventory.push({ id: 'item_006' });
   const itemCatalog = [
     { id: 'item_006', name: '詭異人偶', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } },
   ];
   const startingAP = player.actionPoints;
-  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { itemCatalog });
+  const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { itemCatalog });
   expect(result).toEqual({
     kind: 'leaveCheckPending',
     rollChoice: true,
     options: [{ itemId: 'item_006', name: '詭異人偶', diceInterjection: itemCatalog[0].diceInterjection }],
     leaveCheck: { stat: 'might', min: 3 },
-    direction: 'north',
+    direction: 'west',
   });
   expect(player.x).toBe(0); // unmoved
-  expect(player.y).toBe(0);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP); // nothing spent yet
 });
 
 test('moveToRoom with a leaveCheck: a room-level onBeforeRoll modifier affects the direct (non-interjected) roll', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   // The modifier lives on the player's CURRENT room (the one being left),
   // matching resumeLeaveCheckRollChoice's `gameState.board[player.floor].get(coordKey(player.x, player.y))`.
-  const currentRoom = gameState.board.ground.get(coordKey(0, 0));
+  const currentRoom = gameState.board.ground.get(coordKey(0, 1));
   currentRoom.modifiers = [{ effects: [{ hookType: 'onBeforeRoll', delta: -1 }] }];
   // might value is 3 (baseIndex). Without the modifier, 3 dice at face 2 -> sum 6, passes min:5.
   // With the -1 onBeforeRoll modifier, 2 dice at face 2 -> sum 4, fails min:5.
   const rng = () => 0.99; // every die -> face 2
-  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 5 }, { rng });
+  const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 5 }, { rng });
   expect(result).toEqual({ kind: 'leaveCheckFailed', rolled: 4, required: 5 });
 });
 
 test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning and internal rolling, even with an eligible item held', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'south', 'west'] });
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   player.inventory.push({ id: 'item_006' });
   const itemCatalog = [
     { id: 'item_006', name: '詭異人偶', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } },
   ];
   const startingAP = player.actionPoints;
-  const result = moveToRoom(gameState, 'p1', 'north', { stat: 'might', min: 3 }, { resolvedRoll: 6, itemCatalog });
-  expect(result).toEqual({ kind: 'move', x: 0, y: -1 });
+  const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { resolvedRoll: 6, itemCatalog });
+  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
   expect(player.actionPoints).toBe(startingAP - 1);
 });
 
 test('getAvailableDirections omits directions where neighbor room exists but has no door facing back', () => {
   const { gameState } = makeGameStateWithPlayer();
-  // Manually place an explored room north of the entrance hall, but with no door facing south (back toward player).
-  gameState.board.ground.set('0,-1', { roomId: 'room_manual', x: 0, y: -1, doorSides: ['north', 'east', 'west'] });
+  // Manually place an explored room west of the player's starting room, but with no door facing east (back toward player).
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'south', 'west'] });
   const available = getAvailableDirections(gameState, 'p1');
-  // North should NOT be in the available directions because the neighbor lacks a south-facing door.
-  expect(available.find((a) => a.direction === 'north')).toBeUndefined();
+  // West should NOT be in the available directions because the neighbor lacks an east-facing door.
+  expect(available.find((a) => a.direction === 'west')).toBeUndefined();
 });
 
 test('moveToRoom throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {

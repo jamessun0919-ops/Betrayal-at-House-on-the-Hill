@@ -266,7 +266,7 @@ test('resolveEffects persistent_modifier attaches to the room the player current
       removeWhen: { type: 'leavesRoom' },
     },
   ]);
-  const room = gameState.board.ground.get('0,0'); // player starts at entrance hall (0,0)
+  const room = gameState.board.ground.get('0,1'); // player starts at room_lobby_a (0,1)
   expect(room.modifiers).toHaveLength(1);
 });
 

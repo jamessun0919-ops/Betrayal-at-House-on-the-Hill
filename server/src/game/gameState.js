@@ -25,7 +25,7 @@ function addPlayer(gameState, { playerId, name, stats }) {
     name,
     floor: 'ground',
     x: 0,
-    y: 0,
+    y: 1, // room_lobby_a's fixed position (see boardGenerator.js createBoard)
     stats,
     actionPoints: 0,
   });

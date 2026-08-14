@@ -33,12 +33,12 @@ test('createGameState builds a board, an empty player map, and a room deck', () 
   expect(gameState.roomDeck.cards).toHaveLength(3);
 });
 
-test('addPlayer places the new player at the entrance hall with action points set', () => {
+test('addPlayer places the new player at room_lobby_a with action points set', () => {
   const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms());
   const player = addPlayer(gameState, { playerId: 'p1', name: 'Alice', stats: makeStats() });
   expect(player.floor).toBe('ground');
   expect(player.x).toBe(0);
-  expect(player.y).toBe(0);
+  expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(4); // equals speed track value at baseIndex
   expect(gameState.players.get('p1')).toBe(player);
 });
