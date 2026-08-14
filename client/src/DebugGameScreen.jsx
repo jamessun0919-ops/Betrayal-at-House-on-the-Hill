@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import EntranceHallView from './gameplay/EntranceHallView';
+import FocusedRoomView from './gameplay/FocusedRoomView';
+import OverviewMap from './gameplay/OverviewMap';
+import CharacterPanel from './gameplay/CharacterPanel';
 
 const LOBBY_ROOM_IDS = ['room_lobby_a', 'room_lobby_b', 'room_lobby_c'];
 
@@ -14,20 +17,20 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   // the next game:stateUpdate.
   const [roomContent] = useState(initialGameState?.roomContent || null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
-  const [lastPendingAction, setLastPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
-  const [lastCardDrawn, setLastCardDrawn] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [mapMode, setMapMode] = useState('focused'); // 'focused' | 'overview'
+  const [overviewFloor, setOverviewFloor] = useState('ground');
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
   const [pendingRollChoice, setPendingRollChoice] = useState(null);
   const [overrideInput, setOverrideInput] = useState('0');
-  const [lastEffectResolved, setLastEffectResolved] = useState(null);
 
   useEffect(() => {
     function onPrompt(data) {
       setPrompt(data);
     }
     function onPromptResolved(data) {
-      setLastPromptResolved(data);
+      setMessages((prev) => [...prev, `提問結果：${JSON.stringify(data)}`]);
       setPrompt(null);
       setPendingRollChoice(null);
     }
@@ -42,16 +45,16 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setGameState(data);
     }
     function onPendingAction(data) {
-      setLastPendingAction(data);
+      setMessages((prev) => [...prev, `待處理動作：${JSON.stringify(data)}`]);
     }
     function onCardDrawn(data) {
-      setLastCardDrawn(data);
+      setMessages((prev) => [...prev, `抽到的卡：${JSON.stringify(data)}`]);
     }
     function onEffectPendingChoice(data) {
       setPendingEffectChoice(data);
     }
     function onEffectResolved(data) {
-      setLastEffectResolved(data);
+      setMessages((prev) => [...prev, `效果已解析完成：${JSON.stringify(data)}`]);
       setPendingEffectChoice(null);
     }
     function onDiceChoicePending(data) {
@@ -174,42 +177,72 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
       {phase === 'playing' && (
         <div>
-          {(() => {
-            const player = gameState?.players?.find((p) => p.playerId === playerId);
-            const currentRoom =
-              player && gameState.board[player.floor].find((r) => r.x === player.x && r.y === player.y);
-            if (currentRoom && LOBBY_ROOM_IDS.includes(currentRoom.roomId)) {
+        <div style={{ display: 'flex' }}>
+          <div style={{ flex: 2 }}>
+            {(() => {
+              const me = gameState.players.find((p) => p.playerId === playerId);
+              const currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
+
+              if (LOBBY_ROOM_IDS.includes(currentRoom.roomId)) {
+                return (
+                  <EntranceHallView
+                    currentRoomId={currentRoom.roomId}
+                    doorSides={currentRoom.doorSides}
+                    startingRooms={roomContent.startingRooms}
+                    onMove={handleMove}
+                    onUseStairs={handleUseStairs}
+                  />
+                );
+              }
+
+              if (mapMode === 'overview') {
+                const boardRooms = gameState.board[overviewFloor];
+                return (
+                  <OverviewMap
+                    visitedRooms={me.visitedRooms}
+                    floor={overviewFloor}
+                    onFloorChange={setOverviewFloor}
+                    boardRooms={boardRooms}
+                    roomContent={roomContent}
+                    playerX={me.floor === overviewFloor ? me.x : null}
+                    playerY={me.floor === overviewFloor ? me.y : null}
+                  />
+                );
+              }
+
+              const hasRoomForFloor =
+                me.floor === 'ground' ? gameState.roomDeck.hasRoomForGround : gameState.roomDeck.hasRoomForUpper;
+              const roomsInSameSpot = gameState.players.filter(
+                (p) => p.floor === me.floor && p.x === me.x && p.y === me.y
+              );
+
               return (
-                <EntranceHallView
-                  currentRoomId={currentRoom.roomId}
-                  doorSides={currentRoom.doorSides}
-                  startingRooms={roomContent.startingRooms}
+                <FocusedRoomView
+                  player={me}
+                  currentRoom={currentRoom}
+                  boardRooms={gameState.board[me.floor]}
+                  roomContent={roomContent}
+                  roomsInSameSpot={roomsInSameSpot}
+                  allPlayers={gameState.players}
+                  hasRoomForFloor={hasRoomForFloor}
                   onMove={handleMove}
-                  onUseStairs={handleUseStairs}
                 />
               );
-            }
-            return (
-              <div>
-                <h3>移動</h3>
-                <button onClick={() => handleMove('north')}>北</button>
-                <button onClick={() => handleMove('east')}>東</button>
-                <button onClick={() => handleMove('south')}>南</button>
-                <button onClick={() => handleMove('west')}>西</button>
-              </div>
-            );
-          })()}
-          <h3>動作</h3>
-          <button onClick={() => handleSelectAction('item')}>道具</button>
-          <button onClick={() => handleSelectAction('attack')}>襲擊</button>
-          <button onClick={() => handleSelectAction('room_action')}>操作</button>
-          <button onClick={handleUseStairs}>樓梯（免費）</button>
-          <button onClick={handleEndTurn}>結束回合</button>
-          <h3>最新遊戲狀態</h3>
-          <pre>{JSON.stringify(gameState, null, 2)}</pre>
-          {lastPendingAction && <p>待處理動作：{JSON.stringify(lastPendingAction)}</p>}
-          {lastCardDrawn && <p>抽到的卡：{JSON.stringify(lastCardDrawn)}</p>}
-          {lastEffectResolved && <p>效果已解析完成：{JSON.stringify(lastEffectResolved)}</p>}
+            })()}
+            <button onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
+              {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
+            </button>
+          </div>
+          <div style={{ flex: 1 }}>
+            <CharacterPanel
+              player={gameState.players.find((p) => p.playerId === playerId)}
+              messages={messages}
+              onSelectAction={handleSelectAction}
+              onUseStairs={handleUseStairs}
+              onEndTurn={handleEndTurn}
+            />
+          </div>
+        </div>
           {pendingEffectChoice && (
             <div>
               <p>效果選擇中：{pendingEffectChoice.description}</p>
@@ -250,6 +283,8 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
             </div>
           )}
+          <h3>最新遊戲狀態（除錯用，保留）</h3>
+          <pre>{JSON.stringify(gameState, null, 2)}</pre>
         </div>
       )}
     </div>
