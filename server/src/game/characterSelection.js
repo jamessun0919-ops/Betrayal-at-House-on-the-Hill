@@ -10,7 +10,7 @@ function shuffle(array) {
 }
 
 function createCharacterSelectionState(playerIds, characters) {
-  if (!Array.isArray(playerIds) || playerIds.length < 2) {
+  if (!Array.isArray(playerIds) || playerIds.length < 1) {
     throw new Error('TOO_FEW_PLAYERS');
   }
   if (!Array.isArray(characters) || characters.length === 0) {

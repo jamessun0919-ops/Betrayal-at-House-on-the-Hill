@@ -32,7 +32,7 @@ test('startSelection throws SELECTION_ALREADY_STARTED for a roomCode already in 
 
 test('startSelection propagates TOO_FEW_PLAYERS from characterSelection.js', () => {
   const manager = createCharacterSelectionManager();
-  expect(() => startSelection(manager, 'ROOM1', ['p1'], makeCharacters())).toThrow('TOO_FEW_PLAYERS');
+  expect(() => startSelection(manager, 'ROOM1', [], makeCharacters())).toThrow('TOO_FEW_PLAYERS');
 });
 
 test('startSelection propagates INVALID_CHARACTER_LIST from characterSelection.js', () => {

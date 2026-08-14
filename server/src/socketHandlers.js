@@ -100,7 +100,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'GAME_ALREADY_STARTED' });
         }
         const players = lobbyManager.getPlayers(roomCode);
-        if (players.length < 2) {
+        if (players.length < 1) {
           return ack({ error: 'TOO_FEW_PLAYERS' });
         }
         if (players.length > content.characters.length) {
@@ -855,13 +855,14 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   });
   startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
-  // roomContent is only sent here (once) -- if a reconnect/resync event is
-  // ever added, it must also resend roomContent, or reconnecting clients
-  // will have no room names. Currently safe: there is no reconnect path,
+  // roomContent/cardContent are only sent here (once) -- if a reconnect/resync
+  // event is ever added, it must also resend them, or reconnecting clients
+  // will have no room/card names. Currently safe: there is no reconnect path,
   // and lobby:join rejects ROOM_IN_PROGRESS once a game has started.
   io.to(roomCode).emit('game:started', {
     ...serializeGameState(gameState),
     roomContent: { rooms: content.rooms, startingRooms: content.startingRooms },
+    cardContent: { items: content.cards.items, events: content.cards.events, omens: content.cards.omens },
   });
 }
 

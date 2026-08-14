@@ -56,7 +56,7 @@ export default function WaitingRoomScreen({ socket, roomCode, playerId, onLeft }
         <div className="lobby-waiting-buttons">
           <button className="lobby-button" onClick={handleLeave}>退出大廳</button>
           {isHost && (
-            <button className="lobby-button" onClick={handleReady} disabled={players.length < 2}>
+            <button className="lobby-button" onClick={handleReady} disabled={players.length < 1}>
               準備完成
             </button>
           )}

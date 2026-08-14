@@ -459,7 +459,7 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
   httpServer.close();
 });
 
-test('game:startCharacterSelect rejects when fewer than 2 players are in the room', async () => {
+test('game:startCharacterSelect succeeds with a single player in the room', async () => {
   const { httpServer, port } = await startTestServer();
   const url = `http://localhost:${port}`;
 
@@ -471,7 +471,7 @@ test('game:startCharacterSelect rejects when fewer than 2 players are in the roo
   const result = await new Promise((resolve) => {
     client.emit('game:startCharacterSelect', {}, resolve);
   });
-  expect(result.error).toBe('TOO_FEW_PLAYERS');
+  expect(result.error).toBeUndefined();
 
   client.close();
   httpServer.close();

@@ -28,8 +28,12 @@ test('createCharacterSelectionState builds a randomized pick order covering ever
   expect(isCharacterSelectionComplete(state)).toBe(false);
 });
 
-test('createCharacterSelectionState throws TOO_FEW_PLAYERS for fewer than 2 players', () => {
-  expect(() => createCharacterSelectionState(['p1'], makeCharacters())).toThrow('TOO_FEW_PLAYERS');
+test('createCharacterSelectionState succeeds with a single player', () => {
+  const state = createCharacterSelectionState(['p1'], makeCharacters());
+  expect(state.order).toEqual(['p1']);
+});
+
+test('createCharacterSelectionState throws TOO_FEW_PLAYERS for an empty player list', () => {
   expect(() => createCharacterSelectionState([], makeCharacters())).toThrow('TOO_FEW_PLAYERS');
 });
 
