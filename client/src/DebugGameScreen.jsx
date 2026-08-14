@@ -1,10 +1,18 @@
 import { useState, useEffect } from 'react';
+import EntranceHallView from './gameplay/EntranceHallView';
+
+const LOBBY_ROOM_IDS = ['room_lobby_a', 'room_lobby_b', 'room_lobby_c'];
 
 export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
   const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
   const [prompt, setPrompt] = useState(null);
   const [characterSelectState, setCharacterSelectState] = useState(null);
   const [gameState, setGameState] = useState(initialGameState || null);
+  // roomContent is static reference data sent once on game:started -- it is
+  // NOT part of game:stateUpdate's payload, so it must live in its own state
+  // instead of gameState's, or it would be lost the moment any action broadcasts
+  // the next game:stateUpdate.
+  const [roomContent] = useState(initialGameState?.roomContent || null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
   const [lastPendingAction, setLastPendingAction] = useState(null);
   const [actionError, setActionError] = useState('');
@@ -166,11 +174,31 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
       {phase === 'playing' && (
         <div>
-          <h3>移動</h3>
-          <button onClick={() => handleMove('north')}>北</button>
-          <button onClick={() => handleMove('east')}>東</button>
-          <button onClick={() => handleMove('south')}>南</button>
-          <button onClick={() => handleMove('west')}>西</button>
+          {(() => {
+            const player = gameState?.players?.find((p) => p.playerId === playerId);
+            const currentRoom =
+              player && gameState.board[player.floor].find((r) => r.x === player.x && r.y === player.y);
+            if (currentRoom && LOBBY_ROOM_IDS.includes(currentRoom.roomId)) {
+              return (
+                <EntranceHallView
+                  currentRoomId={currentRoom.roomId}
+                  doorSides={currentRoom.doorSides}
+                  startingRooms={roomContent.startingRooms}
+                  onMove={handleMove}
+                  onUseStairs={handleUseStairs}
+                />
+              );
+            }
+            return (
+              <div>
+                <h3>移動</h3>
+                <button onClick={() => handleMove('north')}>北</button>
+                <button onClick={() => handleMove('east')}>東</button>
+                <button onClick={() => handleMove('south')}>南</button>
+                <button onClick={() => handleMove('west')}>西</button>
+              </div>
+            );
+          })()}
           <h3>動作</h3>
           <button onClick={() => handleSelectAction('item')}>道具</button>
           <button onClick={() => handleSelectAction('attack')}>襲擊</button>
