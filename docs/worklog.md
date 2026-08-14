@@ -598,3 +598,26 @@
 - 下階段開始時，討論套用已生成的房間圖片，建立遊戲開始階段畫面（M2D3 前端骨架，這次後端資料已就緒）
 - 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
 
+## 2026-08-14 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者「早安」開新階段，看了開發者已生成的 10 張房間圖（`img/rooms/`：大門廳三格 LobbyA/B/C＋二樓平台 2Fladder＋6 張一般房間），品質高、跟 prompt 規格吻合。用 `brainstorming` skill 確認這次範圍縮小為「只做進入遊戲後的起始畫面」（大門廳），而非完整 M2D3 地圖骨架
+- 確認資料模型整合方向：新的 3 格大門廳（room_lobby_a/b/c）完全取代舊的大門廳/廊廳/梯廳三個從未真正設計過的固定房間（原本 `doorSides` 全部寫死 `ALL_SIDES`）；玩家在大門廳任一格時，畫面固定顯示三張圖完整堆疊（因為圖片本身已設計成無縫拼接，不做鄰居裁切/淡化）
+- 寫成設計文件＋實作計畫（[docs/superpowers/specs/2026-08-14-entrance-hall-and-start-screen-design.md](superpowers/specs/2026-08-14-entrance-hall-and-start-screen-design.md)、[計畫](superpowers/plans/2026-08-14-entrance-hall-and-start-screen.md)），開發者確認後直接執行（判斷範圍雖然touch多個檔案但機制單一，不需要走完整 SDD 流程，agent 自己在獨立 worktree 裡直接施作＋TDD）
+- 後端：`placeFixedRoom` 改成接受明確 `doorSides`，`createBoard` 改用新的 room_lobby_a/b/c＋更新過的二樓平台 doorSides；6 個受影響的測試檔案（`boardGenerator`/`contentLoader`/`effectResolver`/`gameManager`/`gameState`/`turnFlow`/`socketHandlers`）逐一排查座標依賴後更新，過程中發現多個既有測試把新房間的座標（north/south of 原點）當「保證是空的」在用，改用遠離大門廳格子的座標，426/426 測試全綠
+- 前端：新元件 `EntranceHallView.jsx`（依 `roomContent.startingRooms` 動態查圖檔名稱，依真實 `doorSides` 產生按鈕，`room_lobby_c` 額外顯示上二樓按鈕），`DebugGameScreen.jsx` 新增獨立 `roomContent` state（避免被 `game:stateUpdate` 覆蓋掉）並依玩家目前房間條件渲染。在瀏覽器手動跑完整流程驗證（建房→雙人選角→進入遊戲→移動→上樓梯）全部正常，合併回 `main` 並推送
+- 開發者請 agent 開測試伺服器手動測試，回報看不到大門廳圖片、卡在文字除錯頁面。Agent 沒有直接改程式碼，先在自己的瀏覽器分頁重跑一次完整流程確認同一組伺服器上程式碼實際正常運作，判斷是開發者的舊分頁在伺服器重啟後 Vite 熱更新連線斷掉、卡在重啟前的舊版本，請開發者重新整理分頁——確認問題解決
+
+**完成項目**：
+- 大門廳整合＋遊戲開始畫面已完成並合併進 `main`：[設計文件](superpowers/specs/2026-08-14-entrance-hall-and-start-screen-design.md)、[實作計畫](superpowers/plans/2026-08-14-entrance-hall-and-start-screen.md)
+- 大門廳三張圖＋二樓平台圖已接上前端並實際手動驗證正常運作
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- 多個既有測試檔案把「原點南北方向必定是空格」當隱含假設在用，這次新增的大門廳恰好佔用這些座標，逐一排查花了不少時間；沒有捷徑，只能一個個檔案確認座標依賴是否真實存在
+- 開發者回報「看不到圖片」時，先自行重現而非直接猜測改碼，確認是瀏覽器舊分頁快取問題不是程式問題，符合專案「不可自行試錯」的規則精神（用重現排查取代盲改）
+
+**開發者交代備忘事項**：
+- 下階段開始討論接上其他房間（目前已生成 6 張一般房間圖：`room_library`／`room_vault`／`room_bathroom_ground`／`room_bathroom_upper`／`room_larder`／`room_master_bedroom`，`rooms.json` 尚未補 `filename` 欄位，也還沒有一般房間的地圖顯示元件）
+- 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
+
