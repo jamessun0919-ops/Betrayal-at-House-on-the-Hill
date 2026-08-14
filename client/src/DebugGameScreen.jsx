@@ -180,8 +180,25 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       {phase === 'playing' && (
         <div>
         <div style={{ display: 'flex' }}>
-          {/* TEMP: 除錯用邊框，用來核對左 2/3、右 1/3 的實際範圍，確認後可移除 */}
-          <div style={{ flex: 2, border: '2px dashed red', boxSizing: 'border-box' }}>
+          {/* TEMP: 除錯用邊框，用來核對左中右三欄的實際範圍，確認後可移除 */}
+          <div style={{ width: 320, flexShrink: 0, border: '2px dashed red', boxSizing: 'border-box' }} />
+          <div
+            style={{
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              border: '2px dashed green',
+              boxSizing: 'border-box',
+              // --total-square = 目前房間的最大預估視野（房間本身＋上下左右
+              // 各 25% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間（扣掉上方
+              // 標題與下方門/模式切換按鈕列的估計高度）。--tile-size 反推房間
+              // 本身的邊長：total-square = tile-size * 1.5（每側 25% peek，見
+              // FocusedRoomView 的 PEEK_PERCENT）。
+              '--total-square': 'calc(100vh - 200px)',
+              '--tile-size': 'calc(var(--total-square) / 1.5)',
+            }}
+          >
             {(() => {
               const me = gameState.players.find((p) => p.playerId === playerId);
               const currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
@@ -220,11 +237,17 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 />
               );
             })()}
-            <button onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
+            <button
+              onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}
+              // FocusedRoomView's door buttons are absolutely positioned below the
+              // tile (so they don't affect the tile's own flow height) -- this
+              // margin clears that row so the toggle button doesn't overlap them.
+              style={{ marginTop: mapMode === 'focused' ? 40 : 0 }}
+            >
               {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
             </button>
           </div>
-          <div style={{ flex: 1, border: '2px dashed blue', boxSizing: 'border-box' }}>
+          <div style={{ width: 320, flexShrink: 0, border: '2px dashed blue', boxSizing: 'border-box' }}>
             <CharacterPanel
               player={gameState.players.find((p) => p.playerId === playerId)}
               messages={messages}
