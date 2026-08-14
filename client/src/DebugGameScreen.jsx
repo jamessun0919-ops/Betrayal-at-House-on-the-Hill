@@ -154,12 +154,22 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     );
   }
 
-  return (
-    <div style={{ color: '#1a1a1a' }}>
+  const header = (
+    <>
       <h2>
         除錯測試頁面（房號：{roomCode}，我的 playerId：{playerId}）
       </h2>
       {actionError && <p style={{ color: 'red' }}>錯誤：{actionError}</p>}
+    </>
+  );
+
+  return (
+    <div style={{ color: '#1a1a1a' }}>
+      {/* In the playing phase the header moves into the left column instead
+          (see below) -- final target is mobile, where the viewport square
+          needs to claim as much of the screen height as possible, so nothing
+          reserves space above it. */}
+      {phase !== 'playing' && header}
 
       {phase === 'character_select' && (
         <div>
@@ -198,13 +208,14 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           style={{
             display: 'flex',
             // --total-square = 目前房間的最大預估視野（房間本身＋上下左右
-            // 各 25% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間（扣掉上方
-            // 標題與其他預留高度）。中間欄位寬度直接等於這個值，左右欄位
-            // 平分剩下的橫向空間（flex:1）。--tile-size 反推房間本身的邊
-            // 長：total-square = tile-size * 1.5（每側 25% peek，見
-            // FocusedRoomView 的 PEEK_PERCENT）。
-            '--total-square': 'calc(100vh - 200px)',
-            '--tile-size': 'calc(var(--total-square) / 1.5)',
+            // 各 15% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間 -- 標題跟
+            // 錯誤訊息都搬進了左欄，這裡只留一點點緩衝（16px）避免貼死。
+            // 中間欄位寬度直接等於這個值，左右欄位平分剩下的橫向空間
+            // （flex:1）。--tile-size / --peek-size 依開發者指定比例反推：
+            // 房間邊長 = 視野邊長 × 0.7，每側鄰居預覽寬度 = 視野邊長 × 0.15。
+            '--total-square': 'calc(100vh - 16px)',
+            '--tile-size': 'calc(var(--total-square) * 0.7)',
+            '--peek-size': 'calc(var(--total-square) * 0.15)',
           }}
         >
           {/* TEMP: 除錯用邊框，用來核對左中右三欄的實際範圍，確認後可移除 */}
@@ -214,6 +225,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 some browsers even with minWidth:0, which broke the even
                 left/right split. */}
             <div style={{ padding: 8 }}>
+              {header}
               <div>
                 {directions.map((d) => (
                   <button

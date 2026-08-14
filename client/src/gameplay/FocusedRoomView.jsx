@@ -2,23 +2,22 @@ import RoomTile from './RoomTile';
 import PlayerBadge from './PlayerBadge';
 import { getAvailableDirections, findRoomInfo } from './mapUtils';
 
-// The room tile's size comes from the --tile-size CSS custom property set by
-// an ancestor (DebugGameScreen), so this view fills whatever square space
-// it's given -- see the DebugGameScreen comment on --total-square/--tile-size
-// for how that's computed. Neighbor peeks are expressed as percentages of
-// the tile (25% each side), matching the fixed PEEK_SIZE:TILE_SIZE ratio
-// (90:360) this view used before going responsive.
-const PEEK_PERCENT = 25;
+// The room tile's size comes from --tile-size, and each neighbor peek's
+// thickness from --peek-size -- both CSS custom properties set by an
+// ancestor (DebugGameScreen) as fractions of --total-square (0.7 and 0.15
+// respectively, per the developer's spec), so this view fills whatever
+// square space it's given without needing to know the actual pixel values.
+const NEG_PEEK = 'calc(-1 * var(--peek-size))';
 
 function peekStyle(direction) {
   const base = { position: 'absolute' };
   if (direction === 'north') {
     return {
       ...base,
-      top: `-${PEEK_PERCENT}%`,
+      top: NEG_PEEK,
       left: 0,
       width: '100%',
-      height: `${PEEK_PERCENT}%`,
+      height: 'var(--peek-size)',
       backgroundSize: 'var(--tile-size) var(--tile-size)',
       backgroundPosition: 'bottom',
       maskImage: 'linear-gradient(to top, black, transparent)',
@@ -28,10 +27,10 @@ function peekStyle(direction) {
   if (direction === 'south') {
     return {
       ...base,
-      bottom: `-${PEEK_PERCENT}%`,
+      bottom: NEG_PEEK,
       left: 0,
       width: '100%',
-      height: `${PEEK_PERCENT}%`,
+      height: 'var(--peek-size)',
       backgroundSize: 'var(--tile-size) var(--tile-size)',
       backgroundPosition: 'top',
       maskImage: 'linear-gradient(to bottom, black, transparent)',
@@ -42,8 +41,8 @@ function peekStyle(direction) {
     return {
       ...base,
       top: 0,
-      right: `-${PEEK_PERCENT}%`,
-      width: `${PEEK_PERCENT}%`,
+      right: NEG_PEEK,
+      width: 'var(--peek-size)',
       height: '100%',
       backgroundSize: 'var(--tile-size) var(--tile-size)',
       backgroundPosition: 'left',
@@ -55,8 +54,8 @@ function peekStyle(direction) {
   return {
     ...base,
     top: 0,
-    left: `-${PEEK_PERCENT}%`,
-    width: `${PEEK_PERCENT}%`,
+    left: NEG_PEEK,
+    width: 'var(--peek-size)',
     height: '100%',
     backgroundSize: 'var(--tile-size) var(--tile-size)',
     backgroundPosition: 'right',
