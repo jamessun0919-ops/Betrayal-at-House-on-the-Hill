@@ -7,6 +7,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級意志。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -26,6 +27,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 3,
+    "filename": "room_research_lab.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -39,6 +41,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
+    "filename": "room_library.webp",
     "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級知識。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -59,6 +62,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": "room_master_bedroom.webp",
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -71,6 +75,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
+    "filename": "room_conservatory.webp",
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -83,6 +88,7 @@
     "floor": "upper",
     "size": "1x1",
     "doors": 4,
+    "filename": "room_game_room.webp",
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -95,6 +101,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
+    "filename": "room_gardens.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -107,6 +114,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 3,
+    "filename": "room_patio.webp",
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -119,6 +127,7 @@
     "floor": "upper",
     "size": "1x1",
     "doors": 3,
+    "filename": "room_balcony.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -132,6 +141,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -145,10 +155,14 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
+    "filename": null,
     "drawType": "omen",
     "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
     "effects": [],
-    "leaveCheck": { "stat": "might", "min": 3 },
+    "leaveCheck": {
+      "stat": "might",
+      "min": 3
+    },
     "needsCustomLogic": false
   },
   {
@@ -158,6 +172,7 @@
     "floor": "any",
     "size": "1x1",
     "doors": 3,
+    "filename": "room_kitchen.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -171,6 +186,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -184,6 +200,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": "room_larder.webp",
     "drawType": "item",
     "text": "若在此房結束回合，可獲得1級力量。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -204,6 +221,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -217,6 +235,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -231,6 +250,7 @@
     "doors": 2,
     "drawType": "omen",
     "doorPattern": "adjacent",
+    "filename": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false
@@ -243,6 +263,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -255,6 +276,7 @@
     "floor": "any",
     "size": "1x1",
     "doors": 3,
+    "filename": "room_gymnasium.webp",
     "drawType": "item",
     "text": "若在此房結束回合，可獲得1級速度。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -274,16 +296,33 @@
     "floor": "upper",
     "size": "1x1",
     "doors": 1,
+    "filename": "room_vault.webp",
     "drawType": "item",
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
-    "effects": [{
-      "type": "dice_check",
-      "stat": "knowledge",
-      "tiers": [
-        { "min": 6, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
-        { "min": 0, "max": 5, "effects": [] }
-      ]
-    }],
+    "effects": [
+      {
+        "type": "dice_check",
+        "stat": "knowledge",
+        "tiers": [
+          {
+            "min": 6,
+            "max": 8,
+            "effects": [
+              {
+                "type": "draw_card",
+                "deck": "item",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "min": 0,
+            "max": 5,
+            "effects": []
+          }
+        ]
+      }
+    ],
     "needsCustomLogic": true
   },
   {
@@ -294,6 +333,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
+    "filename": null,
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -307,6 +347,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -319,6 +360,7 @@
     "floor": "any",
     "size": "1x1",
     "doors": 4,
+    "filename": null,
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -332,6 +374,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -345,10 +388,14 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於3才能離開",
     "effects": [],
-    "leaveCheck": { "stat": "speed", "min": 4 },
+    "leaveCheck": {
+      "stat": "speed",
+      "min": 4
+    },
     "needsCustomLogic": false
   },
   {
@@ -358,6 +405,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
+    "filename": "room_atrium.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -371,6 +419,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -383,10 +432,14 @@
     "floor": "any",
     "size": "1x1",
     "doors": 4,
+    "filename": "room_vine_conservatory.webp",
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於4才能離開",
     "effects": [],
-    "leaveCheck": { "stat": "speed", "min": 5 },
+    "leaveCheck": {
+      "stat": "speed",
+      "min": 5
+    },
     "needsCustomLogic": false
   },
   {
@@ -397,6 +450,7 @@
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
+    "filename": null,
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -409,6 +463,7 @@
     "floor": "ground",
     "size": "1x1",
     "doors": 1,
+    "filename": "room_bathroom_ground.webp",
     "drawType": "item",
     "text": "",
     "effects": [],
@@ -421,6 +476,7 @@
     "floor": "upper",
     "size": "1x1",
     "doors": 1,
+    "filename": "room_bathroom_upper.webp",
     "drawType": "item",
     "text": "",
     "effects": [],
