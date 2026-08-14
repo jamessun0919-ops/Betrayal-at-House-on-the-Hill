@@ -13,7 +13,7 @@ function StatBar({ label, stat }) {
         {label}：{track[currentIndex] + (overflow || 0)}
       </div>
       <div style={{ display: 'flex' }}>
-        {track.map((_, i) => (
+        {track.map((value, i) => (
           <div
             key={i}
             style={{
@@ -21,18 +21,38 @@ function StatBar({ label, stat }) {
               height: 16,
               border: i === baseIndex ? '2px solid #2980b9' : '1px solid #333',
               backgroundColor: i === currentIndex ? '#f1c40f' : i <= skullIndex ? '#c0392b' : '#eee',
+              color: i <= skullIndex && i !== currentIndex ? '#fff' : '#1a1a1a',
               boxSizing: 'border-box',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.7em',
             }}
-          />
+          >
+            {value}
+          </div>
         ))}
       </div>
     </div>
   );
 }
 
-export default function CharacterPanel({ player, messages, onSelectAction, onUseStairs, onEndTurn }) {
+function findCardName(id, cardContent) {
+  if (!cardContent) return id;
+  const all = [...(cardContent.items || []), ...(cardContent.events || []), ...(cardContent.omens || [])];
+  const found = all.find((c) => c.id === id);
+  return found ? found.name : id;
+}
+
+export default function CharacterPanel({ player, messages, cardContent, onSelectAction, onUseStairs, onEndTurn }) {
+  const speed = player.stats.speed;
+  const maxActionPoints = speed.track[speed.currentIndex] + (speed.overflow || 0);
+
   return (
     <div>
+      <h3>{player.name}</h3>
+      <p>行動力：{player.actionPoints} / {maxActionPoints}</p>
+
       <h3>屬性</h3>
       {STAT_LABELS.map(([key, label]) => (
         <StatBar key={key} label={label} stat={player.stats[key]} />
@@ -42,7 +62,7 @@ export default function CharacterPanel({ player, messages, onSelectAction, onUse
       <ul>
         {player.inventory.length === 0 && <li>（無）</li>}
         {player.inventory.map((item, i) => (
-          <li key={`${item.id}-${i}`}>{item.id}</li>
+          <li key={`${item.id}-${i}`}>{findCardName(item.id, cardContent)}</li>
         ))}
       </ul>
 

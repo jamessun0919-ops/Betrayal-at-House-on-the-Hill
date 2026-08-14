@@ -13,6 +13,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   // instead of gameState's, or it would be lost the moment any action broadcasts
   // the next game:stateUpdate.
   const [roomContent] = useState(initialGameState?.roomContent || null);
+  // Same pattern as roomContent -- cardContent (item/event/omen names) is
+  // static reference data sent once on game:started, not part of
+  // game:stateUpdate's payload.
+  const [cardContent] = useState(initialGameState?.cardContent || null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
   const [actionError, setActionError] = useState('');
   const [messages, setMessages] = useState([]);
@@ -136,7 +140,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   }
 
   return (
-    <div>
+    <div style={{ color: '#1a1a1a' }}>
       <h2>
         除錯測試頁面（房號：{roomCode}，我的 playerId：{playerId}）
       </h2>
@@ -176,7 +180,8 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       {phase === 'playing' && (
         <div>
         <div style={{ display: 'flex' }}>
-          <div style={{ flex: 2 }}>
+          {/* TEMP: 除錯用邊框，用來核對左 2/3、右 1/3 的實際範圍，確認後可移除 */}
+          <div style={{ flex: 2, border: '2px dashed red', boxSizing: 'border-box' }}>
             {(() => {
               const me = gameState.players.find((p) => p.playerId === playerId);
               const currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
@@ -219,10 +224,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
             </button>
           </div>
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, border: '2px dashed blue', boxSizing: 'border-box' }}>
             <CharacterPanel
               player={gameState.players.find((p) => p.playerId === playerId)}
               messages={messages}
+              cardContent={cardContent}
               onSelectAction={handleSelectAction}
               onUseStairs={handleUseStairs}
               onEndTurn={handleEndTurn}
