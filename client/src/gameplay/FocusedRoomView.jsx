@@ -9,7 +9,6 @@ import { getAvailableDirections, findRoomInfo } from './mapUtils';
 // the tile (25% each side), matching the fixed PEEK_SIZE:TILE_SIZE ratio
 // (90:360) this view used before going responsive.
 const PEEK_PERCENT = 25;
-const DIRECTION_LABELS = { north: '北', east: '東', south: '南', west: '西' };
 
 function peekStyle(direction) {
   const base = { position: 'absolute' };
@@ -125,28 +124,20 @@ function NeighborPeek({ direction, neighborRoom, roomContent }) {
   return <div style={{ ...style, backgroundImage: 'none', backgroundColor: '#8a8a8a', opacity: 0.4 }} />;
 }
 
-export default function FocusedRoomView({
-  player,
-  currentRoom,
-  boardRooms,
-  roomContent,
-  roomsInSameSpot,
-  allPlayers,
-  hasRoomForFloor,
-  onMove,
-}) {
+// Move/open-door buttons live in DebugGameScreen's left column now (not
+// here) -- this view is purely the visual room square (tile + neighbor
+// peeks + player badges). Only 'move' directions matter here, since only
+// those get a neighbor peek; open_door directions have no neighbor room to
+// peek at yet.
+export default function FocusedRoomView({ player, currentRoom, boardRooms, roomContent, roomsInSameSpot, allPlayers }) {
   const currentInfo = findRoomInfo(currentRoom.roomId, roomContent);
-  const directions = getAvailableDirections(player, currentRoom, boardRooms).filter(
-    (d) => d.kind === 'move' || hasRoomForFloor
-  );
+  const moveDirections = getAvailableDirections(player, currentRoom, boardRooms).filter((d) => d.kind === 'move');
 
   return (
     <div style={{ position: 'relative', width: 'var(--tile-size)', height: 'var(--tile-size)' }}>
-      {directions
-        .filter((d) => d.kind === 'move')
-        .map((d) => (
-          <NeighborPeek key={d.direction} direction={d.direction} neighborRoom={d.neighborRoom} roomContent={roomContent} />
-        ))}
+      {moveDirections.map((d) => (
+        <NeighborPeek key={d.direction} direction={d.direction} neighborRoom={d.neighborRoom} roomContent={roomContent} />
+      ))}
       <RoomTile
         filename={currentInfo?.filename}
         name={currentInfo?.name}
@@ -163,22 +154,6 @@ export default function FocusedRoomView({
           />
         );
       })}
-      <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0 }}>
-        {directions.map((d) => (
-          <button
-            key={d.direction}
-            onClick={() => onMove(d.direction)}
-            style={{
-              marginRight: 8,
-              border: d.kind === 'move' ? '2px solid #2ecc71' : '2px dashed #888',
-              backgroundColor: d.kind === 'move' ? '#eafaf1' : '#f0f0f0',
-            }}
-          >
-            {DIRECTION_LABELS[d.direction]}
-            {d.kind === 'open_door' ? '？' : ''}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

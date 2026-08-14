@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
+import { getAvailableDirections } from './gameplay/mapUtils';
+
+const DIRECTION_LABELS = { north: '北', east: '東', south: '南', west: '西' };
 
 export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
   const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
@@ -139,6 +142,18 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     });
   }
 
+  // Precomputed once for the playing-phase render -- both the left button
+  // column and the center room view need these.
+  let me, currentRoom, hasRoomForFloor, directions;
+  if (gameState) {
+    me = gameState.players.find((p) => p.playerId === playerId);
+    currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
+    hasRoomForFloor = me.floor === 'ground' ? gameState.roomDeck.hasRoomForGround : gameState.roomDeck.hasRoomForUpper;
+    directions = getAvailableDirections(me, currentRoom, gameState.board[me.floor]).filter(
+      (d) => d.kind === 'move' || hasRoomForFloor
+    );
+  }
+
   return (
     <div style={{ color: '#1a1a1a' }}>
       <h2>
@@ -179,30 +194,59 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
       {phase === 'playing' && (
         <div>
-        <div style={{ display: 'flex' }}>
+        <div
+          style={{
+            display: 'flex',
+            // --total-square = 目前房間的最大預估視野（房間本身＋上下左右
+            // 各 25% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間（扣掉上方
+            // 標題與其他預留高度）。中間欄位寬度直接等於這個值，左右欄位
+            // 平分剩下的橫向空間（flex:1）。--tile-size 反推房間本身的邊
+            // 長：total-square = tile-size * 1.5（每側 25% peek，見
+            // FocusedRoomView 的 PEEK_PERCENT）。
+            '--total-square': 'calc(100vh - 200px)',
+            '--tile-size': 'calc(var(--total-square) / 1.5)',
+          }}
+        >
           {/* TEMP: 除錯用邊框，用來核對左中右三欄的實際範圍，確認後可移除 */}
-          <div style={{ width: 320, flexShrink: 0, border: '2px dashed red', boxSizing: 'border-box' }} />
+          <div style={{ flex: 1, minWidth: 0, border: '2px dashed red', boxSizing: 'border-box' }}>
+            {/* Padding lives on this inner wrapper, not the flex item itself --
+                padding on a flex-basis:0% item still acts as a shrink floor in
+                some browsers even with minWidth:0, which broke the even
+                left/right split. */}
+            <div style={{ padding: 8 }}>
+              <div>
+                {directions.map((d) => (
+                  <button
+                    key={d.direction}
+                    onClick={() => handleMove(d.direction)}
+                    style={{
+                      marginRight: 8,
+                      marginBottom: 8,
+                      border: d.kind === 'move' ? '2px solid #2ecc71' : '2px dashed #888',
+                      backgroundColor: d.kind === 'move' ? '#eafaf1' : '#f0f0f0',
+                    }}
+                  >
+                    {DIRECTION_LABELS[d.direction]}
+                    {d.kind === 'open_door' ? '？' : ''}
+                  </button>
+                ))}
+              </div>
+              <button onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
+                {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
+              </button>
+            </div>
+          </div>
           <div
             style={{
-              flex: 1,
+              width: 'var(--total-square)',
+              flexShrink: 0,
               display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
+              justifyContent: 'center',
               border: '2px dashed green',
               boxSizing: 'border-box',
-              // --total-square = 目前房間的最大預估視野（房間本身＋上下左右
-              // 各 25% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間（扣掉上方
-              // 標題與下方門/模式切換按鈕列的估計高度）。--tile-size 反推房間
-              // 本身的邊長：total-square = tile-size * 1.5（每側 25% peek，見
-              // FocusedRoomView 的 PEEK_PERCENT）。
-              '--total-square': 'calc(100vh - 200px)',
-              '--tile-size': 'calc(var(--total-square) / 1.5)',
             }}
           >
             {(() => {
-              const me = gameState.players.find((p) => p.playerId === playerId);
-              const currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
-
               if (mapMode === 'overview') {
                 const boardRooms = gameState.board[overviewFloor];
                 return (
@@ -218,8 +262,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 );
               }
 
-              const hasRoomForFloor =
-                me.floor === 'ground' ? gameState.roomDeck.hasRoomForGround : gameState.roomDeck.hasRoomForUpper;
               const roomsInSameSpot = gameState.players.filter(
                 (p) => p.floor === me.floor && p.x === me.x && p.y === me.y
               );
@@ -232,24 +274,13 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                   roomContent={roomContent}
                   roomsInSameSpot={roomsInSameSpot}
                   allPlayers={gameState.players}
-                  hasRoomForFloor={hasRoomForFloor}
-                  onMove={handleMove}
                 />
               );
             })()}
-            <button
-              onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}
-              // FocusedRoomView's door buttons are absolutely positioned below the
-              // tile (so they don't affect the tile's own flow height) -- this
-              // margin clears that row so the toggle button doesn't overlap them.
-              style={{ marginTop: mapMode === 'focused' ? 40 : 0 }}
-            >
-              {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
-            </button>
           </div>
-          <div style={{ width: 320, flexShrink: 0, border: '2px dashed blue', boxSizing: 'border-box' }}>
+          <div style={{ flex: 1, minWidth: 0, border: '2px dashed blue', boxSizing: 'border-box' }}>
             <CharacterPanel
-              player={gameState.players.find((p) => p.playerId === playerId)}
+              player={me}
               messages={messages}
               cardContent={cardContent}
               onSelectAction={handleSelectAction}
