@@ -1,10 +1,7 @@
 import { useState, useEffect } from 'react';
-import EntranceHallView from './gameplay/EntranceHallView';
 import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
-
-const LOBBY_ROOM_IDS = ['room_lobby_a', 'room_lobby_b', 'room_lobby_c'];
 
 export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
   const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
@@ -183,18 +180,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
             {(() => {
               const me = gameState.players.find((p) => p.playerId === playerId);
               const currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
-
-              if (LOBBY_ROOM_IDS.includes(currentRoom.roomId)) {
-                return (
-                  <EntranceHallView
-                    currentRoomId={currentRoom.roomId}
-                    doorSides={currentRoom.doorSides}
-                    startingRooms={roomContent.startingRooms}
-                    onMove={handleMove}
-                    onUseStairs={handleUseStairs}
-                  />
-                );
-              }
 
               if (mapMode === 'overview') {
                 const boardRooms = gameState.board[overviewFloor];
