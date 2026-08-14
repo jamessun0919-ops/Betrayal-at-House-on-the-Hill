@@ -61,6 +61,31 @@ function peekStyle(direction) {
   };
 }
 
+const BADGE_SIZE = 24;
+const BADGE_GAP = 28;
+
+// Positions a player's badge at the edge of the room tile they entered
+// through (enteredFromSide is the OPPOSITE of the move direction -- moving
+// north means you walked in through the room's south wall). null means
+// spawned here or arrived via stairs, so the badge sits centered.
+function badgeStyle(enteredFromSide, index, total) {
+  const mid = TILE_SIZE / 2 - BADGE_SIZE / 2;
+  const stagger = (index - (total - 1) / 2) * BADGE_GAP;
+  const edgeMargin = 8;
+  switch (enteredFromSide) {
+    case 'north':
+      return { position: 'absolute', top: edgeMargin, left: mid + stagger };
+    case 'south':
+      return { position: 'absolute', bottom: edgeMargin, left: mid + stagger };
+    case 'east':
+      return { position: 'absolute', right: edgeMargin, top: mid + stagger };
+    case 'west':
+      return { position: 'absolute', left: edgeMargin, top: mid + stagger };
+    default:
+      return { position: 'absolute', top: mid + stagger, left: mid };
+  }
+}
+
 function NeighborPeek({ direction, neighborRoom, roomContent }) {
   const info = findRoomInfo(neighborRoom.roomId, roomContent);
   const style = peekStyle(direction);
@@ -105,7 +130,7 @@ export default function FocusedRoomView({
             key={p.playerId}
             name={p.name}
             colorIndex={colorIndex === -1 ? i : colorIndex}
-            style={{ position: 'absolute', top: 8 + i * 28, left: 8 }}
+            style={badgeStyle(p.enteredFromSide, i, roomsInSameSpot.length)}
           />
         );
       })}

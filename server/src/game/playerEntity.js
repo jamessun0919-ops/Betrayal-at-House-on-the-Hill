@@ -49,6 +49,7 @@ function createPlayer({ playerId, name, floor, x, y, stats, actionPoints }) {
     actionPoints,
     inventory: [],
     visitedRooms: [{ floor, x, y }],
+    enteredFromSide: null, // null = arrived by spawn/stairs (badge centered), else the door side entered through
   };
 }
 
@@ -110,10 +111,11 @@ function resetActionPoints(player) {
   player.actionPoints = getStatValue(player, 'speed');
 }
 
-function movePlayerTo(player, floor, x, y) {
+function movePlayerTo(player, floor, x, y, enteredFromSide = null) {
   player.floor = floor;
   player.x = x;
   player.y = y;
+  player.enteredFromSide = enteredFromSide;
   const alreadyVisited = player.visitedRooms.some(
     (r) => r.floor === floor && r.x === x && r.y === y
   );

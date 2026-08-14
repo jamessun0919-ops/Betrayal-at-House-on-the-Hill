@@ -1,4 +1,4 @@
-const { SIDES } = require('./doorLayout');
+const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
 const { drawRoom, hasRoomForFloor } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
@@ -90,7 +90,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   const targetCoord = { x: player.x + delta.dx, y: player.y + delta.dy };
 
   if (choice.kind === 'move') {
-    movePlayerTo(player, player.floor, targetCoord.x, targetCoord.y);
+    movePlayerTo(player, player.floor, targetCoord.x, targetCoord.y, OPPOSITE_SIDE[direction]);
     player.actionPoints -= 1;
     return { kind: 'move', x: targetCoord.x, y: targetCoord.y };
   }
@@ -103,7 +103,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     direction,
     roomDefinition
   );
-  movePlayerTo(player, player.floor, placedRoom.x, placedRoom.y);
+  movePlayerTo(player, player.floor, placedRoom.x, placedRoom.y, OPPOSITE_SIDE[direction]);
   player.actionPoints = 0;
   const pendingCardDraw =
     roomDefinition.drawType && roomDefinition.drawType !== 'none'
