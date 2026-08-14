@@ -621,3 +621,28 @@
 - 下階段開始討論接上其他房間（目前已生成 6 張一般房間圖：`room_library`／`room_vault`／`room_bathroom_ground`／`room_bathroom_upper`／`room_larder`／`room_master_bedroom`，`rooms.json` 尚未補 `filename` 欄位，也還沒有一般房間的地圖顯示元件）
 - 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
 
+## 2026-08-14 第 2 次工作階段
+
+**當日工作內容**：
+- 開發者「午安」開新階段，展示新一批房間圖片（16 張一般房間＋4 張大門廳），確認範圍為「補齊 31 筆 rooms.json 的 filename 欄位（無資料先佔位）＋聚焦目前房間／鄰居一角／總覽地圖」的一般房間地圖骨架，開發者指定用 `subagent-driven-development` 執行
+- 完成並自我審查 [docs/superpowers/plans/2026-08-14-m2d3-general-room-skeleton.md](superpowers/plans/2026-08-14-m2d3-general-room-skeleton.md)（6 任務），用 SDD 依序執行：`mapUtils.js`／`RoomTile`＋`PlayerBadge`／`FocusedRoomView`／`OverviewMap`／`CharacterPanel`／整合進 `DebugGameScreen.jsx`。Task 6 審查抓到 1 個 Critical（計畫本身 Step 2 與 Step 3 文字互相矛盾，導致 `lastPromptResolved` 顯示永遠空白），確認是計畫撰寫疏漏後直接修復；修復期間 implementer session 因額度限制中斷，agent 確認檔案改動已落地後自行完成收尾。427/427 測試通過，合併進 `main` 並推送
+- 開發者手動測試後回報 5 項修正需求（大廳單人可進角色選擇、玩家圖標依進入方向定位、暫時除錯框線、文字對比度、道具顯示真實名稱），逐項調查程式碼根因後實作，其中圖標定位範圍（是否含同房間其他玩家）用 `AskUserQuestion` 確認後採用「後端新增 `enteredFromSide` 欄位、支援所有玩家」的完整方案；文字對比度根因是外層 `.lobby-viewport` 的近白色文字設定沒被除錯頁面覆蓋
+- 開發者提供截圖回報版面仍不符期待，要求視野正方形放大到最大化、移動按鈕搬到左欄、先確保視野最大再平分左右空間。實作時發現並修正一個 flexbox 冷知識（padding 直接加在 `flex-basis:0%` 的欄位上，即使 `minWidth:0` 仍會頂住縮放下限，需搬到內層 wrapper）
+- 開發者再次回報不符期待並提供精確數字規格（房間佔視野 70%、四邊鄰居預覽各 15%），用 `AskUserQuestion` 確認是比例關係後，把標題／錯誤訊息搬進左欄（釋放視野正方形上方空間，最終呈現目標是手機），視野高度預留從 200px 降到 16px，同時修正一個先前遺漏未同步調整的預留高度舊值
+
+**完成項目**：
+- M2D3 一般房間地圖骨架已完成並合併進 `main`：[計畫](superpowers/plans/2026-08-14-m2d3-general-room-skeleton.md)、[設計文件](superpowers/specs/2026-08-14-m2d3-general-room-skeleton-design.md)
+- 大廳單人角色選擇、玩家圖標依方向定位、道具真實名稱顯示、人物面板文字對比度／姓名／行動力／屬性刻度數值等 5 項修正已完成並合併
+- 視野正方形置中最大化版面（左中右三欄，中間固定寬＝視野正方形、左右平分剩餘空間、標題與按鈕移至左欄、70%/15%/15% 比例）已完成並合併
+- Handover.md 更新完成
+
+**遇到瓶頸**：
+- SDD Task 6 審查抓到的 Critical 其實是 agent 自己撰寫計畫時的疏漏（Step 2 程式碼跟 Step 3 文字說明互相矛盾），非 implementer 誤判——這次的教訓是計畫自我審查階段對「文字承諾」跟「程式碼實際行為」要交叉核對，不能只個別檢查
+- 版面需求前後修正了 3 輪，前兩輪開發者回報「不是我要的」，第三輪開發者直接提供精確像素比例（70%/15%/15%）跟明確約束（手機呈現、盡量最大化）才收斂——抽象的版面描述（如「填滿中央區域」）容易產生認知落差，具體數字規格才能一次到位
+- 過程中連續踩到兩個 CSS/flexbox 細節坑：忘記在按鈕搬到左欄後同步調小視野高度的預留空間；padding 直接加在 flex 欄位上會頂住 `minWidth:0` 的縮放下限，都是先發現版面數字對不上、實測比對公式才抓出來
+
+**開發者交代備忘事項**：
+- 下階段預計開發者會用手機實際測試這次的最大化置中版面，帶著回饋回來討論
+- 目前的除錯框線（左中右三欄的紅／綠／藍虛線）仍是暫時性的，等開發者確認版面無誤後要移除
+- 角色圖片去背仍待開發者自行提供新圖檔，尚未收到
+
