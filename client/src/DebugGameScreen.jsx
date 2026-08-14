@@ -30,6 +30,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setPrompt(data);
     }
     function onPromptResolved(data) {
+      setLastPromptResolved(data);
       setMessages((prev) => [...prev, `提問結果：${JSON.stringify(data)}`]);
       setPrompt(null);
       setPendingRollChoice(null);
