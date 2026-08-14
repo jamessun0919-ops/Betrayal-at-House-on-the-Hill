@@ -1,5 +1,5 @@
 import RoomTile from './RoomTile';
-import PlayerBadge, { PLAYER_COLORS } from './PlayerBadge';
+import PlayerBadge from './PlayerBadge';
 import { getAvailableDirections, findRoomInfo } from './mapUtils';
 
 const TILE_SIZE = 360;
