@@ -17,9 +17,9 @@ function makeContent(overrides = {}) {
     ],
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
     cards: { events: [], items: [], omens: [] },
@@ -445,9 +445,9 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
   expect(startedPayload.roomContent).toEqual({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
   });
@@ -728,9 +728,9 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
 test('game:move applies a room\'s leaveCheck before allowing the player to move out, blocking on a failed roll', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
   });
@@ -756,9 +756,9 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
 test('game:move with an eligible interjection item held on a leaveCheck room pauses for a roll choice instead of resolving immediately', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
     cards: {
@@ -801,9 +801,9 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
 function makeLeaveCheckInterjectionContent() {
   return makeContent({
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
     cards: {
@@ -1040,9 +1040,9 @@ test('game:endTurn rejects the caller while they are controlling an active summo
 test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the player ends their turn there', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
   });
@@ -1054,7 +1054,7 @@ test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the 
   const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(result.error).toBeUndefined();
   expect(player.stats.sanity.currentIndex).toBe(baseSanity + 1);
-  expect(player.roomBonusesReceived).toEqual(['room_entrance_hall']);
+  expect(player.roomBonusesReceived).toEqual(['room_lobby_b']);
 
   clientA.close();
   clientB.close();
@@ -1064,9 +1064,9 @@ test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the 
 test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the player has already received it', async () => {
   const content = makeContent({
     startingRooms: [
-      { id: 'room_entrance_hall', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
-      { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-      { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
     ],
   });
@@ -1081,7 +1081,7 @@ test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the 
   await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
   await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex + 1); // unchanged
-  expect(player.roomBonusesReceived).toEqual(['room_entrance_hall']); // not duplicated
+  expect(player.roomBonusesReceived).toEqual(['room_lobby_b']); // not duplicated
 
   clientA.close();
   clientB.close();

@@ -7,38 +7,40 @@ const DIRECTION_DELTA = {
   west: { dx: -1, dy: 0 },
 };
 
-const ALL_SIDES = ['north', 'east', 'south', 'west'];
-
 function coordKey(x, y) {
   return `${x},${y}`;
 }
 
-function placeFixedRoom(grid, roomId, x, y) {
-  grid.set(coordKey(x, y), { roomId, x, y, doorSides: ALL_SIDES.slice(), droppedItems: [] });
+function placeFixedRoom(grid, roomId, x, y, doorSides) {
+  grid.set(coordKey(x, y), { roomId, x, y, doorSides: doorSides.slice(), droppedItems: [] });
 }
 
 function createBoard(startingRooms) {
   const ground = new Map();
   const upper = new Map();
 
-  const entranceHall = startingRooms.find((r) => r.id === 'room_entrance_hall');
-  const foyer = startingRooms.find((r) => r.id === 'room_foyer');
-  const grandStaircase = startingRooms.find((r) => r.id === 'room_grand_staircase');
+  const lobbyA = startingRooms.find((r) => r.id === 'room_lobby_a');
+  const lobbyB = startingRooms.find((r) => r.id === 'room_lobby_b');
+  const lobbyC = startingRooms.find((r) => r.id === 'room_lobby_c');
   const upperLanding = startingRooms.find((r) => r.id === 'room_upper_landing');
 
-  if (!entranceHall || !foyer || !grandStaircase || !upperLanding) {
+  if (!lobbyA || !lobbyB || !lobbyC || !upperLanding) {
     throw new Error('MISSING_STARTING_ROOM');
   }
 
-  placeFixedRoom(ground, entranceHall.id, 0, 0);
-  placeFixedRoom(ground, foyer.id, 4, 0);
-  placeFixedRoom(ground, grandStaircase.id, -4, 0);
-  placeFixedRoom(upper, upperLanding.id, 0, 0);
+  // The three-room entrance hall is drawn as one continuous space with no
+  // walls between adjacent lobby tiles (see the room-art prompts) -- it's
+  // placed vertically, lobbyB at the origin, lobbyA to its south (below),
+  // lobbyC to its north (above, leading up to the upper landing).
+  placeFixedRoom(ground, lobbyA.id, 0, 1, ['north', 'east', 'west']);
+  placeFixedRoom(ground, lobbyB.id, 0, 0, ['north', 'south', 'east', 'west']);
+  placeFixedRoom(ground, lobbyC.id, 0, -1, ['west', 'south']);
+  placeFixedRoom(upper, upperLanding.id, 0, 0, ['north', 'east', 'west']);
 
   return {
     ground,
     upper,
-    stairsLink: { groundRoomId: grandStaircase.id, upperRoomId: upperLanding.id },
+    stairsLink: { groundRoomId: lobbyC.id, upperRoomId: upperLanding.id },
   };
 }
 

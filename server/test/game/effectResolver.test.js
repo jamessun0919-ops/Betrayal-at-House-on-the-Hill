@@ -3,9 +3,9 @@ const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { createPromptState, respondToPrompt } = require('../../src/game/promptState');
 
 const STARTING_ROOMS = [
-  { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-  { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-  { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+  { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
 ];
 

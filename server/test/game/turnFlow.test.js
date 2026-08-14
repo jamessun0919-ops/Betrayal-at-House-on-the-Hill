@@ -16,9 +16,9 @@ const {
 } = require('../../src/game/turnFlow');
 
 const STARTING_ROOMS = [
-  { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-  { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-  { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+  { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
 ];
 
@@ -355,10 +355,10 @@ test('endTurn throws SUMMON_ACTIVE when the player has an active summon', () => 
   expect(() => endTurn(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
 });
 
-test('canUseStairs returns true in the Grand Staircase room on the ground floor', () => {
+test('canUseStairs returns true in room_lobby_c on the ground floor', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  player.x = -4;
-  player.y = 0; // fixed position of room_grand_staircase
+  player.x = 0;
+  player.y = -1; // fixed position of room_lobby_c
   expect(canUseStairs(gameState, 'p1')).toBe(true);
 });
 
@@ -372,14 +372,14 @@ test('canUseStairs returns true in the Upper Landing room on the upper floor', (
 
 test('canUseStairs returns false when the player is not at a stairs-linked room', () => {
   const { gameState } = makeGameStateWithPlayer();
-  // Default player position is the entrance hall (0,0), not the stairs room.
+  // Default player position is room_lobby_b (0,0), not the stairs room.
   expect(canUseStairs(gameState, 'p1')).toBe(false);
 });
 
 test('useStairs moves the player to the linked room on the other floor without spending action points', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  player.x = -4;
-  player.y = 0; // Grand Staircase
+  player.x = 0;
+  player.y = -1; // room_lobby_c
   const startingAP = player.actionPoints;
   const result = useStairs(gameState, 'p1');
   expect(result).toEqual({ kind: 'stairs', floor: 'upper', x: 0, y: 0 });
@@ -397,8 +397,8 @@ test('useStairs throws STAIRS_NOT_AVAILABLE when the player is not at a stairs-l
 test('useStairs throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
   const { gameState } = makeGameStateWithPlayer();
   const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player2.x = -4;
-  player2.y = 0; // Grand Staircase
+  player2.x = 0;
+  player2.y = -1; // room_lobby_c
   gameState.turnOrder = ['p1', 'p2'];
   gameState.currentPlayerIndex = 0; // p1's turn
   expect(() => useStairs(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
@@ -406,8 +406,8 @@ test('useStairs throws NOT_YOUR_TURN when called by a player who is not the curr
 
 test('useStairs throws SUMMON_ACTIVE when the player is controlling a summon', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  player.x = -4;
-  player.y = 0; // Grand Staircase -- stairs would otherwise be available
+  player.x = 0;
+  player.y = -1; // room_lobby_c -- stairs would otherwise be available
   player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
   expect(() => useStairs(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
 });

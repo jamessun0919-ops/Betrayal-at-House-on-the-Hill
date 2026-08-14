@@ -1,43 +1,57 @@
 const { createBoard, placeNewRoom, coordKey, canMoveBetween } = require('../../src/game/boardGenerator');
 
 const STARTING_ROOMS = [
-  { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-  { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-  { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
-  { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+  { id: 'room_lobby_a', name: '大門廳', floor: 'ground', filename: 'LobbyA.webp' },
+  { id: 'room_lobby_b', name: '大門廳', floor: 'ground', filename: 'LobbyB.webp' },
+  { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing', filename: 'LobbyC.webp' },
+  { id: 'room_upper_landing', name: '二樓平台', floor: 'upper', filename: '2Fladder.webp' },
 ];
 
-test('createBoard places the four starting rooms at their fixed coordinates', () => {
+test('createBoard places the four starting rooms at their fixed coordinates with the correct doorSides', () => {
   const board = createBoard(STARTING_ROOMS);
 
-  expect(board.ground.get(coordKey(0, 0)).roomId).toBe('room_entrance_hall');
-  expect(board.ground.get(coordKey(4, 0)).roomId).toBe('room_foyer');
-  expect(board.ground.get(coordKey(-4, 0)).roomId).toBe('room_grand_staircase');
-  expect(board.upper.get(coordKey(0, 0)).roomId).toBe('room_upper_landing');
+  const lobbyA = board.ground.get(coordKey(0, 1));
+  expect(lobbyA.roomId).toBe('room_lobby_a');
+  expect(lobbyA.doorSides.slice().sort()).toEqual(['east', 'north', 'west']);
+
+  const lobbyB = board.ground.get(coordKey(0, 0));
+  expect(lobbyB.roomId).toBe('room_lobby_b');
+  expect(lobbyB.doorSides.slice().sort()).toEqual(['east', 'north', 'south', 'west']);
+
+  const lobbyC = board.ground.get(coordKey(0, -1));
+  expect(lobbyC.roomId).toBe('room_lobby_c');
+  expect(lobbyC.doorSides.slice().sort()).toEqual(['south', 'west']);
+
+  const upperLanding = board.upper.get(coordKey(0, 0));
+  expect(upperLanding.roomId).toBe('room_upper_landing');
+  expect(upperLanding.doorSides.slice().sort()).toEqual(['east', 'north', 'west']);
+
   expect(board.stairsLink).toEqual({
-    groundRoomId: 'room_grand_staircase',
+    groundRoomId: 'room_lobby_c',
     upperRoomId: 'room_upper_landing',
   });
 });
 
 test('placeNewRoom places a room at the correct coordinate for each direction', () => {
   const board = createBoard(STARTING_ROOMS);
+  // Away from the lobby footprint (x=0 column) so both directions land empty.
 
-  const north = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'north', { id: 'room_a', doors: 4 });
-  expect(north).toMatchObject({ roomId: 'room_a', x: 0, y: -1 });
+  const north = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'north', { id: 'room_a', doors: 4 });
+  expect(north).toMatchObject({ roomId: 'room_a', x: 5, y: 4 });
 
-  const east = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'east', { id: 'room_b', doors: 4 });
-  expect(east).toMatchObject({ roomId: 'room_b', x: 1, y: 0 });
+  const east = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'east', { id: 'room_b', doors: 4 });
+  expect(east).toMatchObject({ roomId: 'room_b', x: 6, y: 5 });
 
-  expect(board.ground.get(coordKey(0, -1)).roomId).toBe('room_a');
-  expect(board.ground.get(coordKey(1, 0)).roomId).toBe('room_b');
+  expect(board.ground.get(coordKey(5, 4)).roomId).toBe('room_a');
+  expect(board.ground.get(coordKey(6, 5)).roomId).toBe('room_b');
 });
 
 test('placeNewRoom always includes a door on the side facing back toward the entry room', () => {
   const board = createBoard(STARTING_ROOMS);
-  // Moving south from entrance hall — the new room's entry side is north
-  // (the side facing back toward where the player came from).
-  const placed = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'south', { id: 'room_c', doors: 1 });
+  // Moving south from an empty coordinate (away from the lobby footprint) —
+  // the new room's entry side is north (facing back toward where the
+  // player came from).
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'south', { id: 'room_c', doors: 1 });
   expect(placed.doorSides).toEqual(['north']);
 });
 
@@ -60,16 +74,17 @@ test('placeNewRoom resolves conflicts against an already-placed neighbor', () =>
 
 test('placeNewRoom passes roomDefinition.doorPattern through to the door layout for doors:2', () => {
   const board = createBoard(STARTING_ROOMS);
-  // Moving south from (0,0) lands the new room at (0,1); its entry side
-  // (facing back toward where the player came from) is north.
+  // Moving south from (5,5) (away from the lobby footprint) lands the new
+  // room at (5,6); its entry side (facing back toward where the player
+  // came from) is north.
   for (let i = 0; i < 20; i++) {
-    const placed = placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'south', {
+    const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'south', {
       id: `room_opposite_${i}`,
       doors: 2,
       doorPattern: 'opposite',
     });
     expect(placed.doorSides.slice().sort()).toEqual(['north', 'south']);
-    board.ground.delete(coordKey(0, 1));
+    board.ground.delete(coordKey(5, 6));
   }
 });
 
@@ -83,11 +98,11 @@ test('placeNewRoom throws INVALID_ROOM_DOORS for a malformed door count', () => 
 test('placeNewRoom throws ROOM_ALREADY_PLACED when the target coordinate is occupied', () => {
   const board = createBoard(STARTING_ROOMS);
   expect(() =>
-    placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'north', { id: 'room_dup', doors: 4 })
-  ).not.toThrow(); // lands at (0,-1), empty
+    placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'north', { id: 'room_dup', doors: 4 })
+  ).not.toThrow(); // lands at (5,4), empty
   expect(() =>
-    placeNewRoom(board, 'ground', { x: 0, y: -2 }, 'south', { id: 'room_dup2', doors: 4 })
-  ).toThrow('ROOM_ALREADY_PLACED'); // also lands at (0,-1), now occupied
+    placeNewRoom(board, 'ground', { x: 5, y: 3 }, 'south', { id: 'room_dup2', doors: 4 })
+  ).toThrow('ROOM_ALREADY_PLACED'); // also lands at (5,4), now occupied
 });
 
 test('placeNewRoom throws INVALID_DIRECTION for invalid direction', () => {
@@ -123,8 +138,8 @@ test('placeNewRoom throws INVALID_FROM_COORD for a malformed fromCoord', () => {
 
 test('createBoard places starting rooms with an empty droppedItems array', () => {
   const board = createBoard(STARTING_ROOMS);
-  const entranceHall = board.ground.get('0,0');
-  expect(entranceHall.droppedItems).toEqual([]);
+  const lobbyB = board.ground.get('0,0');
+  expect(lobbyB.droppedItems).toEqual([]);
 });
 
 test('placeNewRoom creates a room with an empty droppedItems array', () => {
@@ -135,19 +150,19 @@ test('placeNewRoom creates a room with an empty droppedItems array', () => {
 
 test('createBoard throws MISSING_STARTING_ROOM when a required starting room is missing', () => {
   const incompleteRooms = [
-    { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-    { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-    // Missing room_grand_staircase and room_upper_landing
+    { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+    { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+    // Missing room_lobby_c and room_upper_landing
   ];
   expect(() => createBoard(incompleteRooms)).toThrow('MISSING_STARTING_ROOM');
 });
 
 test('canMoveBetween returns true when both rooms agree there is a door on the shared side', () => {
   const board = createBoard(STARTING_ROOMS);
-  // entrance hall (0,0) has doors on all 4 sides (fixed starting room).
-  // Place a room to its north with doors:4 -> it will also have a door facing south (entry side).
-  placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'north', { id: 'room_a', doors: 4 });
-  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(true);
+  // room_lobby_b (0,0) has doors on all 4 sides (fixed starting room).
+  // Place a room to its east with doors:4 -> it will also have a door facing west (entry side).
+  placeNewRoom(board, 'ground', { x: 0, y: 0 }, 'east', { id: 'room_a', doors: 4 });
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'east')).toBe(true);
 });
 
 test('canMoveBetween returns false when the neighbor has no door facing back (one-way mismatch)', () => {
@@ -167,7 +182,7 @@ test('canMoveBetween returns false when the origin room itself has no door on th
 
 test('canMoveBetween returns false when the target coordinate is unexplored', () => {
   const board = createBoard(STARTING_ROOMS);
-  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'north')).toBe(false);
+  expect(canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'east')).toBe(false);
 });
 
 test('canMoveBetween throws ROOM_NOT_FOUND when there is no room at fromCoord', () => {

@@ -1,9 +1,9 @@
 const { createGameState, addPlayer, getPlayer, serializeGameState } = require('../../src/game/gameState');
 
 const STARTING_ROOMS = [
-  { id: 'room_entrance_hall', name: '大門廳', floor: 'ground' },
-  { id: 'room_foyer', name: '廊廳', floor: 'ground' },
-  { id: 'room_grand_staircase', name: '梯廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+  { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+  { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
 ];
 
@@ -29,7 +29,7 @@ test('createGameState builds a board, an empty player map, and a room deck', () 
   expect(gameState.players.size).toBe(0);
   expect(gameState.hauntStarted).toBe(false);
   expect(gameState.omenCount).toBe(0);
-  expect(gameState.board.ground.get('0,0').roomId).toBe('room_entrance_hall');
+  expect(gameState.board.ground.get('0,0').roomId).toBe('room_lobby_b');
   expect(gameState.roomDeck.cards).toHaveLength(3);
 });
 
@@ -68,9 +68,9 @@ test('serializeGameState converts the board and players Maps into plain arrays',
 
   expect(Array.isArray(serialized.board.ground)).toBe(true);
   expect(Array.isArray(serialized.board.upper)).toBe(true);
-  expect(serialized.board.ground.some((r) => r.roomId === 'room_entrance_hall')).toBe(true);
+  expect(serialized.board.ground.some((r) => r.roomId === 'room_lobby_b')).toBe(true);
   expect(serialized.board.stairsLink).toEqual({
-    groundRoomId: 'room_grand_staircase',
+    groundRoomId: 'room_lobby_c',
     upperRoomId: 'room_upper_landing',
   });
   expect(Array.isArray(serialized.players)).toBe(true);
