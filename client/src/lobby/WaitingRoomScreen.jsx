@@ -1,19 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { translateError } from './errorMessages';
 
-export default function WaitingRoomScreen({ socket, roomCode, playerId, onLeft }) {
-  const [players, setPlayers] = useState([]);
+export default function WaitingRoomScreen({ socket, roomCode, playerId, players, onLeft }) {
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    function onPlayers(data) {
-      setPlayers(data.players);
-    }
-    socket.on('lobby:players', onPlayers);
-    return () => {
-      socket.off('lobby:players', onPlayers);
-    };
-  }, [socket]);
 
   const me = players.find((p) => p.playerId === playerId);
   const isHost = Boolean(me && me.isHost);

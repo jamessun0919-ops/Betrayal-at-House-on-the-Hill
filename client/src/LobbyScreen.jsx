@@ -21,12 +21,19 @@ export default function LobbyScreen() {
   const [characterSelectState, setCharacterSelectState] = useState(null);
   const [prompt, setPrompt] = useState(null);
   const [gameStartedPayload, setGameStartedPayload] = useState(null);
+  const [players, setPlayers] = useState([]);
 
   useEffect(() => {
     const socket = createSocket();
     socketRef.current = socket;
     socket.on('disconnect', () => setDisconnected(true));
     socket.on('lobby:closed', () => resetToStart());
+    // Subscribed here (not inside WaitingRoomScreen) so it's listening from
+    // the moment the socket connects -- lobby:create's ack and the server's
+    // immediately-following lobby:players broadcast can both arrive before
+    // WaitingRoomScreen would have mounted and subscribed itself, silently
+    // dropping the broadcast (same class of race as game:started below).
+    socket.on('lobby:players', (data) => setPlayers(data.players));
     socket.on('game:prompt', (data) => setPrompt(data));
     socket.on('game:promptResolved', () => setPrompt(null));
     socket.on('game:characterSelectUpdate', (data) => {
@@ -49,6 +56,7 @@ export default function LobbyScreen() {
     setNicknameError('');
     setCharacterSelectState(null);
     setPrompt(null);
+    setPlayers([]);
   }
 
   function handleCreateClick() {
@@ -128,6 +136,7 @@ export default function LobbyScreen() {
           socket={socketRef.current}
           roomCode={roomCode}
           playerId={playerId}
+          players={players}
           onLeft={() => setScreen('lobbyList')}
         />
       )}
