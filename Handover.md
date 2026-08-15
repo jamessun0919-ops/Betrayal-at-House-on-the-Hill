@@ -1,10 +1,10 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-14（第 12 次工作階段，M2D3 一般房間地圖骨架已完成並合併，版面最大化置中調整完成，等待開發者手機實測回饋）
+最後更新：2026-08-15（第 13 次工作階段，手機實測完成：`lobby:players` 競態條件已修復並合併，確認手機為直式螢幕，直式版面規格已記錄待實作）
 
-**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
+**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架、`lobby:players` 競態條件修復皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
 
-**M2D3（遊戲進行畫面）骨架已全部完成，等待開發者手機實測回饋**：設計文件已完成（[docs/superpowers/specs/2026-08-13-m2d3-gameplay-screen-design.md](docs/superpowers/specs/2026-08-13-m2d3-gameplay-screen-design.md)）。三個子範圍皆已合併：①後端資料串接（[計畫](docs/superpowers/plans/2026-08-13-m2d3-backend-data-wiring.md)）②大門廳整合＋遊戲開始畫面（[設計文件](docs/superpowers/specs/2026-08-14-entrance-hall-and-start-screen-design.md)、[計畫](docs/superpowers/plans/2026-08-14-entrance-hall-and-start-screen.md)）③一般房間地圖骨架（[設計文件](docs/superpowers/specs/2026-08-14-m2d3-general-room-skeleton-design.md)、[計畫](docs/superpowers/plans/2026-08-14-m2d3-general-room-skeleton.md)）。**目前的版面（左中右三欄置中最大化）是手動測試多輪迭代出來的結果，開發者下次要用手機實際測試再回饋**，見「目前的瓶頸或停頓點」。
+**M2D3（遊戲進行畫面）骨架已全部完成並通過手機實測，明確卡在「直式版面改版」待實作**：設計文件已完成（[docs/superpowers/specs/2026-08-13-m2d3-gameplay-screen-design.md](docs/superpowers/specs/2026-08-13-m2d3-gameplay-screen-design.md)）。三個子範圍皆已合併：①後端資料串接（[計畫](docs/superpowers/plans/2026-08-13-m2d3-backend-data-wiring.md)）②大門廳整合＋遊戲開始畫面（[設計文件](docs/superpowers/specs/2026-08-14-entrance-hall-and-start-screen-design.md)、[計畫](docs/superpowers/plans/2026-08-14-entrance-hall-and-start-screen.md)）③一般房間地圖骨架（[設計文件](docs/superpowers/specs/2026-08-14-m2d3-general-room-skeleton-design.md)、[計畫](docs/superpowers/plans/2026-08-14-m2d3-general-room-skeleton.md)）。開發者手機實測後確認**最終呈現是直式螢幕，原規劃的橫式版面需要改設計**，已給出明確規格但要求先記錄不實作，見「目前的瓶頸或停頓點」與「下一步行動」。
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -114,7 +114,7 @@
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
-無設計層面阻塞。`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
+無設計層面阻塞。`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**、**`lobby:players` 競態條件修復**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
 
 **手機實測已進行，兩項發現，明確卡在等下次工作階段實作（開發者已指示先記錄、不實作，待額度恢復後進行）**：
 1. **`lobby:players` 廣播競態條件（已修復並合併，`d4d059e`）**：手機單人建房測試時，玩家列表跟房主「準備完成」按鈕完全沒出現（只有房號跟退出按鈕）。根因：`WaitingRoomScreen.jsx` 原本自己在 `useEffect` 掛載後才訂閱 `lobby:players`，但伺服器端 `lobby:create`/`lobby:join` 是「先回 ack、緊接著同步廣播 `lobby:players`」，兩者幾乎同時送達；ack 觸發的 React 狀態更新→重新渲染→`WaitingRoomScreen` 掛載→`useEffect` 執行訂閱，這中間有真實的時間差，廣播如果剛好在這個空窗期送達就會被無聲丟棄，`players` 永遠停在初始值 `[]`。**這個問題其實從一開始就存在，只是過去所有測試都是雙人流程**（第二位玩家加入會觸發補救用的第二次廣播，蓋掉被漏接的第一次），這次開發者手機單人測試（用了上次階段剛加的單人建房功能）才第一次讓它浮現。修法跟 M2D2 的 `game:started`/`initialGameState` 是同一個模式：`lobby:players` 訂閱搬到 `LobbyScreen.jsx` 常駐的 `useEffect`（socket 一建立就開始監聽，早於任何 `lobby:create`/`lobby:join` 送出），往下當 props 餵給 `WaitingRoomScreen`，不再讓子元件自己掛載後才訂閱。已驗證：427/427 後端測試通過（未動後端）、實機瀏覽器單人建房流程正常顯示玩家列表與房主按鈕。
