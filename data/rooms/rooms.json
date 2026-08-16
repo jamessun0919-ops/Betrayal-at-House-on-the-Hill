@@ -140,7 +140,7 @@
     "floor": "upper",
     "size": "1x1",
     "doors": 2,
-    "doorPattern": "opposite",
+    "doorPattern": "adjacent",
     "filename": null,
     "drawType": "event",
     "text": "",
@@ -148,7 +148,7 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_tower",
+    "id": "room_bridge",
     "name": "塔橋",
     "description": "",
     "floor": "upper",
@@ -179,13 +179,12 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_abandoned_room",
+    "id": "room_abandoned",
     "name": "廢棄的房間",
     "description": "",
     "floor": "any",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "adjacent",
+    "doors": 3,
     "filename": null,
     "drawType": "event",
     "text": "",
@@ -214,13 +213,12 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_bedroom",
-    "name": "臥房",
+    "id": "room_maid",
+    "name": "傭人房",
     "description": "",
     "floor": "any",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "adjacent",
+    "doors": 3,
     "filename": null,
     "drawType": "event",
     "text": "",
@@ -228,8 +226,8 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_servants_quarters",
-    "name": "傭人房",
+    "id": "room_guest_1",
+    "name": "乾淨的客房",
     "description": "",
     "floor": "any",
     "size": "1x1",
@@ -242,7 +240,7 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_charred_room",
+    "id": "room_charred",
     "name": "焦黑的房間",
     "description": "",
     "floor": "any",
@@ -256,7 +254,7 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_bloody_room",
+    "id": "room_bloody",
     "name": "染血的房間",
     "description": "",
     "floor": "any",
@@ -357,14 +355,14 @@
     "id": "room_ballroom",
     "name": "舞廳",
     "description": "",
-    "floor": "any",
+    "floor": "ground",
     "size": "1x1",
     "doors": 4,
     "filename": null,
     "drawType": "omen",
-    "text": "",
+    "text": "與二樓的包廂房形成綁定房間：生成舞廳時，需在二樓對應座標同步生成包廂房；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": true
   },
   {
     "id": "room_piano_room",
@@ -411,9 +409,9 @@
     "effects": [],
     "needsCustomLogic": false
   },
-  {
-    "id": "room_guest_room",
-    "name": "客房",
+  { 
+    "id": "room_murder",
+    "name": "兇殺現場",
     "description": "",
     "floor": "ground",
     "size": "1x1",
@@ -443,7 +441,7 @@
     "needsCustomLogic": false
   },
   {
-    "id": "room_baby_room",
+    "id": "room_baby",
     "name": "嬰兒房",
     "description": "",
     "floor": "upper",
@@ -481,5 +479,256 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false
+  },
+  {
+    "id": "room_beast",
+    "name": "野獸房",
+    "description": "",
+    "floor": "ground",
+    "size": "1x1",
+    "doors": 2,
+    "doorPattern": "adjacent",
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_dining",
+    "name": "餐廳",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_operating_lab",
+    "name": "手術室",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_attic",
+    "name": "天花閣樓",
+    "description": "",
+    "floor": "upper",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "離開時，地板突然不穩！需進行速度檢定達3+，否則失去1級力量",
+    "effects": [],
+    "leaveCheck": {
+      "stat": "speed",
+      "min": 3
+    },
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_pentagram",
+    "name": "五芒星室",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "離開時，被儀式嚇到！需進行知識檢定達4+，否則失去1級神志",
+    "effects": [],
+    "leaveCheck": {
+      "stat": "knowledge",
+      "min": 4
+    },
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_graveyard",
+    "name": "墓園",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "氣氛陰沈⋯⋯離開時，需進行神志檢定達4+，否則失去1級知識",
+    "effects": [],
+    "leaveCheck": {
+      "stat": "sanity",
+      "min": 4
+    },
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_catacombs",
+    "name": "地下墓穴",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "這恐怖的地方像迷宮一樣走不出去⋯⋯請進行神志檢定，6+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_chasm",
+    "name": "地底深淵",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "搖搖欲墜的吊橋跨過無底深淵⋯⋯請進行速度檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_furnace",
+    "name": "鍋爐室",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "若你在此房結束你的回合，則受到1級物理傷害。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_crypt",
+    "name": "地窖",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "若你在此房結束你的回合，則受到1級神志傷害。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_wine_cellar",
+    "name": "酒窖",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_storeroom",
+    "name": "倉庫",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_junk_room",
+    "name": "髒亂的房間",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "離開時，被垃圾絆住了！需進行力量檢定達3+，否則失去1級速度",
+    "effects": [],
+    "leaveCheck": {
+      "stat": "might",
+      "min": 3
+    },
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_organ_room",
+    "name": "風琴室",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_underground_lake",
+    "name": "地下湖",
+    "description": "",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_gallery",
+    "name": "包廂房",
+    "description": "",
+    "floor": "upper",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "與一樓的舞廳形成綁定房間：生成包廂房時，需在一樓對應座標同步生成舞廳；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。在舞廳被探索出來之後，玩家可選擇從包廂房躍下，進入舞廳中，並受到1顆骰的物理傷害。此跳躍無需耗移動點數。",
+    "effects": [],
+    "needsCustomLogic": true
+  },
+  {
+    "id": "room_bedroom",
+    "name": "臥房",
+    "description": "",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false
+  },
+  {
+    "id": "room_collapsed_room",
+    "name": "崩塌的房間",
+    "description": "",
+    "floor": "ground",
+    "size": "1x1",
+    "doors": 2,
+    "filename": null,
+    "drawType": "event",
+    "text": "首位進入者，接受速度檢定，5+得以閃過地板大洞！若檢定失敗，探險者掉進地下室，在正下方座標（同一水平位置，地下室樓層）生成一張新地下室房間卡，並受到1顆骰子的物理傷害。之後進來的玩家可自由選擇是否跳入地板大洞抵達同一間地下室房間，無需耗移動點數，同樣受到1顆骰子的物理傷害。",
+    "effects": [],
+    "needsCustomLogic": true
   }
 ]
