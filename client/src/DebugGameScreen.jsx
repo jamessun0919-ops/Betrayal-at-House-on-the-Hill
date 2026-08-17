@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
@@ -55,6 +55,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
   const [pendingRollChoice, setPendingRollChoice] = useState(null);
   const [pendingCheckQueue, setPendingCheckQueue] = useState([]);
+  // Monotonic id generator for pendingCheckQueue items -- CheckModal keys off
+  // pendingCheckQueue[0].queueId (not the queue's length) so appending a new
+  // item to the tail while the front item is still showing doesn't remount
+  // and reset the in-progress check's phase.
+  const nextCheckQueueId = useRef(0);
   const [overrideInput, setOverrideInput] = useState('0');
 
   useEffect(() => {
@@ -84,7 +89,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       if (!data.hasCheck) {
         setPendingCheckQueue((prev) => [
           ...prev,
-          { noCheck: true, playerId: data.playerId, sourceKind: data.deckType, sourceId: data.cardId },
+          { noCheck: true, playerId: data.playerId, sourceKind: data.deckType, sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
         ]);
       }
       const card = findCardInfo(data.cardId, cardContent);
@@ -106,7 +111,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       // handler below) -- writing it immediately would spoil the result
       // through the modal's semi-transparent backdrop before the roll.
       const logMessage = `${playerName}：${statLabel}考驗${data.passed ? '成功' : '失敗'}（擲出 ${data.rolled} 點）`;
-      setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data, logMessage }]);
+      setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data, logMessage, queueId: nextCheckQueueId.current++ }]);
     }
     function onRoomEntered(data) {
       const room = findRoomInfo(data.roomId, roomContent);
@@ -406,7 +411,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           )}
           {pendingCheckQueue.length > 0 && !pendingCheckQueue[0].noCheck && (
             <CheckModal
-              key={pendingCheckQueue.length}
+              key={pendingCheckQueue[0].queueId}
               check={pendingCheckQueue[0]}
               roomContent={roomContent}
               cardContent={cardContent}
