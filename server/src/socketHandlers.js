@@ -695,7 +695,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     return { pending: false };
   }
   const card = drawCard(deck);
-  const hasCheck = Array.isArray(card.effects) && card.effects.some((e) => e.type === 'dice_check');
+  const hasCheck = !card.activatedOnUse && Array.isArray(card.effects) && card.effects.some((e) => e.type === 'dice_check');
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name, hasCheck });
 
   if (deckType === 'omen') {

@@ -44,7 +44,7 @@ const boxStyle = {
 export default function CheckModal({ check, roomContent, cardContent, onDone }) {
   const [phase, setPhase] = useState('before'); // 'before' | 'animating' | 'result'
   const source = resolveSource(check, roomContent, cardContent);
-  const statLabel = STAT_LABELS[check.stat] || check.stat;
+  const statLabel = STAT_LABELS[check.stat] || '';
 
   function handleRoll() {
     setPhase('animating');
@@ -93,7 +93,7 @@ export default function CheckModal({ check, roomContent, cardContent, onDone }) 
         <p style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 12 }}>{source.name}</p>
         <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>{source.text}</p>
         <div style={{ backgroundColor: '#1c1c1c', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 15 }}>
-          <div>考驗屬性：{statLabel}</div>
+          {statLabel && <div>考驗屬性：{statLabel}</div>}
           {check.threshold != null && <div>需要：{check.threshold} 以上</div>}
         </div>
         <button style={{ width: '100%', fontSize: 18, padding: 12 }} onClick={handleRoll}>

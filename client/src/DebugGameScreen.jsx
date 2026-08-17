@@ -98,14 +98,15 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setMessages((prev) => [...prev, templateByDeck[data.deckType] || `${playerName} 抽到了 ${cardName}`]);
     }
     function onCheckResolved(data) {
-      setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data }]);
       const playerName = findPlayerName(data.playerId, gameState?.players);
       const STAT_LABELS_LOCAL = { might: '力量', speed: '速度', knowledge: '知識', sanity: '意志' };
-      const statLabel = STAT_LABELS_LOCAL[data.stat] || data.stat;
-      setMessages((prev) => [
-        ...prev,
-        `${playerName}：${statLabel}考驗${data.passed ? '成功' : '失敗'}（擲出 ${data.rolled} 點）`,
-      ]);
+      const statLabel = STAT_LABELS_LOCAL[data.stat] || '';
+      // Message text is precomputed here but only appended to the message log
+      // once the player dismisses this check's CheckModal (see the onDone
+      // handler below) -- writing it immediately would spoil the result
+      // through the modal's semi-transparent backdrop before the roll.
+      const logMessage = `${playerName}：${statLabel}考驗${data.passed ? '成功' : '失敗'}（擲出 ${data.rolled} 點）`;
+      setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data, logMessage }]);
     }
     function onRoomEntered(data) {
       const room = findRoomInfo(data.roomId, roomContent);
@@ -351,7 +352,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                zIndex: 50,
+                // Must render above CheckModal's zIndex 70 -- this interjection
+                // prompt has a real 20s server-side deadline, while CheckModal
+                // is purely a cosmetic reveal-delay with no deadline of its own.
+                zIndex: 80,
               }}
             >
               <div style={{ backgroundColor: '#fff', padding: 16, maxWidth: '90%', maxHeight: '80%', overflow: 'auto', borderRadius: 8 }}>
@@ -402,10 +406,14 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           )}
           {pendingCheckQueue.length > 0 && !pendingCheckQueue[0].noCheck && (
             <CheckModal
+              key={pendingCheckQueue.length}
               check={pendingCheckQueue[0]}
               roomContent={roomContent}
               cardContent={cardContent}
-              onDone={() => setPendingCheckQueue((prev) => prev.slice(1))}
+              onDone={() => {
+                setMessages((prev) => [...prev, pendingCheckQueue[0].logMessage]);
+                setPendingCheckQueue((prev) => prev.slice(1));
+              }}
             />
           )}
           {pendingCheckQueue.length > 0 && pendingCheckQueue[0].noCheck && (
