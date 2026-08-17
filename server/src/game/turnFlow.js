@@ -74,12 +74,17 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     throw new Error('INVALID_MOVE_DIRECTION');
   }
 
+  let leaveCheckResult;
   if (leaveCheck) {
     // e.g. 塔橋/雜亂的房間/藤蔓糾纏的溫室 -- leaving this room (either to an
     // already-placed neighbor or by opening a new door) requires a stat
     // check first. A failed check costs the same 1 AP a normal move
     // attempt would, and never draws/places a new room -- the player never
     // actually left, so nothing about the door they tried is revealed.
+    // Captured unconditionally (not just in the direct-roll sub-branch below)
+    // so it's available whether this call rolls synchronously or receives an
+    // already-resolved roll via resolvedRoll (the dice-interjection resume path).
+    const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
     const { itemCatalog, resolvedRoll, rng } = rollOptions;
     let rolled;
     if (resolvedRoll !== undefined) {
@@ -91,12 +96,18 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
         // pendingRollChoice and resumes with a resolvedRoll instead.
         return { kind: 'leaveCheckPending', rollChoice: true, options, leaveCheck, direction };
       }
-      const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
       const modifiers = [...(player.modifiers || []), ...(room.modifiers || [])];
       const diceCount = getStatValue(player, leaveCheck.stat);
       const adjustedCount = Math.max(1, Math.min(8, applyModifiers(diceCount, modifiers, 'onBeforeRoll', {})));
       rolled = applyModifiers(rollDice(adjustedCount, rng || Math.random), modifiers, 'onAfterRoll', {});
     }
+    leaveCheckResult = {
+      stat: leaveCheck.stat,
+      roomId: room.roomId,
+      rolled,
+      required: leaveCheck.min,
+      passed: rolled >= leaveCheck.min,
+    };
     if (rolled < leaveCheck.min) {
       player.actionPoints -= 1;
       if (leaveCheck.failPenalty) {
@@ -107,7 +118,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
         // so this is skipped for them, matching their sourced text exactly.
         changeStat(player, leaveCheck.failPenalty.stat, leaveCheck.failPenalty.delta, gameState.hauntStarted);
       }
-      return { kind: 'leaveCheckFailed', rolled, required: leaveCheck.min };
+      return { kind: 'leaveCheckFailed', rolled, required: leaveCheck.min, leaveCheckResult };
     }
   }
 
@@ -117,7 +128,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   if (choice.kind === 'move') {
     movePlayerTo(player, player.floor, targetCoord.x, targetCoord.y, OPPOSITE_SIDE[direction]);
     player.actionPoints -= 1;
-    return { kind: 'move', x: targetCoord.x, y: targetCoord.y };
+    return { kind: 'move', x: targetCoord.x, y: targetCoord.y, ...(leaveCheckResult ? { leaveCheckResult } : {}) };
   }
 
   // 舞廳 & 包廂房 -- drawing either one must also place its pair at the same
@@ -170,6 +181,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
         y: placedRoom.y,
         roomId: placedRoom.roomId,
         pendingCardDraw,
+        ...(leaveCheckResult ? { leaveCheckResult } : {}),
       };
     }
     const diceCount = getStatValue(player, COLLAPSE_CHECK_STAT);
@@ -182,6 +194,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
       roomId: placedRoom.roomId,
       pendingCardDraw,
       collapseResult,
+      ...(leaveCheckResult ? { leaveCheckResult } : {}),
     };
   }
 
@@ -191,6 +204,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     y: placedRoom.y,
     roomId: placedRoom.roomId,
     pendingCardDraw,
+    ...(leaveCheckResult ? { leaveCheckResult } : {}),
   };
 }
 
@@ -227,7 +241,7 @@ function placeBallroomGalleryPair(gameState, roomDefinition, placedRoom) {
 // doesn't exist yet. This is a known, deliberate gap, not an oversight.
 function applyCollapseCheck(gameState, player, placedRoom, rolled) {
   if (rolled >= COLLAPSE_CHECK_MIN) {
-    return { fell: false, rolled };
+    return { fell: false, rolled, stat: COLLAPSE_CHECK_STAT, required: COLLAPSE_CHECK_MIN };
   }
   const guaranteedSide = SIDES[Math.floor(Math.random() * SIDES.length)];
   const basementRoomDefinition = drawRoom(gameState.roomDeck, 'basement');
@@ -244,7 +258,15 @@ function applyCollapseCheck(gameState, player, placedRoom, rolled) {
   // leads without re-rolling -- see the room_action jump-down mechanic.
   placedRoom.collapseLink = { x: basementRoom.x, y: basementRoom.y };
   movePlayerTo(player, 'basement', basementRoom.x, basementRoom.y, null);
-  return { fell: true, rolled, basementRoomId: basementRoom.roomId, x: basementRoom.x, y: basementRoom.y };
+  return {
+    fell: true,
+    rolled,
+    stat: COLLAPSE_CHECK_STAT,
+    required: COLLAPSE_CHECK_MIN,
+    basementRoomId: basementRoom.roomId,
+    x: basementRoom.x,
+    y: basementRoom.y,
+  };
 }
 
 // Called from socketHandlers.js after a pending collapse-check roll choice

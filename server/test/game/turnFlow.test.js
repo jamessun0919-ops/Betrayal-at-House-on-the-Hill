@@ -150,7 +150,12 @@ test('moveToRoom with a leaveCheck: passing the roll moves the player and costs 
   const startingAP = player.actionPoints;
   const rng = () => 0.99; // every die -> face 2; might value 3 -> sum 6, passes min:3
   const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng });
-  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(result).toEqual({
+    kind: 'move',
+    x: -1,
+    y: 1,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
+  });
   expect(player.x).toBe(-1);
   expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1); // not double-charged
@@ -162,14 +167,24 @@ test('moveToRoom with a leaveCheck: failing the roll blocks the move, costs exac
   const startingAP = player.actionPoints;
   const failRng = () => 0; // every die -> face 0; might value 3 -> sum 0, fails min:3
   const failResult = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng: failRng });
-  expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
+  expect(failResult).toEqual({
+    kind: 'leaveCheckFailed',
+    rolled: 0,
+    required: 3,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 0, required: 3, passed: false },
+  });
   expect(player.x).toBe(0); // unmoved
   expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1);
 
   const passRng = () => 0.99;
   const retryResult = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng: passRng });
-  expect(retryResult).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(retryResult).toEqual({
+    kind: 'move',
+    x: -1,
+    y: 1,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
+  });
   expect(player.actionPoints).toBe(startingAP - 2);
 });
 
@@ -208,7 +223,12 @@ test('moveToRoom with a leaveCheck also gates opening a new door: failure does n
   const startingAP = player.actionPoints;
   const failRng = () => 0;
   const failResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, { rng: failRng });
-  expect(failResult).toEqual({ kind: 'leaveCheckFailed', rolled: 0, required: 3 });
+  expect(failResult).toEqual({
+    kind: 'leaveCheckFailed',
+    rolled: 0,
+    required: 3,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 0, required: 3, passed: false },
+  });
   expect(player.x).toBe(0); // unmoved -- no room was drawn or placed
   expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1); // not zeroed -- opening never happened
@@ -252,7 +272,12 @@ test('moveToRoom with a leaveCheck: a room-level onBeforeRoll modifier affects t
   // With the -1 onBeforeRoll modifier, 2 dice at face 2 -> sum 4, fails min:5.
   const rng = () => 0.99; // every die -> face 2
   const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 5 }, { rng });
-  expect(result).toEqual({ kind: 'leaveCheckFailed', rolled: 4, required: 5 });
+  expect(result).toEqual({
+    kind: 'leaveCheckFailed',
+    rolled: 4,
+    required: 5,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 4, required: 5, passed: false },
+  });
 });
 
 test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning and internal rolling, even with an eligible item held', () => {
@@ -264,7 +289,12 @@ test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning an
   ];
   const startingAP = player.actionPoints;
   const result = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { resolvedRoll: 6, itemCatalog });
-  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(result).toEqual({
+    kind: 'move',
+    x: -1,
+    y: 1,
+    leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
+  });
   expect(player.actionPoints).toBe(startingAP - 1);
 });
 
@@ -399,7 +429,7 @@ test('moveToRoom into room_collapsed_room: passing the speed check (5+) leaves t
   const result = moveToRoom(gameState, 'p1', 'east', null, { rng: passRng });
   expect(result.kind).toBe('open_door');
   expect(result.roomId).toBe('room_collapsed_room');
-  expect(result.collapseResult).toEqual({ fell: false, rolled: 8 });
+  expect(result.collapseResult).toEqual({ fell: false, rolled: 8, stat: 'speed', required: 5 });
   expect(player.floor).toBe('ground');
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
@@ -437,6 +467,19 @@ test('moveToRoom into room_collapsed_room with an eligible interjection item ret
   // The room-entry move itself already happened -- only the roll is pending.
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
+});
+
+test('moveToRoom into the collapsed room: a passing speed check now also reports stat/required for display', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_collapsed_room', doors: 4, floor: 'ground' },
+  ]);
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  const rng = () => 0.99; // every die -> face 2; speed value should clear COLLAPSE_CHECK_MIN (5)
+  const result = moveToRoom(gameState, 'p1', 'east', null, { rng });
+  expect(result.kind).toBe('open_door');
+  expect(result.collapseResult.fell).toBe(false);
+  expect(result.collapseResult.stat).toBe('speed');
+  expect(result.collapseResult.required).toBe(5);
 });
 
 test('resumeCollapseCheck resolves the outcome for a player already standing in the collapsed room', () => {
