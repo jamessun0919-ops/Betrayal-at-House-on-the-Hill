@@ -37,6 +37,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   // static reference data sent once on game:started, not part of
   // game:stateUpdate's payload.
   const [cardContent] = useState(initialGameState?.cardContent || null);
+  // Same pattern again -- characterContent (portrait/icon filenames) is
+  // static reference data sent once on game:started, not part of
+  // game:stateUpdate's payload.
+  const [characterContent] = useState(initialGameState?.characterContent || null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
   const [actionError, setActionError] = useState('');
   const [messages, setMessages] = useState([]);
@@ -174,7 +178,12 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
     currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
-    hasRoomForFloor = me.floor === 'ground' ? gameState.roomDeck.hasRoomForGround : gameState.roomDeck.hasRoomForUpper;
+    hasRoomForFloor =
+      me.floor === 'ground'
+        ? gameState.roomDeck.hasRoomForGround
+        : me.floor === 'upper'
+          ? gameState.roomDeck.hasRoomForUpper
+          : gameState.roomDeck.hasRoomForBasement;
     directions = getAvailableDirections(me, currentRoom, gameState.board[me.floor]).filter(
       (d) => d.kind === 'move' || hasRoomForFloor
     );
@@ -263,6 +272,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                       roomContent={roomContent}
                       roomsInSameSpot={roomsInSameSpot}
                       allPlayers={gameState.players}
+                      characterContent={characterContent}
                       directions={directions}
                       onMove={handleMove}
                     />

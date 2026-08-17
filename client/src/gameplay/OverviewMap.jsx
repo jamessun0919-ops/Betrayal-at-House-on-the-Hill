@@ -14,6 +14,9 @@ export default function OverviewMap({ visitedRooms, floor, onFloorChange, boardR
         <button onClick={() => onFloorChange('upper')} disabled={floor === 'upper'}>
           樓上
         </button>
+        <button onClick={() => onFloorChange('basement')} disabled={floor === 'basement'}>
+          地下室
+        </button>
       </div>
       {onThisFloor.length === 0 ? (
         <p>這個樓層還沒探索過</p>

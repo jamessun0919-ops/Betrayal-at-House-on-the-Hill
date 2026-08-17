@@ -141,12 +141,19 @@ function directionButtonStyle(direction) {
   return { ...base, left: 'calc(-1 * var(--peek-size) / 2)', top: '50%', transform: 'translate(-50%, -50%)' };
 }
 
+function findCharacterIcon(characterId, characterContent) {
+  if (!characterContent || !characterId) return null;
+  const character = characterContent.find((c) => c.id === characterId);
+  return character?.fileicon ? `/images/${character.fileicon}` : null;
+}
+
 export default function FocusedRoomView({
   currentRoom,
   boardRooms,
   roomContent,
   roomsInSameSpot,
   allPlayers,
+  characterContent,
   directions,
   onMove,
 }) {
@@ -171,6 +178,7 @@ export default function FocusedRoomView({
             key={p.playerId}
             name={p.name}
             colorIndex={colorIndex === -1 ? i : colorIndex}
+            iconSrc={findCharacterIcon(p.characterId, characterContent)}
             style={badgeStyle(p.enteredFromSide, i, roomsInSameSpot.length)}
           />
         );
