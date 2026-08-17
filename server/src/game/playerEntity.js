@@ -11,7 +11,7 @@ function isNonDecreasing(track) {
   return true;
 }
 
-function createPlayer({ playerId, name, floor, x, y, stats, actionPoints }) {
+function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionPoints }) {
   for (const stat of STATS) {
     const def = stats[stat];
     if (!def || !isValidTrackShape(def.track)) {
@@ -42,6 +42,7 @@ function createPlayer({ playerId, name, floor, x, y, stats, actionPoints }) {
   return {
     playerId,
     name,
+    characterId: characterId || null,
     floor,
     x,
     y,

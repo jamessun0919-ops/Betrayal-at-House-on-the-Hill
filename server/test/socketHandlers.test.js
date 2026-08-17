@@ -21,6 +21,7 @@ function makeContent(overrides = {}) {
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
     cards: { events: [], items: [], omens: [] },
     ...overrides,
@@ -449,10 +450,13 @@ test('game:startCharacterSelect full flow: host triggers, both players get promp
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
   });
   expect(startedPayload.roomDeck.hasRoomForGround).toBe(true);
   expect(startedPayload.players[0].visitedRooms).toEqual([{ floor: 'ground', x: 0, y: 1 }]);
+  expect(startedPayload.characterContent).toEqual(makeContent().characters);
+  expect(startedPayload.players.every((p) => typeof p.characterId === 'string')).toBe(true);
 
   clientA.close();
   clientB.close();
@@ -732,6 +736,7 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
@@ -760,6 +765,7 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
     cards: {
       events: [],
@@ -798,6 +804,111 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
   httpServer.close();
 });
 
+test('game:move into room_collapsed_room: failing the speed check drops the player to a new basement room at the same coordinate', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> face 0, guaranteed fail
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('open_door');
+  expect(result.roomId).toBe('room_collapsed_room');
+  expect(result.collapseResult.fell).toBe(true);
+  expect(player.floor).toBe('basement');
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into room_collapsed_room with an eligible interjection item pauses for a roll choice, then game:diceChoiceRespond resolves the fall', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+    cards: {
+      events: [],
+      omens: [],
+      items: [{ id: 'item_005', name: '天使羽毛', diceInterjection: { scope: 'any', override: true, consumesItem: true } }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_005' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(moveResult.error).toBeUndefined();
+  expect(moveResult.kind).toBe('collapseCheckPending');
+  expect(player.floor).toBe('ground'); // already entered the room; only the roll is pending
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+
+  const pending = await pendingPromise;
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  const respondResult = await new Promise((resolve) =>
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 0 }, resolve)
+  );
+  expect(respondResult.error).toBeUndefined();
+  await resolvedPromise;
+
+  expect(player.floor).toBe('basement'); // overrideValue 0 < 5, guaranteed fail
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action jumps a later player down an already-collapsed room for free', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // guaranteed fail -> falls immediately
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+  expect(player.floor).toBe('basement'); // fell already -- simulate the room resetting AP to try the jump action too
+  player.actionPoints = 4;
+  player.floor = 'ground';
+  player.x = 1;
+  player.y = 1;
+  const startingAP = player.actionPoints;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+
+  expect(result.error).toBeUndefined();
+  expect(result).toEqual({ kind: 'room_action', collapseJump: true, x: 1, y: 1 });
+  expect(player.floor).toBe('basement');
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+  expect(player.actionPoints).toBe(startingAP); // free
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 function makeLeaveCheckInterjectionContent() {
   return makeContent({
     startingRooms: [
@@ -805,6 +916,7 @@ function makeLeaveCheckInterjectionContent() {
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
     cards: {
       events: [],
@@ -1044,6 +1156,7 @@ test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the 
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
@@ -1068,6 +1181,7 @@ test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the 
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
     ],
   });
   const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);

@@ -5,6 +5,7 @@ const STARTING_ROOMS = [
   { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
   { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+  { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
 ];
 
 function makeDrawableRooms(count = 3) {
@@ -68,7 +69,9 @@ test('serializeGameState converts the board and players Maps into plain arrays',
 
   expect(Array.isArray(serialized.board.ground)).toBe(true);
   expect(Array.isArray(serialized.board.upper)).toBe(true);
+  expect(Array.isArray(serialized.board.basement)).toBe(true);
   expect(serialized.board.ground.some((r) => r.roomId === 'room_lobby_b')).toBe(true);
+  expect(serialized.board.basement.some((r) => r.roomId === 'room_basement_landing')).toBe(true);
   expect(serialized.board.stairsLink).toEqual({
     groundRoomId: 'room_lobby_c',
     upperRoomId: 'room_upper_landing',
@@ -83,7 +86,7 @@ test('serializeGameState converts the board and players Maps into plain arrays',
   expect(JSON.parse(JSON.stringify(serialized)).players[0].playerId).toBe('p1');
 });
 
-test('serializeGameState exposes remainingCount/isEmpty/hasRoomForGround/hasRoomForUpper for the room deck, not its contents', () => {
+test('serializeGameState exposes remainingCount/isEmpty/hasRoomForGround/hasRoomForUpper/hasRoomForBasement for the room deck, not its contents', () => {
   const gameState = createGameState(STARTING_ROOMS, [
     { id: 'room_a', doors: 2, floor: 'ground' },
     { id: 'room_b', doors: 2, floor: 'upper' },
@@ -94,15 +97,17 @@ test('serializeGameState exposes remainingCount/isEmpty/hasRoomForGround/hasRoom
     isEmpty: false,
     hasRoomForGround: true,
     hasRoomForUpper: true,
+    hasRoomForBasement: false,
   });
   expect(serialized.roomDeck.cards).toBeUndefined();
 });
 
-test('serializeGameState roomDeck hasRoomForGround/hasRoomForUpper reflect per-floor availability, not just overall emptiness', () => {
+test('serializeGameState roomDeck hasRoomForGround/hasRoomForUpper/hasRoomForBasement reflect per-floor availability, not just overall emptiness', () => {
   const gameState = createGameState(STARTING_ROOMS, [{ id: 'room_a', doors: 2, floor: 'ground' }]);
   const serialized = serializeGameState(gameState);
   expect(serialized.roomDeck.hasRoomForGround).toBe(true);
   expect(serialized.roomDeck.hasRoomForUpper).toBe(false);
+  expect(serialized.roomDeck.hasRoomForBasement).toBe(false);
 });
 
 test('serializeGameState includes turnOrder/currentPlayerIndex when GameManager has set them, or null before that', () => {

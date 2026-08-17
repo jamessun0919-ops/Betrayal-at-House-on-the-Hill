@@ -29,6 +29,7 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
     const newPlayer = addPlayer(gameState, {
       playerId: player.playerId,
       name: player.name,
+      characterId: character.id,
       stats: character.stats,
     });
     if (character.itemID) {

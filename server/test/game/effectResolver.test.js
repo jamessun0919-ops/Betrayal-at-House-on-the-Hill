@@ -7,6 +7,7 @@ const STARTING_ROOMS = [
   { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
   { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+  { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
 ];
 
 function makeStats() {

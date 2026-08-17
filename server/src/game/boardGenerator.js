@@ -1,4 +1,6 @@
-const { OPPOSITE_SIDE, computeDoorLayout } = require('./doorLayout');
+const { SIDES, OPPOSITE_SIDE, computeDoorLayout } = require('./doorLayout');
+
+const FLOORS = ['ground', 'upper', 'basement'];
 
 const DIRECTION_DELTA = {
   north: { dx: 0, dy: -1 },
@@ -18,13 +20,15 @@ function placeFixedRoom(grid, roomId, x, y, doorSides) {
 function createBoard(startingRooms) {
   const ground = new Map();
   const upper = new Map();
+  const basement = new Map();
 
   const lobbyA = startingRooms.find((r) => r.id === 'room_lobby_a');
   const lobbyB = startingRooms.find((r) => r.id === 'room_lobby_b');
   const lobbyC = startingRooms.find((r) => r.id === 'room_lobby_c');
   const upperLanding = startingRooms.find((r) => r.id === 'room_upper_landing');
+  const basementLanding = startingRooms.find((r) => r.id === 'room_basement_landing');
 
-  if (!lobbyA || !lobbyB || !lobbyC || !upperLanding) {
+  if (!lobbyA || !lobbyB || !lobbyC || !upperLanding || !basementLanding) {
     throw new Error('MISSING_STARTING_ROOM');
   }
 
@@ -36,10 +40,16 @@ function createBoard(startingRooms) {
   placeFixedRoom(ground, lobbyB.id, 0, 0, ['north', 'south', 'east', 'west']);
   placeFixedRoom(ground, lobbyC.id, 0, -1, ['west', 'south']);
   placeFixedRoom(upper, upperLanding.id, 0, 0, ['north', 'east', 'west']);
+  // Same 3-door shape as the upper landing -- lets the basement floor be
+  // explored laterally once something can get a player onto it. How a
+  // player actually arrives here is a separate, not-yet-designed mechanism
+  // (coordinate-based room connections), out of scope for this change.
+  placeFixedRoom(basement, basementLanding.id, 0, 0, ['north', 'east', 'west']);
 
   return {
     ground,
     upper,
+    basement,
     stairsLink: { groundRoomId: lobbyC.id, upperRoomId: upperLanding.id },
   };
 }
@@ -61,7 +71,7 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
   if (!DIRECTION_DELTA[direction]) {
     throw new Error('INVALID_DIRECTION');
   }
-  if (floor !== 'ground' && floor !== 'upper') {
+  if (!FLOORS.includes(floor)) {
     throw new Error('INVALID_FLOOR');
   }
   if (!roomDefinition.id) {
@@ -98,11 +108,96 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
   return placedRoom;
 }
 
+// Places a room at an absolute (x, y), not relative to a neighbor + a
+// direction the player walked in from. Used for vertical connections
+// (falling/jumping between floors at the same coordinate) where there is no
+// lateral "entry side" -- guaranteedSide is the caller's choice of which
+// side computeDoorLayout should treat as always-open (its usual fallback
+// guarantee against a fully-walled, unreachable room), picked however the
+// caller wants (e.g. randomly) rather than derived from a direction of travel.
+function placeRoomAt(board, floor, x, y, roomDefinition, guaranteedSide) {
+  if (!Number.isInteger(roomDefinition.doors) || roomDefinition.doors < 1 || roomDefinition.doors > 4) {
+    throw new Error('INVALID_ROOM_DOORS');
+  }
+  if (!SIDES.includes(guaranteedSide)) {
+    throw new Error('INVALID_GUARANTEED_SIDE');
+  }
+  if (!FLOORS.includes(floor)) {
+    throw new Error('INVALID_FLOOR');
+  }
+  if (!roomDefinition.id) {
+    throw new Error('INVALID_ROOM_ID');
+  }
+  if (!Number.isInteger(x) || !Number.isInteger(y)) {
+    throw new Error('INVALID_COORD');
+  }
+  const grid = board[floor];
+  const key = coordKey(x, y);
+  if (grid.has(key)) {
+    throw new Error('ROOM_ALREADY_PLACED');
+  }
+
+  const getNeighborRequirement = makeNeighborRequirementReader(grid, { x, y });
+  const doorSides = computeDoorLayout(
+    roomDefinition.doors,
+    guaranteedSide,
+    getNeighborRequirement,
+    roomDefinition.doorPattern || null
+  );
+
+  const placedRoom = {
+    roomId: roomDefinition.id,
+    x,
+    y,
+    doorSides: Array.from(doorSides),
+    droppedItems: [],
+  };
+  grid.set(key, placedRoom);
+  return placedRoom;
+}
+
+function shuffle(array) {
+  const result = array.slice();
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = result[i];
+    result[i] = result[j];
+    result[j] = tmp;
+  }
+  return result;
+}
+
+// Places a room adjacent to a randomly chosen already-placed room on the
+// given floor, through one of that room's own genuinely open doors (not an
+// arbitrary coordinate) -- so the result is always reachable via normal
+// exploration, same as anything placeNewRoom produces. Used for the rare
+// ballroom/gallery pairing exception (last card for a floor, paired
+// coordinate already occupied) where the pair can't go at its "natural"
+// same-coordinate spot.
+function placeAtRandomOpenDoor(board, floor, roomDefinition) {
+  if (!FLOORS.includes(floor)) {
+    throw new Error('INVALID_FLOOR');
+  }
+  const grid = board[floor];
+  const candidateRooms = shuffle(Array.from(grid.values()));
+  for (const room of candidateRooms) {
+    const openDirections = shuffle(room.doorSides.slice());
+    for (const direction of openDirections) {
+      const delta = DIRECTION_DELTA[direction];
+      const targetCoord = { x: room.x + delta.dx, y: room.y + delta.dy };
+      if (!grid.has(coordKey(targetCoord.x, targetCoord.y))) {
+        return placeNewRoom(board, floor, { x: room.x, y: room.y }, direction, roomDefinition);
+      }
+    }
+  }
+  throw new Error('NO_OPEN_COORD_FOUND');
+}
+
 function canMoveBetween(board, floor, fromCoord, direction) {
   if (!DIRECTION_DELTA[direction]) {
     throw new Error('INVALID_DIRECTION');
   }
-  if (floor !== 'ground' && floor !== 'upper') {
+  if (!FLOORS.includes(floor)) {
     throw new Error('INVALID_FLOOR');
   }
   if (!Number.isInteger(fromCoord.x) || !Number.isInteger(fromCoord.y)) {
@@ -126,4 +221,13 @@ function canMoveBetween(board, floor, fromCoord, direction) {
   return toRoom.doorSides.includes(facingSide);
 }
 
-module.exports = { createBoard, placeNewRoom, coordKey, canMoveBetween, DIRECTION_DELTA };
+module.exports = {
+  createBoard,
+  placeNewRoom,
+  placeRoomAt,
+  placeAtRandomOpenDoor,
+  coordKey,
+  canMoveBetween,
+  DIRECTION_DELTA,
+  FLOORS,
+};

@@ -1,13 +1,14 @@
-const { createBoard, placeNewRoom, coordKey, canMoveBetween } = require('../../src/game/boardGenerator');
+const { createBoard, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, canMoveBetween } = require('../../src/game/boardGenerator');
 
 const STARTING_ROOMS = [
   { id: 'room_lobby_a', name: '大門廳', floor: 'ground', filename: 'LobbyA.webp' },
   { id: 'room_lobby_b', name: '大門廳', floor: 'ground', filename: 'LobbyB.webp' },
   { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing', filename: 'LobbyC.webp' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper', filename: '2Fladder.webp' },
+  { id: 'room_basement_landing', name: '地下平台', floor: 'basement', filename: null },
 ];
 
-test('createBoard places the four starting rooms at their fixed coordinates with the correct doorSides', () => {
+test('createBoard places the five starting rooms at their fixed coordinates with the correct doorSides', () => {
   const board = createBoard(STARTING_ROOMS);
 
   const lobbyA = board.ground.get(coordKey(0, 1));
@@ -25,6 +26,10 @@ test('createBoard places the four starting rooms at their fixed coordinates with
   const upperLanding = board.upper.get(coordKey(0, 0));
   expect(upperLanding.roomId).toBe('room_upper_landing');
   expect(upperLanding.doorSides.slice().sort()).toEqual(['east', 'north', 'west']);
+
+  const basementLanding = board.basement.get(coordKey(0, 0));
+  expect(basementLanding.roomId).toBe('room_basement_landing');
+  expect(basementLanding.doorSides.slice().sort()).toEqual(['east', 'north', 'west']);
 
   expect(board.stairsLink).toEqual({
     groundRoomId: 'room_lobby_c',
@@ -115,7 +120,7 @@ test('placeNewRoom throws INVALID_DIRECTION for invalid direction', () => {
 test('placeNewRoom throws INVALID_FLOOR for invalid floor', () => {
   const board = createBoard(STARTING_ROOMS);
   expect(() =>
-    placeNewRoom(board, 'basement', { x: 0, y: 0 }, 'north', { id: 'room_bad_floor', doors: 4 })
+    placeNewRoom(board, 'attic', { x: 0, y: 0 }, 'north', { id: 'room_bad_floor', doors: 4 })
   ).toThrow('INVALID_FLOOR');
 });
 
@@ -193,6 +198,64 @@ test('canMoveBetween throws ROOM_NOT_FOUND when there is no room at fromCoord', 
 test('canMoveBetween throws INVALID_DIRECTION/INVALID_FLOOR/INVALID_FROM_COORD for malformed input', () => {
   const board = createBoard(STARTING_ROOMS);
   expect(() => canMoveBetween(board, 'ground', { x: 0, y: 0 }, 'sideways')).toThrow('INVALID_DIRECTION');
-  expect(() => canMoveBetween(board, 'basement', { x: 0, y: 0 }, 'north')).toThrow('INVALID_FLOOR');
+  expect(() => canMoveBetween(board, 'attic', { x: 0, y: 0 }, 'north')).toThrow('INVALID_FLOOR');
   expect(() => canMoveBetween(board, 'ground', { x: 'a', y: 0 }, 'north')).toThrow('INVALID_FROM_COORD');
+});
+
+test('placeNewRoom and canMoveBetween work on the basement floor', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placed = placeNewRoom(board, 'basement', { x: 0, y: 0 }, 'east', { id: 'room_basement_a', doors: 4 });
+  expect(placed).toMatchObject({ roomId: 'room_basement_a', x: 1, y: 0 });
+  expect(canMoveBetween(board, 'basement', { x: 0, y: 0 }, 'east')).toBe(true);
+});
+
+test('placeRoomAt places a room at an absolute coordinate with the guaranteed side always a door', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placed = placeRoomAt(board, 'basement', 5, 5, { id: 'room_fallen', doors: 1 }, 'south');
+  expect(placed).toMatchObject({ roomId: 'room_fallen', x: 5, y: 5, doorSides: ['south'] });
+  expect(board.basement.get(coordKey(5, 5))).toBe(placed);
+});
+
+test('placeRoomAt throws ROOM_ALREADY_PLACED when the target coordinate is occupied', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() => placeRoomAt(board, 'basement', 0, 0, { id: 'room_dup', doors: 1 }, 'north')).toThrow(
+    'ROOM_ALREADY_PLACED'
+  ); // (0,0) on basement is already room_basement_landing
+});
+
+test('placeRoomAt throws INVALID_GUARANTEED_SIDE for a non-cardinal side', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() => placeRoomAt(board, 'basement', 5, 5, { id: 'room_bad', doors: 1 }, 'sideways')).toThrow(
+    'INVALID_GUARANTEED_SIDE'
+  );
+});
+
+test('placeRoomAt respects existing neighbor door/wall requirements like placeNewRoom does', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Neighbor to the east of (5,5) has no door on its west side facing back.
+  board.basement.set(coordKey(6, 5), { roomId: 'room_neighbor', x: 6, y: 5, doorSides: ['north'] });
+  const placed = placeRoomAt(board, 'basement', 5, 5, { id: 'room_fallen', doors: 4 }, 'south');
+  expect(placed.doorSides).toContain('south');
+  expect(placed.doorSides).not.toContain('east');
+});
+
+test('placeAtRandomOpenDoor places the room through a genuinely open door of an existing room, not an arbitrary coordinate', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Only room_basement_landing exists on basement (0,0), doors: north/east/west.
+  const placed = placeAtRandomOpenDoor(board, 'basement', { id: 'room_random', doors: 2 });
+  const validNeighborCoords = [coordKey(0, -1), coordKey(1, 0), coordKey(-1, 0)]; // north/east/west of (0,0)
+  expect(validNeighborCoords).toContain(coordKey(placed.x, placed.y));
+  // The new room must have a door facing back toward room_basement_landing.
+  expect(board.basement.get(coordKey(placed.x, placed.y))).toBe(placed);
+});
+
+test('placeAtRandomOpenDoor throws NO_OPEN_COORD_FOUND when every existing room on the floor is fully boxed in', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Occupy every direction room_basement_landing's doors lead to.
+  board.basement.set(coordKey(0, -1), { roomId: 'room_a', x: 0, y: -1, doorSides: [] });
+  board.basement.set(coordKey(1, 0), { roomId: 'room_b', x: 1, y: 0, doorSides: [] });
+  board.basement.set(coordKey(-1, 0), { roomId: 'room_c', x: -1, y: 0, doorSides: [] });
+  expect(() => placeAtRandomOpenDoor(board, 'basement', { id: 'room_random', doors: 2 })).toThrow(
+    'NO_OPEN_COORD_FOUND'
+  );
 });

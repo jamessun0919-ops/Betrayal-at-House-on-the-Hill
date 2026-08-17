@@ -13,6 +13,8 @@ const {
   endTurn,
   canUseStairs,
   useStairs,
+  resumeCollapseCheck,
+  jumpIntoCollapsedRoom,
 } = require('../../src/game/turnFlow');
 
 const STARTING_ROOMS = [
@@ -20,6 +22,7 @@ const STARTING_ROOMS = [
   { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
   { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+  { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
 ];
 
 function makeStats() {
@@ -168,6 +171,36 @@ test('moveToRoom with a leaveCheck: failing the roll blocks the move, costs exac
   const retryResult = moveToRoom(gameState, 'p1', 'west', { stat: 'might', min: 3 }, { rng: passRng });
   expect(retryResult).toEqual({ kind: 'move', x: -1, y: 1 });
   expect(player.actionPoints).toBe(startingAP - 2);
+});
+
+test('moveToRoom with a leaveCheck.failPenalty: a failed check also loses 1 level of the penalty stat (e.g. 天花閣樓 speed check failing costs 1 might)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  const leaveCheck = { stat: 'speed', min: 3, failPenalty: { stat: 'might', delta: -1 } };
+  const startingMightIndex = player.stats.might.currentIndex;
+  const result = moveToRoom(gameState, 'p1', 'west', leaveCheck, { rng: () => 0 });
+  expect(result.kind).toBe('leaveCheckFailed');
+  expect(player.stats.might.currentIndex).toBe(startingMightIndex - 1);
+});
+
+test('moveToRoom with a leaveCheck that has no failPenalty leaves other stats untouched on failure (matches 塔橋/雜亂的房間/藤蔓糾纏的溫室, whose text does not claim a stat penalty)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  const leaveCheck = { stat: 'might', min: 3 }; // no failPenalty field
+  const snapshotBefore = JSON.stringify(player.stats);
+  const result = moveToRoom(gameState, 'p1', 'west', leaveCheck, { rng: () => 0 });
+  expect(result.kind).toBe('leaveCheckFailed');
+  expect(JSON.stringify(player.stats)).toBe(snapshotBefore);
+});
+
+test('moveToRoom with a leaveCheck.failPenalty: the resolvedRoll bypass path (dice-interjection resume) also applies the penalty', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  const leaveCheck = { stat: 'speed', min: 3, failPenalty: { stat: 'might', delta: -1 } };
+  const startingMightIndex = player.stats.might.currentIndex;
+  const result = moveToRoom(gameState, 'p1', 'west', leaveCheck, { resolvedRoll: 0 });
+  expect(result.kind).toBe('leaveCheckFailed');
+  expect(player.stats.might.currentIndex).toBe(startingMightIndex - 1);
 });
 
 test('moveToRoom with a leaveCheck also gates opening a new door: failure does not draw or zero action points beyond the normal 1', () => {
@@ -357,6 +390,127 @@ test('endTurn throws SUMMON_ACTIVE when the player has an active summon', () => 
   expect(() => endTurn(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
 });
 
+test('moveToRoom into room_collapsed_room: passing the speed check (5+) leaves the player in place, no fall', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+    { id: 'room_basement_a', doors: 2, floor: 'basement' },
+  ]);
+  const passRng = () => 0.99; // speed 4 dice, all face 2 -> sum 8, passes 5+
+  const result = moveToRoom(gameState, 'p1', 'east', null, { rng: passRng });
+  expect(result.kind).toBe('open_door');
+  expect(result.roomId).toBe('room_collapsed_room');
+  expect(result.collapseResult).toEqual({ fell: false, rolled: 8 });
+  expect(player.floor).toBe('ground');
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+});
+
+test('moveToRoom into room_collapsed_room: failing the speed check drops the player to a new basement room at the same (x,y)', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+    { id: 'room_basement_a', doors: 2, floor: 'basement' },
+  ]);
+  const failRng = () => 0; // all dice face 0 -> sum 0, fails 5+
+  const result = moveToRoom(gameState, 'p1', 'east', null, { rng: failRng });
+  expect(result.kind).toBe('open_door');
+  expect(result.collapseResult.fell).toBe(true);
+  expect(result.collapseResult.rolled).toBe(0);
+  expect(result.collapseResult.basementRoomId).toBe('room_basement_a');
+  expect(player.floor).toBe('basement');
+  expect(player.x).toBe(1); // same x,y as the ground-floor collapsed room
+  expect(player.y).toBe(1);
+
+  const collapsedRoom = gameState.board.ground.get(coordKey(1, 1));
+  expect(collapsedRoom.collapseLink).toEqual({ x: 1, y: 1 });
+  const basementRoom = gameState.board.basement.get(coordKey(1, 1));
+  expect(basementRoom.roomId).toBe('room_basement_a');
+});
+
+test('moveToRoom into room_collapsed_room with an eligible interjection item returns collapseCheckPending instead of resolving synchronously', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_collapsed_room', doors: 2, floor: 'ground' }]);
+  player.inventory.push({ id: 'item_005' });
+  const itemCatalog = [{ id: 'item_005', diceInterjection: { scope: 'any', override: true, consumesItem: true } }];
+  const result = moveToRoom(gameState, 'p1', 'east', null, { itemCatalog });
+  expect(result.kind).toBe('collapseCheckPending');
+  expect(result.options).toHaveLength(1);
+  expect(result.roomId).toBe('room_collapsed_room');
+  // The room-entry move itself already happened -- only the roll is pending.
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+});
+
+test('resumeCollapseCheck resolves the outcome for a player already standing in the collapsed room', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+    { id: 'room_basement_a', doors: 2, floor: 'basement' },
+  ]);
+  moveToRoom(gameState, 'p1', 'east', null, { itemCatalog: [], rng: () => 0.99 }); // consumes the deck's collapsed-room card, deterministically passing so it doesn't also consume the basement card
+  // Re-place the player manually at a fresh, unresolved collapsed room to test resumeCollapseCheck in isolation.
+  gameState.board.ground.set(coordKey(5, 5), { roomId: 'room_collapsed_room', x: 5, y: 5, doorSides: ['north'], droppedItems: [] });
+  player.floor = 'ground';
+  player.x = 5;
+  player.y = 5;
+  const result = resumeCollapseCheck(gameState, 'p1', 0); // fails
+  expect(result.fell).toBe(true);
+  expect(player.floor).toBe('basement');
+  expect(player.x).toBe(5);
+  expect(player.y).toBe(5);
+});
+
+test('jumpIntoCollapsedRoom teleports a later player down a known collapseLink for free (no action point cost)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set(coordKey(0, 1), {
+    roomId: 'room_collapsed_room',
+    x: 0,
+    y: 1,
+    doorSides: ['north'],
+    droppedItems: [],
+    collapseLink: { x: 7, y: 7 },
+  });
+  gameState.board.basement.set(coordKey(7, 7), { roomId: 'room_basement_a', x: 7, y: 7, doorSides: ['north'], droppedItems: [] });
+  const startingAP = player.actionPoints;
+
+  const result = jumpIntoCollapsedRoom(gameState, 'p1');
+
+  expect(result).toEqual({ kind: 'room_action', collapseJump: true, x: 7, y: 7 });
+  expect(player.floor).toBe('basement');
+  expect(player.x).toBe(7);
+  expect(player.y).toBe(7);
+  expect(player.actionPoints).toBe(startingAP); // free -- not spent
+});
+
+test('jumpIntoCollapsedRoom throws NO_ROOM_ACTION_AVAILABLE when the room has no collapseLink yet', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.board.ground.set(coordKey(0, 1), {
+    roomId: 'room_collapsed_room',
+    x: 0,
+    y: 1,
+    doorSides: ['north'],
+    droppedItems: [],
+  });
+  expect(() => jumpIntoCollapsedRoom(gameState, 'p1')).toThrow('NO_ROOM_ACTION_AVAILABLE');
+});
+
+test('jumpIntoCollapsedRoom throws NO_ROOM_ACTION_AVAILABLE when the player is not standing in a Collapsed Room', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => jumpIntoCollapsedRoom(gameState, 'p1')).toThrow('NO_ROOM_ACTION_AVAILABLE');
+});
+
+test('jumpIntoCollapsedRoom throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.board.ground.set(coordKey(0, 1), {
+    roomId: 'room_collapsed_room',
+    x: 0,
+    y: 1,
+    doorSides: ['north'],
+    droppedItems: [],
+    collapseLink: { x: 7, y: 7 },
+  });
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.turnOrder = ['p1', 'p2'];
+  expect(() => jumpIntoCollapsedRoom(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+});
+
 test('canUseStairs returns true in room_lobby_c on the ground floor', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   player.x = 0;
@@ -375,6 +529,14 @@ test('canUseStairs returns true in the Upper Landing room on the upper floor', (
 test('canUseStairs returns false when the player is not at a stairs-linked room', () => {
   const { gameState } = makeGameStateWithPlayer();
   // Default player position is room_lobby_b (0,0), not the stairs room.
+  expect(canUseStairs(gameState, 'p1')).toBe(false);
+});
+
+test('canUseStairs returns false on the basement floor (stairsLink only pairs ground/upper)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.floor = 'basement';
+  player.x = 0;
+  player.y = 0; // fixed position of room_basement_landing
   expect(canUseStairs(gameState, 'p1')).toBe(false);
 });
 
@@ -665,4 +827,71 @@ test('advanceTurn drops the outgoing summon\'s carried item into its room instea
   expect(player.summons).toBeNull();
   const room = gameState.board.ground.get(coordKey(0, 0));
   expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('drawing room_ballroom on the ground floor also places room_gallery at the same (x,y) on the upper floor', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_ballroom', doors: 4, floor: 'ground' },
+    { id: 'room_gallery', doors: 2, floor: 'upper' },
+  ]);
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_ballroom');
+  expect(player.x).toBe(1);
+  expect(player.y).toBe(1);
+
+  const gallery = gameState.board.upper.get(coordKey(1, 1));
+  expect(gallery).toBeDefined();
+  expect(gallery.roomId).toBe('room_gallery');
+
+  // Gallery's card must be gone from the deck -- consumed by the pairing, not drawn.
+  expect(gameState.roomDeck.cards.some((r) => r.id === 'room_gallery')).toBe(false);
+});
+
+test('drawing room_gallery on the upper floor also places room_ballroom at the same (x,y) on the ground floor', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_gallery', doors: 4, floor: 'upper' },
+    { id: 'room_ballroom', doors: 2, floor: 'ground' },
+  ]);
+  gameState.board.upper.set(coordKey(5, 5), {
+    roomId: 'room_manual',
+    x: 5,
+    y: 5,
+    doorSides: ['north', 'east', 'south', 'west'],
+    droppedItems: [],
+  });
+  player.floor = 'upper';
+  player.x = 5;
+  player.y = 5;
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_gallery');
+  const ballroom = gameState.board.ground.get(coordKey(6, 5));
+  expect(ballroom).toBeDefined();
+  expect(ballroom.roomId).toBe('room_ballroom');
+  expect(gameState.roomDeck.cards.some((r) => r.id === 'room_ballroom')).toBe(false);
+});
+
+test('room_ballroom is rejected and redrawn when its paired coordinate is occupied and other cards remain for the floor', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_ballroom', doors: 4, floor: 'ground' },
+    { id: 'room_other', doors: 2, floor: 'ground' },
+  ]);
+  gameState.board.upper.set(coordKey(1, 1), { roomId: 'room_blocker', x: 1, y: 1, doorSides: [], droppedItems: [] });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_other');
+  expect(gameState.roomDeck.cards.some((r) => r.id === 'room_ballroom')).toBe(true);
+  expect(gameState.board.ground.get(coordKey(1, 1)).roomId).toBe('room_other');
+});
+
+test('room_ballroom placement is let through as the last ground-floor card even with the paired coordinate occupied -- gallery falls back to a random open door', () => {
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_ballroom', doors: 4, floor: 'ground' }, // only ground-eligible card
+    { id: 'room_gallery', doors: 2, floor: 'upper' },
+  ]);
+  gameState.board.upper.set(coordKey(1, 1), { roomId: 'room_blocker', x: 1, y: 1, doorSides: [], droppedItems: [] });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_ballroom');
+  expect(gameState.board.ground.get(coordKey(1, 1)).roomId).toBe('room_ballroom');
+  const galleryEntries = Array.from(gameState.board.upper.values()).filter((r) => r.roomId === 'room_gallery');
+  expect(galleryEntries).toHaveLength(1);
+  expect(coordKey(galleryEntries[0].x, galleryEntries[0].y)).not.toBe(coordKey(1, 1));
 });

@@ -16,13 +16,14 @@ function createGameState(startingRooms, rooms, cards = {}) {
   };
 }
 
-function addPlayer(gameState, { playerId, name, stats }) {
+function addPlayer(gameState, { playerId, name, characterId, stats }) {
   if (gameState.players.has(playerId)) {
     throw new Error('DUPLICATE_PLAYER_ID');
   }
   const player = createPlayer({
     playerId,
     name,
+    characterId,
     floor: 'ground',
     x: 0,
     y: 1, // room_lobby_a's fixed position (see boardGenerator.js createBoard)
@@ -43,6 +44,7 @@ function serializeGameState(gameState) {
     board: {
       ground: Array.from(gameState.board.ground.values()),
       upper: Array.from(gameState.board.upper.values()),
+      basement: Array.from(gameState.board.basement.values()),
       stairsLink: gameState.board.stairsLink,
     },
     players: Array.from(gameState.players.values()),
@@ -53,6 +55,7 @@ function serializeGameState(gameState) {
       isEmpty: isRoomDeckEmpty(gameState.roomDeck),
       hasRoomForGround: hasRoomForFloor(gameState.roomDeck, 'ground'),
       hasRoomForUpper: hasRoomForFloor(gameState.roomDeck, 'upper'),
+      hasRoomForBasement: hasRoomForFloor(gameState.roomDeck, 'basement'),
     },
     eventDeck: {
       remainingCount: getCardRemainingCount(gameState.eventDeck),

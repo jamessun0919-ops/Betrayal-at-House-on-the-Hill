@@ -34,6 +34,21 @@ test('createPlayer builds a player with the given stat tracks, position, and act
     overflow: 0,
   });
   expect(player.inventory).toEqual([]);
+  expect(player.characterId).toBeNull(); // not supplied
+});
+
+test('createPlayer stores the given characterId (used by the client to look up portrait/icon assets)', () => {
+  const player = createPlayer({
+    playerId: 'p1',
+    name: 'Alice',
+    characterId: 'char_001',
+    floor: 'ground',
+    x: 0,
+    y: 0,
+    stats: makeStats(),
+    actionPoints: 0,
+  });
+  expect(player.characterId).toBe('char_001');
 });
 
 test('getStatValue reads the track value at the current index', () => {

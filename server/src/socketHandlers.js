@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, jumpIntoCollapsedRoom } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
@@ -183,6 +183,12 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return;
         }
 
+        if (result.kind === 'collapseCheckPending') {
+          handleCollapseCheckRollPending(io, effectResolverManager, gameState, roomCode, playerId, result, rollChoiceTimeouts, rollChoiceTimeoutMs, effectChoiceTimeouts, content);
+          ack({ kind: 'collapseCheckPending', roomId: result.roomId, x: result.x, y: result.y });
+          return;
+        }
+
         ack(result);
         finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
@@ -234,6 +240,17 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (actionType === 'room_action') {
           const currentPlayer = getPlayer(gameState, playerId);
           const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));
+
+          if (placedRoom.roomId === 'room_collapsed_room' && placedRoom.collapseLink) {
+            // Jumping down an already-fallen-through Collapsed Room is a pure
+            // teleport, not an effects-array resolution -- skip the normal
+            // room_action/effects path entirely.
+            const jumpResult = jumpIntoCollapsedRoom(gameState, playerId);
+            ack(jumpResult);
+            io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+            return;
+          }
+
           const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
           sourceEffects =
             roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
@@ -575,6 +592,39 @@ function handleLeaveCheckRollPending(io, effectResolverManager, gameState, roomC
   rollChoiceTimeouts.set(roomCode, handle);
 }
 
+function handleCollapseCheckRollPending(io, effectResolverManager, gameState, roomCode, playerId, moveResult, rollChoiceTimeouts, rollChoiceTimeoutMs, effectChoiceTimeouts, content) {
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const optionIds = moveResult.options.map((o) => o.itemId).concat('__skip__');
+  const prompt = createPrompt(resolverEntry.promptState, {
+    type: 'dice_interjection',
+    targetPlayerId: playerId,
+    description: '要不要使用道具介入這次崩塌檢定？',
+    options: optionIds,
+    timeoutMs: rollChoiceTimeoutMs,
+    now: Date.now(),
+  });
+  resolverEntry.pendingRollChoice = {
+    playerId,
+    promptId: prompt.promptId,
+    deadline: prompt.deadline,
+    options: moveResult.options,
+    resumeKind: 'collapseCheck',
+    resumeContext: { pendingCardDraw: moveResult.pendingCardDraw },
+  };
+  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
+  io.to(roomCode).emit('game:diceChoicePending', {
+    playerId,
+    promptId: prompt.promptId,
+    options: moveResult.options,
+    deadline: prompt.deadline,
+  });
+  const delayMs = Math.max(prompt.deadline - Date.now(), 0);
+  const handle = setTimeout(() => {
+    handleRollChoiceTimeout(io, effectResolverManager, gameState, roomCode, prompt.promptId, rollChoiceTimeouts, effectChoiceTimeouts, content, rollChoiceTimeoutMs);
+  }, delayMs);
+  rollChoiceTimeouts.set(roomCode, handle);
+}
+
 function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
   if (!roomDefinition || !Array.isArray(roomDefinition.effects)) {
     return;
@@ -734,6 +784,9 @@ function resumeRollChoice(io, effectResolverManager, gameState, roomCode, player
   if (resumeKind === 'leaveCheck') {
     return resumeLeaveCheckRollChoice(io, socket, effectResolverManager, gameState, roomCode, playerId, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
   }
+  if (resumeKind === 'collapseCheck') {
+    return resumeCollapseCheckRollChoice(io, socket, effectResolverManager, gameState, roomCode, playerId, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+  }
   if (resumeKind !== 'diceCheck') {
     throw new Error('UNSUPPORTED_ROLL_CHOICE_RESUME_KIND');
   }
@@ -761,6 +814,36 @@ function resumeLeaveCheckRollChoice(io, socket, effectResolverManager, gameState
     { now: Date.now(), itemCatalog: content.cards.items, rng: Math.random }
   );
   const result = moveToRoom(gameState, playerId, direction, leaveCheck, { resolvedRoll: finalRoll });
+  finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+  return { pending: false };
+}
+
+function resumeCollapseCheckRollChoice(io, socket, effectResolverManager, gameState, roomCode, playerId, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
+  const resolverEntry = getResolver(effectResolverManager, roomCode);
+  const player = getPlayer(gameState, playerId);
+  // Player is still standing in the just-placed Collapsed Room -- nothing
+  // else can happen while a roll choice is pending.
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  const modifiers = [...(player.modifiers || []), ...(room.modifiers || [])];
+  const diceCount = getStatValue(player, 'speed');
+  const finalRoll = computeInterjectedRoll(
+    gameState,
+    resolverEntry.promptState,
+    playerId,
+    diceCount,
+    modifiers,
+    interjectionChoice,
+    { now: Date.now(), itemCatalog: content.cards.items, rng: Math.random }
+  );
+  const collapseResult = resumeCollapseCheck(gameState, playerId, finalRoll);
+  const result = {
+    kind: 'open_door',
+    x: room.x,
+    y: room.y,
+    roomId: room.roomId,
+    pendingCardDraw: resumeContext.pendingCardDraw,
+    collapseResult,
+  };
   finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
   return { pending: false };
 }
@@ -856,14 +939,16 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   });
   startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
-  // roomContent/cardContent are only sent here (once) -- if a reconnect/resync
-  // event is ever added, it must also resend them, or reconnecting clients
-  // will have no room/card names. Currently safe: there is no reconnect path,
-  // and lobby:join rejects ROOM_IN_PROGRESS once a game has started.
+  // roomContent/cardContent/characterContent are only sent here (once) -- if
+  // a reconnect/resync event is ever added, it must also resend them, or
+  // reconnecting clients will have no room/card/character names or icons.
+  // Currently safe: there is no reconnect path, and lobby:join rejects
+  // ROOM_IN_PROGRESS once a game has started.
   io.to(roomCode).emit('game:started', {
     ...serializeGameState(gameState),
     roomContent: { rooms: content.rooms, startingRooms: content.startingRooms },
     cardContent: { items: content.cards.items, events: content.cards.events, omens: content.cards.omens },
+    characterContent: content.characters,
   });
 }
 

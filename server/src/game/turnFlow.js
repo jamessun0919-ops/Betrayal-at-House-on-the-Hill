@@ -1,12 +1,29 @@
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
-const { canMoveBetween, placeNewRoom, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
-const { drawRoom, hasRoomForFloor } = require('./roomDeck');
+const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
+const { drawRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
-const { movePlayerTo, resetActionPoints, getStatValue } = require('./playerEntity');
+const { movePlayerTo, resetActionPoints, getStatValue, changeStat } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
 
 const ACTION_TYPES = ['item', 'attack', 'room_action'];
+
+const COLLAPSED_ROOM_ID = 'room_collapsed_room';
+const COLLAPSE_CHECK_STAT = 'speed';
+const COLLAPSE_CHECK_MIN = 5;
+
+const BALLROOM_ID = 'room_ballroom';
+const GALLERY_ID = 'room_gallery';
+
+function isBallroomOrGallery(id) {
+  return id === BALLROOM_ID || id === GALLERY_ID;
+}
+function pairedFloorFor(id) {
+  return id === BALLROOM_ID ? 'upper' : 'ground';
+}
+function pairedIdFor(id) {
+  return id === BALLROOM_ID ? GALLERY_ID : BALLROOM_ID;
+}
 
 function requirePlayer(gameState, playerId) {
   const player = getPlayer(gameState, playerId);
@@ -82,6 +99,14 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     }
     if (rolled < leaveCheck.min) {
       player.actionPoints -= 1;
+      if (leaveCheck.failPenalty) {
+        // e.g. 天花閣樓/五芒星室/墓園/髒亂的房間 -- some leaveCheck rooms'
+        // official text also costs a stat level on a failed check, distinct
+        // from the stat being checked (see room text). 塔橋/雜亂的房間/藤蔓
+        // 糾纏的溫室 have no such clause -- their data has no failPenalty,
+        // so this is skipped for them, matching their sourced text exactly.
+        changeStat(player, leaveCheck.failPenalty.stat, leaveCheck.failPenalty.delta, gameState.hauntStarted);
+      }
       return { kind: 'leaveCheckFailed', rolled, required: leaveCheck.min };
     }
   }
@@ -95,7 +120,23 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     return { kind: 'move', x: targetCoord.x, y: targetCoord.y };
   }
 
-  const roomDefinition = drawRoom(gameState.roomDeck, player.floor);
+  // 舞廳 & 包廂房 -- drawing either one must also place its pair at the same
+  // (x, y) on the paired floor. If that coordinate is already occupied, the
+  // whole draw is rejected (card goes back to the bottom of the deck) and a
+  // different card is drawn instead -- unless this was the last card
+  // available for this floor, in which case the draw is allowed through and
+  // the pair falls back to a random open door on its own floor instead of
+  // insisting on the same coordinate (handled in placeBallroomGalleryPair).
+  let roomDefinition = drawRoom(gameState.roomDeck, player.floor);
+  while (isBallroomOrGallery(roomDefinition.id)) {
+    const pairedFloor = pairedFloorFor(roomDefinition.id);
+    const pairedOccupied = gameState.board[pairedFloor].has(coordKey(targetCoord.x, targetCoord.y));
+    if (!pairedOccupied) break;
+    if (!hasRoomForFloor(gameState.roomDeck, player.floor)) break; // last card for this floor -- let it through anyway
+    gameState.roomDeck.cards.push(roomDefinition); // rejected -- back to the bottom, draw again
+    roomDefinition = drawRoom(gameState.roomDeck, player.floor);
+  }
+
   const placedRoom = placeNewRoom(
     gameState.board,
     player.floor,
@@ -109,6 +150,41 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     roomDefinition.drawType && roomDefinition.drawType !== 'none'
       ? { deck: roomDefinition.drawType }
       : null;
+
+  if (isBallroomOrGallery(roomDefinition.id)) {
+    placeBallroomGalleryPair(gameState, roomDefinition, placedRoom);
+  }
+
+  if (roomDefinition.id === COLLAPSED_ROOM_ID) {
+    // 崩塌的房間 -- speed check (5+) to dodge the hole in the floor. Reuses
+    // the same dice-interjection pattern as leaveCheck (see the leaveCheck
+    // branch above) rather than rolling in isolation.
+    const { itemCatalog, rng } = rollOptions;
+    const options = findInterjectionOptions(player, itemCatalog || [], null);
+    if (options.length > 0) {
+      return {
+        kind: 'collapseCheckPending',
+        rollChoice: true,
+        options,
+        x: placedRoom.x,
+        y: placedRoom.y,
+        roomId: placedRoom.roomId,
+        pendingCardDraw,
+      };
+    }
+    const diceCount = getStatValue(player, COLLAPSE_CHECK_STAT);
+    const rolled = applyModifiers(rollDice(diceCount, rng || Math.random), player.modifiers || [], 'onAfterRoll', {});
+    const collapseResult = applyCollapseCheck(gameState, player, placedRoom, rolled);
+    return {
+      kind: 'open_door',
+      x: placedRoom.x,
+      y: placedRoom.y,
+      roomId: placedRoom.roomId,
+      pendingCardDraw,
+      collapseResult,
+    };
+  }
+
   return {
     kind: 'open_door',
     x: placedRoom.x,
@@ -118,8 +194,93 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   };
 }
 
+// Places the ballroom/gallery pair once one of them has just been placed at
+// `placedRoom`. The pair's card is pulled directly out of the room deck by
+// id (not drawn through a door) and consumed the same way -- so it can
+// never later be independently drawn as if it were still available.
+function placeBallroomGalleryPair(gameState, roomDefinition, placedRoom) {
+  const pairedId = pairedIdFor(roomDefinition.id);
+  const pairedFloor = pairedFloorFor(roomDefinition.id);
+  const pairedDefinition = removeRoomById(gameState.roomDeck, pairedId);
+  if (!pairedDefinition) {
+    // Pair card isn't in the deck (unexpected content inconsistency) --
+    // nothing to pair against, leave the drawn room as a standalone room.
+    return null;
+  }
+  const grid = gameState.board[pairedFloor];
+  const guaranteedSide = SIDES[Math.floor(Math.random() * SIDES.length)];
+  if (!grid.has(coordKey(placedRoom.x, placedRoom.y))) {
+    return placeRoomAt(gameState.board, pairedFloor, placedRoom.x, placedRoom.y, pairedDefinition, guaranteedSide);
+  }
+  // Exception path: target occupied -- only reachable here because this was
+  // the last card for the drawn room's own floor, so the reject+redraw loop
+  // in moveToRoom let it through anyway. Fall back to a random open door.
+  return placeAtRandomOpenDoor(gameState.board, pairedFloor, pairedDefinition);
+}
+
+// Resolves the collapse check's outcome once a final roll is known (whether
+// rolled synchronously above or after a dice-interjection round-trip via
+// resumeCollapseCheck below). A pass leaves the room as-is; a fail draws a
+// new basement room at the same (x, y) and drops the player through.
+// Physical damage ("受到1顆骰子的物理傷害") is NOT applied here -- the M3
+// damage-distribution system (player picks which stat absorbs each point)
+// doesn't exist yet. This is a known, deliberate gap, not an oversight.
+function applyCollapseCheck(gameState, player, placedRoom, rolled) {
+  if (rolled >= COLLAPSE_CHECK_MIN) {
+    return { fell: false, rolled };
+  }
+  const guaranteedSide = SIDES[Math.floor(Math.random() * SIDES.length)];
+  const basementRoomDefinition = drawRoom(gameState.roomDeck, 'basement');
+  const basementRoom = placeRoomAt(
+    gameState.board,
+    'basement',
+    placedRoom.x,
+    placedRoom.y,
+    basementRoomDefinition,
+    guaranteedSide
+  );
+  // Recorded on the collapsed room's own board instance (not the static
+  // room definition) so later players standing here can find where "down"
+  // leads without re-rolling -- see the room_action jump-down mechanic.
+  placedRoom.collapseLink = { x: basementRoom.x, y: basementRoom.y };
+  movePlayerTo(player, 'basement', basementRoom.x, basementRoom.y, null);
+  return { fell: true, rolled, basementRoomId: basementRoom.roomId, x: basementRoom.x, y: basementRoom.y };
+}
+
+// Called from socketHandlers.js after a pending collapse-check roll choice
+// (dice interjection) resolves. The player is still standing in the
+// just-placed Collapsed Room (nothing else can happen while a roll choice
+// is pending), so it's found by the player's current position rather than
+// needing the coordinate threaded back through the prompt/resume plumbing.
+function resumeCollapseCheck(gameState, playerId, rolled) {
+  const player = requirePlayer(gameState, playerId);
+  const placedRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  return applyCollapseCheck(gameState, player, placedRoom, rolled);
+}
+
 function getRoomAt(gameState, floor, x, y) {
   return gameState.board[floor].get(coordKey(x, y));
+}
+
+// 之後進來的玩家，可自由選擇是否跳入地板大洞 -- once a Collapsed Room has a
+// recorded collapseLink (someone already fell through), any later player
+// standing in it can jump down for free (no action point cost, matching the
+// official rule's "無需耗移動點數"). Triggered via the same room_action /
+// "行動" button as any other room action, but this is a pure teleport, not
+// an effects-array resolution -- socketHandlers.js special-cases it before
+// falling through to the normal room_action/effects path.
+function jumpIntoCollapsedRoom(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  if (getCurrentTurnPlayerId(gameState) !== playerId) {
+    throw new Error('NOT_YOUR_TURN');
+  }
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  if (!room || room.roomId !== COLLAPSED_ROOM_ID || !room.collapseLink) {
+    throw new Error('NO_ROOM_ACTION_AVAILABLE');
+  }
+  const { x, y } = room.collapseLink;
+  movePlayerTo(player, 'basement', x, y, null);
+  return { kind: 'room_action', collapseJump: true, x, y };
 }
 
 function moveSummon(gameState, playerId, direction) {
@@ -360,7 +521,12 @@ function canUseStairs(gameState, playerId) {
   if (player.floor === 'ground') {
     return room.roomId === stairsLink.groundRoomId;
   }
-  return room.roomId === stairsLink.upperRoomId;
+  if (player.floor === 'upper') {
+    return room.roomId === stairsLink.upperRoomId;
+  }
+  // stairsLink only pairs ground<->upper -- any other floor (basement, or a
+  // future one) has no stairs link yet.
+  return false;
 }
 
 function useStairs(gameState, playerId) {
@@ -401,4 +567,6 @@ module.exports = {
   endTurn,
   canUseStairs,
   useStairs,
+  resumeCollapseCheck,
+  jumpIntoCollapsedRoom,
 };

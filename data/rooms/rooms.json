@@ -409,7 +409,7 @@
     "effects": [],
     "needsCustomLogic": false
   },
-  { 
+  {
     "id": "room_murder",
     "name": "兇殺現場",
     "description": "",
@@ -533,7 +533,11 @@
     "effects": [],
     "leaveCheck": {
       "stat": "speed",
-      "min": 3
+      "min": 3,
+      "failPenalty": {
+        "stat": "might",
+        "delta": -1
+      }
     },
     "needsCustomLogic": false
   },
@@ -550,7 +554,11 @@
     "effects": [],
     "leaveCheck": {
       "stat": "knowledge",
-      "min": 4
+      "min": 4,
+      "failPenalty": {
+        "stat": "sanity",
+        "delta": -1
+      }
     },
     "needsCustomLogic": false
   },
@@ -567,7 +575,11 @@
     "effects": [],
     "leaveCheck": {
       "stat": "sanity",
-      "min": 4
+      "min": 4,
+      "failPenalty": {
+        "stat": "knowledge",
+        "delta": -1
+      }
     },
     "needsCustomLogic": false
   },
@@ -662,7 +674,11 @@
     "effects": [],
     "leaveCheck": {
       "stat": "might",
-      "min": 3
+      "min": 3,
+      "failPenalty": {
+        "stat": "speed",
+        "delta": -1
+      }
     },
     "needsCustomLogic": false
   },

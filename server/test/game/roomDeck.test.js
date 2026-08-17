@@ -1,4 +1,4 @@
-const { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor } = require('../../src/game/roomDeck');
+const { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor, removeRoomById } = require('../../src/game/roomDeck');
 
 function makeRooms(count, floor = 'ground') {
   const rooms = [];
@@ -86,10 +86,20 @@ test('drawRoom(deck, floor) only ever returns rooms matching that floor or "any"
   expect(deck.cards.every((room) => room.floor === 'upper')).toBe(true);
 });
 
-test('drawRoom throws INVALID_FLOOR for a floor value that is not ground or upper', () => {
+test('drawRoom throws INVALID_FLOOR for an unrecognized floor value', () => {
   const deck = createRoomDeck(makeRooms(2));
-  expect(() => drawRoom(deck, 'basement')).toThrow('INVALID_FLOOR');
+  expect(() => drawRoom(deck, 'attic')).toThrow('INVALID_FLOOR');
   expect(() => drawRoom(deck, undefined)).toThrow('INVALID_FLOOR');
+});
+
+test('drawRoom(deck, "basement") only ever returns basement or "any" rooms', () => {
+  const rooms = [
+    { id: 'b1', doors: 2, floor: 'basement' },
+    { id: 'g1', doors: 2, floor: 'ground' },
+  ];
+  const deck = createRoomDeck(rooms);
+  const room = drawRoom(deck, 'basement');
+  expect(room.id).toBe('b1');
 });
 
 test('hasRoomForFloor returns true when a matching card remains and false when none do', () => {
@@ -111,5 +121,24 @@ test('hasRoomForFloor does not mutate the deck', () => {
 
 test('hasRoomForFloor throws INVALID_FLOOR for a bad floor argument', () => {
   const deck = createRoomDeck(makeRooms(2));
-  expect(() => hasRoomForFloor(deck, 'basement')).toThrow('INVALID_FLOOR');
+  expect(() => hasRoomForFloor(deck, 'attic')).toThrow('INVALID_FLOOR');
+});
+
+test('removeRoomById pulls a specific room out of the deck regardless of floor, and shrinks the deck', () => {
+  const rooms = [
+    { id: 'g1', doors: 2, floor: 'ground' },
+    { id: 'u1', doors: 2, floor: 'upper' },
+  ];
+  const deck = createRoomDeck(rooms);
+  const removed = removeRoomById(deck, 'u1');
+  expect(removed).toEqual({ id: 'u1', doors: 2, floor: 'upper' });
+  expect(getRemainingCount(deck)).toBe(1);
+  expect(deck.cards.some((r) => r.id === 'u1')).toBe(false);
+});
+
+test('removeRoomById returns null and does not mutate the deck when the id is not present', () => {
+  const deck = createRoomDeck(makeRooms(2));
+  const removed = removeRoomById(deck, 'not_in_deck');
+  expect(removed).toBeNull();
+  expect(getRemainingCount(deck)).toBe(2);
 });

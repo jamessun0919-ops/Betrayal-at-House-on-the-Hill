@@ -5,6 +5,7 @@ const STARTING_ROOMS = [
   { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
   { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
   { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+  { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
 ];
 
 function makeDrawableRooms() {
@@ -49,6 +50,14 @@ test('startGame resolves each player stats from their assigned character', () =>
   const manager = createGameManager();
   const gameState = startGame(manager, 'ROOM1', baseStartArgs());
   expect(gameState.players.get('p1').stats.might.track).toEqual([1, 2, 3, 4, 5]);
+});
+
+test('startGame records each player\'s assigned characterId on the player entity (for client-side portrait/icon lookup)', () => {
+  const manager = createGameManager();
+  const args = baseStartArgs();
+  const gameState = startGame(manager, 'ROOM1', args);
+  const p1Args = args.players.find((p) => p.playerId === 'p1');
+  expect(gameState.players.get('p1').characterId).toBe(p1Args.characterId);
 });
 
 test('startGame generates a random turn order covering every player, independent of join/character order', () => {

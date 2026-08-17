@@ -1,3 +1,5 @@
+const { FLOORS } = require('./boardGenerator');
+
 function shuffle(array) {
   const result = array.slice();
   for (let i = result.length - 1; i > 0; i--) {
@@ -25,14 +27,14 @@ function getRemainingCount(deck) {
 }
 
 function hasRoomForFloor(deck, floor) {
-  if (floor !== 'ground' && floor !== 'upper') {
+  if (!FLOORS.includes(floor)) {
     throw new Error('INVALID_FLOOR');
   }
   return deck.cards.some((room) => room.floor === floor || room.floor === 'any');
 }
 
 function drawRoom(deck, floor) {
-  if (floor !== 'ground' && floor !== 'upper') {
+  if (!FLOORS.includes(floor)) {
     throw new Error('INVALID_FLOOR');
   }
   if (isRoomDeckEmpty(deck)) {
@@ -50,4 +52,18 @@ function drawRoom(deck, floor) {
   throw new Error('ROOM_DECK_EMPTY');
 }
 
-module.exports = { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor };
+// Pulls a specific room out of the deck by id, wherever it currently sits,
+// without regard to floor -- used for the ballroom/gallery pairing, where
+// placing one auto-places (and consumes) the other's card directly rather
+// than through a normal door-opening draw. Returns null if it isn't in the
+// deck (already drawn/placed some other way).
+function removeRoomById(deck, id) {
+  const index = deck.cards.findIndex((room) => room.id === id);
+  if (index === -1) {
+    return null;
+  }
+  const [room] = deck.cards.splice(index, 1);
+  return room;
+}
+
+module.exports = { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor, removeRoomById };
