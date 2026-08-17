@@ -290,7 +290,12 @@ function selectAction(gameState, playerId, actionType, options = {}) {
     if (!options.hasRoomAction) {
       throw new Error('NO_ROOM_ACTION_AVAILABLE');
     }
-    player.actionPoints -= 1;
+    // Some room actions (e.g. the entrance-hall stairs rooms) are declared
+    // free, matching the pre-existing "stairs cost no action points" rule --
+    // most room actions (e.g. the vault's dice check) still cost 1.
+    if (!options.freeRoomAction) {
+      player.actionPoints -= 1;
+    }
     return { kind: 'room_action' };
   }
 

@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { changeStat, addItem, removeItem, getStatValue } = require('./playerEntity');
+const { changeStat, addItem, removeItem, getStatValue, movePlayerTo } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
 const { coordKey } = require('./boardGenerator');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
@@ -46,6 +46,27 @@ function handleLoseItem(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   removeItem(player, effect.itemId);
   return { pending: false };
+}
+
+// Moves the player to wherever a specific room (by id) is currently placed
+// on the board -- floor-agnostic by design, so it keeps working once a third
+// floor exists. Used by the entrance-hall stairs rooms (LobbyC <-> upper
+// landing) so up/down movement can be triggered through the same generic
+// room_action pathway as any other room effect (e.g. the vault's dice
+// check), instead of a dedicated stairs button/socket event.
+function handleMoveToRoom(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  for (const floor of Object.keys(gameState.board)) {
+    const grid = gameState.board[floor];
+    if (!(grid instanceof Map)) continue;
+    for (const room of grid.values()) {
+      if (room.roomId === effect.targetRoomId) {
+        movePlayerTo(player, floor, room.x, room.y);
+        return { pending: false };
+      }
+    }
+  }
+  throw new Error('TARGET_ROOM_NOT_FOUND');
 }
 
 function handleToggleActive(gameState, promptState, playerId, effect, context) {
@@ -243,6 +264,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
+  move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),

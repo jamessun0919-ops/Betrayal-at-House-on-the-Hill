@@ -240,6 +240,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
               ? roomDefinition.effects
               : null;
           selectOptions.hasRoomAction = Boolean(sourceEffects);
+          selectOptions.freeRoomAction = Boolean(roomDefinition && roomDefinition.freeAction);
           sourceId = placedRoom.roomId;
         }
 

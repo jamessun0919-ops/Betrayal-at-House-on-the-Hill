@@ -3,8 +3,25 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import { getAvailableDirections } from './gameplay/mapUtils';
+import './gameplay/playingLayout.css';
 
-const DIRECTION_LABELS = { north: '北', east: '東', south: '南', west: '西' };
+// Centers a corner button inside the blank peek-size x peek-size square at
+// one of the viewport's 4 corners -- the room tile (70%) plus the 4 edge
+// peek bands (15% each) never cover the corners of the total-square, so
+// these sit in otherwise-empty space regardless of which map mode (focused
+// room vs overview) is currently rendered inside the viewport.
+function cornerButtonStyle(corner) {
+  const base = { position: 'absolute', zIndex: 10, fontSize: 12, padding: '2px 6px', borderRadius: 4 };
+  const vOffset = corner.includes('top')
+    ? { top: 'calc(var(--peek-size) / 2)', transformY: '-50%' }
+    : { bottom: 'calc(var(--peek-size) / 2)', transformY: '50%' };
+  const hOffset = corner.includes('left')
+    ? { left: 'calc(var(--peek-size) / 2)', transformX: '-50%' }
+    : { right: 'calc(var(--peek-size) / 2)', transformX: '50%' };
+  const { transformY, ...vRest } = vOffset;
+  const { transformX, ...hRest } = hOffset;
+  return { ...base, ...vRest, ...hRest, transform: `translate(${transformX}, ${transformY})` };
+}
 
 export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
   const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
@@ -106,44 +123,53 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
   function handleMove(direction) {
     socket.emit('game:move', { direction }, (res) => {
-      if (res && res.error) setActionError(res.error);
+      if (res && res.error) {
+        console.error('[game:move]', res.error);
+        setActionError(res.error);
+      }
     });
   }
 
-  function handleSelectAction(actionType) {
-    socket.emit('game:selectAction', { actionType }, (res) => {
-      if (res && res.error) setActionError(res.error);
-    });
-  }
-
-  function handleUseStairs() {
-    socket.emit('game:useStairs', {}, (res) => {
-      if (res && res.error) setActionError(res.error);
+  function handleSelectAction(actionType, options = {}) {
+    socket.emit('game:selectAction', { actionType, ...options }, (res) => {
+      if (res && res.error) {
+        console.error('[game:selectAction]', res.error);
+        setActionError(res.error);
+      }
     });
   }
 
   function handleEndTurn() {
     socket.emit('game:endTurn', {}, (res) => {
-      if (res && res.error) setActionError(res.error);
+      if (res && res.error) {
+        console.error('[game:endTurn]', res.error);
+        setActionError(res.error);
+      }
     });
   }
 
   function handleEffectChoiceRespond(optionId) {
     if (!pendingEffectChoice) return;
     socket.emit('game:effectPromptRespond', { promptId: pendingEffectChoice.promptId, optionId }, (res) => {
-      if (res && res.error) setActionError(res.error);
+      if (res && res.error) {
+        console.error('[game:effectPromptRespond]', res.error);
+        setActionError(res.error);
+      }
     });
   }
 
   function handleRollChoiceRespond(optionId, overrideValue) {
     if (!pendingRollChoice) return;
     socket.emit('game:diceChoiceRespond', { promptId: pendingRollChoice.promptId, optionId, overrideValue }, (res) => {
-      if (res && res.error) setActionError(res.error);
+      if (res && res.error) {
+        console.error('[game:diceChoiceRespond]', res.error);
+        setActionError(res.error);
+      }
     });
   }
 
-  // Precomputed once for the playing-phase render -- both the left button
-  // column and the center room view need these.
+  // Precomputed once for the playing-phase render -- both the action panel
+  // and the viewport room view need these.
   let me, currentRoom, hasRoomForFloor, directions;
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
@@ -203,146 +229,127 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       )}
 
       {phase === 'playing' && (
-        <div>
-        <div
-          style={{
-            display: 'flex',
-            // --total-square = 目前房間的最大預估視野（房間本身＋上下左右
-            // 各 15% 的鄰居預覽空間），高度貼齊螢幕可用垂直空間 -- 標題跟
-            // 錯誤訊息都搬進了左欄，這裡只留一點點緩衝（16px）避免貼死。
-            // 中間欄位寬度直接等於這個值，左右欄位平分剩下的橫向空間
-            // （flex:1）。--tile-size / --peek-size 依開發者指定比例反推：
-            // 房間邊長 = 視野邊長 × 0.7，每側鄰居預覽寬度 = 視野邊長 × 0.15。
-            '--total-square': 'calc(100vh - 16px)',
-            '--tile-size': 'calc(var(--total-square) * 0.7)',
-            '--peek-size': 'calc(var(--total-square) * 0.15)',
-          }}
-        >
-          {/* TEMP: 除錯用邊框，用來核對左中右三欄的實際範圍，確認後可移除 */}
-          <div style={{ flex: 1, minWidth: 0, border: '2px dashed red', boxSizing: 'border-box' }}>
-            {/* Padding lives on this inner wrapper, not the flex item itself --
-                padding on a flex-basis:0% item still acts as a shrink floor in
-                some browsers even with minWidth:0, which broke the even
-                left/right split. */}
-            <div style={{ padding: 8 }}>
-              {header}
-              <div>
-                {directions.map((d) => (
-                  <button
-                    key={d.direction}
-                    onClick={() => handleMove(d.direction)}
-                    style={{
-                      marginRight: 8,
-                      marginBottom: 8,
-                      border: d.kind === 'move' ? '2px solid #2ecc71' : '2px dashed #888',
-                      backgroundColor: d.kind === 'move' ? '#eafaf1' : '#f0f0f0',
-                    }}
-                  >
-                    {DIRECTION_LABELS[d.direction]}
-                    {d.kind === 'open_door' ? '？' : ''}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
-                {mapMode === 'focused' ? '切換到總覽地圖' : '切換回目前房間'}
+        <div className="playing-layout">
+          {/* TEMP: 除錯用邊框，用來核對版面各區塊的實際範圍，確認後可移除 */}
+          <div className="playing-layout__viewport" style={{ border: '2px dashed green', boxSizing: 'border-box' }}>
+            <div style={{ position: 'relative', width: 'var(--total-square)', height: 'var(--total-square)' }}>
+              {(() => {
+                if (mapMode === 'overview') {
+                  const boardRooms = gameState.board[overviewFloor];
+                  return (
+                    <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <OverviewMap
+                        visitedRooms={me.visitedRooms}
+                        floor={overviewFloor}
+                        onFloorChange={setOverviewFloor}
+                        boardRooms={boardRooms}
+                        roomContent={roomContent}
+                        playerX={me.floor === overviewFloor ? me.x : null}
+                        playerY={me.floor === overviewFloor ? me.y : null}
+                      />
+                    </div>
+                  );
+                }
+
+                const roomsInSameSpot = gameState.players.filter(
+                  (p) => p.floor === me.floor && p.x === me.x && p.y === me.y
+                );
+
+                return (
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <FocusedRoomView
+                      currentRoom={currentRoom}
+                      boardRooms={gameState.board[me.floor]}
+                      roomContent={roomContent}
+                      roomsInSameSpot={roomsInSameSpot}
+                      allPlayers={gameState.players}
+                      directions={directions}
+                      onMove={handleMove}
+                    />
+                  </div>
+                );
+              })()}
+              {/* 四個角落浮動按鈕：不管目前是聚焦房間還是總覽地圖都要顯示 */}
+              <button style={cornerButtonStyle('top-left')} onClick={() => handleSelectAction('room_action')}>
+                行動
+              </button>
+              <button style={cornerButtonStyle('top-right')} onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
+                {mapMode === 'focused' ? '總覽地圖' : '目前房間'}
+              </button>
+              <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
+                襲擊
+              </button>
+              <button style={cornerButtonStyle('bottom-right')} onClick={handleEndTurn}>
+                回合結束
               </button>
             </div>
           </div>
-          <div
-            style={{
-              width: 'var(--total-square)',
-              flexShrink: 0,
-              display: 'flex',
-              justifyContent: 'center',
-              border: '2px dashed green',
-              boxSizing: 'border-box',
-            }}
-          >
-            {(() => {
-              if (mapMode === 'overview') {
-                const boardRooms = gameState.board[overviewFloor];
-                return (
-                  <OverviewMap
-                    visitedRooms={me.visitedRooms}
-                    floor={overviewFloor}
-                    onFloorChange={setOverviewFloor}
-                    boardRooms={boardRooms}
-                    roomContent={roomContent}
-                    playerX={me.floor === overviewFloor ? me.x : null}
-                    playerY={me.floor === overviewFloor ? me.y : null}
-                  />
-                );
-              }
-
-              const roomsInSameSpot = gameState.players.filter(
-                (p) => p.floor === me.floor && p.x === me.x && p.y === me.y
-              );
-
-              return (
-                <FocusedRoomView
-                  player={me}
-                  currentRoom={currentRoom}
-                  boardRooms={gameState.board[me.floor]}
-                  roomContent={roomContent}
-                  roomsInSameSpot={roomsInSameSpot}
-                  allPlayers={gameState.players}
-                />
-              );
-            })()}
-          </div>
-          <div style={{ flex: 1, minWidth: 0, border: '2px dashed blue', boxSizing: 'border-box' }}>
+          <div className="playing-layout__panel" style={{ border: '2px dashed blue', boxSizing: 'border-box' }}>
             <CharacterPanel
               player={me}
               messages={messages}
               cardContent={cardContent}
               onSelectAction={handleSelectAction}
-              onUseStairs={handleUseStairs}
-              onEndTurn={handleEndTurn}
             />
           </div>
-        </div>
-          {pendingEffectChoice && (
-            <div>
-              <p>效果選擇中：{pendingEffectChoice.description}</p>
-              <ul>
-                {pendingEffectChoice.options.map((o) => (
-                  <li key={o.optionId}>
-                    {o.label || o.optionId}
-                    <button onClick={() => handleEffectChoiceRespond(o.optionId)}>選這個</button>
-                  </li>
-                ))}
-              </ul>
+          {(pendingEffectChoice || pendingRollChoice) && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 50,
+              }}
+            >
+              <div style={{ backgroundColor: '#fff', padding: 16, maxWidth: '90%', maxHeight: '80%', overflow: 'auto', borderRadius: 8 }}>
+              {pendingEffectChoice && (
+                <div>
+                  <p>效果選擇中：{pendingEffectChoice.description}</p>
+                  <ul>
+                    {pendingEffectChoice.options.map((o) => (
+                      <li key={o.optionId}>
+                        {o.label || o.optionId}
+                        <button onClick={() => handleEffectChoiceRespond(o.optionId)}>選這個</button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {pendingRollChoice && (
+                <div>
+                  <p>擲骰道具介入：要不要使用道具？</p>
+                  <ul>
+                    {pendingRollChoice.options.map((o) => (
+                      <li key={o.itemId}>
+                        {o.name}
+                        {o.diceInterjection.override ? (
+                          <>
+                            <input
+                              type="number"
+                              min="0"
+                              max="8"
+                              value={overrideInput}
+                              onChange={(e) => setOverrideInput(e.target.value)}
+                            />
+                            <button onClick={() => handleRollChoiceRespond(o.itemId, Number(overrideInput))}>
+                              使用
+                            </button>
+                          </>
+                        ) : (
+                          <button onClick={() => handleRollChoiceRespond(o.itemId, undefined)}>使用</button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                  <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
+                </div>
+              )}
+              </div>
             </div>
           )}
-          {pendingRollChoice && (
-            <div>
-              <p>擲骰道具介入：要不要使用道具？</p>
-              <ul>
-                {pendingRollChoice.options.map((o) => (
-                  <li key={o.itemId}>
-                    {o.name}
-                    {o.diceInterjection.override ? (
-                      <>
-                        <input
-                          type="number"
-                          min="0"
-                          max="8"
-                          value={overrideInput}
-                          onChange={(e) => setOverrideInput(e.target.value)}
-                        />
-                        <button onClick={() => handleRollChoiceRespond(o.itemId, Number(overrideInput))}>使用</button>
-                      </>
-                    ) : (
-                      <button onClick={() => handleRollChoiceRespond(o.itemId, undefined)}>使用</button>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
-            </div>
-          )}
-          <h3>最新遊戲狀態（除錯用，保留）</h3>
-          <pre>{JSON.stringify(gameState, null, 2)}</pre>
         </div>
       )}
     </div>

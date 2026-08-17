@@ -1,6 +1,6 @@
 import RoomTile from './RoomTile';
 import PlayerBadge from './PlayerBadge';
-import { getAvailableDirections, findRoomInfo } from './mapUtils';
+import { findRoomInfo } from './mapUtils';
 
 // The room tile's size comes from --tile-size, and each neighbor peek's
 // thickness from --peek-size -- both CSS custom properties set by an
@@ -123,20 +123,42 @@ function NeighborPeek({ direction, neighborRoom, roomContent }) {
   return <div style={{ ...style, backgroundImage: 'none', backgroundColor: '#8a8a8a', opacity: 0.4 }} />;
 }
 
-// Move/open-door buttons live in DebugGameScreen's left column now (not
-// here) -- this view is purely the visual room square (tile + neighbor
-// peeks + player badges). Only 'move' directions matter here, since only
-// those get a neighbor peek; open_door directions have no neighbor room to
-// peek at yet.
-export default function FocusedRoomView({ player, currentRoom, boardRooms, roomContent, roomsInSameSpot, allPlayers }) {
+// Centers a move/open-door button inside the 15%-wide neighbor-peek band on
+// the given side, floating just above the room image / neighbor peek so it's
+// always clickable and never covered.
+function directionButtonStyle(direction) {
+  const base = { position: 'absolute', zIndex: 10 };
+  if (direction === 'north') {
+    return { ...base, top: 'calc(-1 * var(--peek-size) / 2)', left: '50%', transform: 'translate(-50%, -50%)' };
+  }
+  if (direction === 'south') {
+    return { ...base, bottom: 'calc(-1 * var(--peek-size) / 2)', left: '50%', transform: 'translate(-50%, 50%)' };
+  }
+  if (direction === 'east') {
+    return { ...base, right: 'calc(-1 * var(--peek-size) / 2)', top: '50%', transform: 'translate(50%, -50%)' };
+  }
+  // west
+  return { ...base, left: 'calc(-1 * var(--peek-size) / 2)', top: '50%', transform: 'translate(-50%, -50%)' };
+}
+
+export default function FocusedRoomView({
+  currentRoom,
+  boardRooms,
+  roomContent,
+  roomsInSameSpot,
+  allPlayers,
+  directions,
+  onMove,
+}) {
   const currentInfo = findRoomInfo(currentRoom.roomId, roomContent);
-  const moveDirections = getAvailableDirections(player, currentRoom, boardRooms).filter((d) => d.kind === 'move');
 
   return (
     <div style={{ position: 'relative', width: 'var(--tile-size)', height: 'var(--tile-size)' }}>
-      {moveDirections.map((d) => (
-        <NeighborPeek key={d.direction} direction={d.direction} neighborRoom={d.neighborRoom} roomContent={roomContent} />
-      ))}
+      {directions
+        .filter((d) => d.kind === 'move')
+        .map((d) => (
+          <NeighborPeek key={d.direction} direction={d.direction} neighborRoom={d.neighborRoom} roomContent={roomContent} />
+        ))}
       <RoomTile
         filename={currentInfo?.filename}
         name={currentInfo?.name}
@@ -153,6 +175,22 @@ export default function FocusedRoomView({ player, currentRoom, boardRooms, roomC
           />
         );
       })}
+      {directions.map((d) => (
+        <button
+          key={d.direction}
+          onClick={() => onMove(d.direction)}
+          style={{
+            ...directionButtonStyle(d.direction),
+            border: d.kind === 'move' ? '2px solid #2ecc71' : '2px dashed #888',
+            backgroundColor: d.kind === 'move' ? '#eafaf1' : '#f0f0f0',
+            borderRadius: 4,
+            padding: '2px 6px',
+            fontSize: 12,
+          }}
+        >
+          {d.kind === 'move' ? '移動' : '開門'}
+        </button>
+      ))}
     </div>
   );
 }

@@ -1,0 +1,59 @@
+/* 遊戲進行畫面（DebugGameScreen phase==='playing'）的版面容器。
+   橫式（預設）：視野畫面在左、角色資訊＋行動區域在右。直式（orientation:
+   portrait）：視野正方形在上，角色資訊＋行動區域在下。--total-square 橫式依
+   螢幕高度算、直式依螢幕寬度算，--tile-size/--peek-size 永遠是 --total-square
+   的固定比例（70%/15%），兩種模式共用同一組公式。整個容器用 position:fixed
+   釘死在視窗範圍內、overflow:hidden 鎖死捲動，兩個區域都不可上下左右滑動。 */
+/* 瀏覽器預設 body margin（通常 8px）會讓頁面多出可捲動的高度，即使
+   .playing-layout 本身用 position:fixed 精準貼齊視窗 -- 直接歸零避免這個
+   殘留捲動空間。只有這個畫面（DebugGameScreen）會 import 這個檔案，其他頁面
+   不受影響。 */
+body {
+  margin: 0;
+}
+
+.playing-layout {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  overscroll-behavior: none;
+  display: grid;
+  grid-template-columns: var(--total-square) 1fr;
+  grid-template-rows: 1fr;
+  grid-template-areas: 'viewport panel';
+  --total-square: calc(100vh - 16px);
+  --tile-size: calc(var(--total-square) * 0.7);
+  --peek-size: calc(var(--total-square) * 0.15);
+}
+
+@media (orientation: portrait) {
+  .playing-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: var(--total-square) 1fr;
+    grid-template-areas:
+      'viewport'
+      'panel';
+    --total-square: calc(100vw - 16px);
+  }
+}
+
+.playing-layout__viewport {
+  grid-area: viewport;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  /* Grid items default to min-width/min-height:auto, which lets oversized
+     content grow the track (and the fixed container) past the viewport
+     instead of being clipped by overflow:hidden -- reset to 0 so hidden
+     overflow actually clips. */
+  min-width: 0;
+  min-height: 0;
+}
+
+.playing-layout__panel {
+  grid-area: panel;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+}
