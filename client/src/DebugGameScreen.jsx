@@ -3,8 +3,13 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import CheckModal from './gameplay/CheckModal';
-import { getAvailableDirections, findCardInfo } from './gameplay/mapUtils';
+import { getAvailableDirections, findRoomInfo, findCardInfo } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
+
+function findPlayerName(playerId, players) {
+  const player = (players || []).find((p) => p.playerId === playerId);
+  return player ? player.name : playerId;
+}
 
 // Centers a corner button inside the blank peek-size x peek-size square at
 // one of the viewport's 4 corners -- the room tile (70%) plus the 4 edge
@@ -82,10 +87,30 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           { noCheck: true, playerId: data.playerId, sourceKind: data.deckType, sourceId: data.cardId },
         ]);
       }
-      setMessages((prev) => [...prev, `抽到的卡：${JSON.stringify(data)}`]); // Task 7 會把這行換成人類可讀句子
+      const card = findCardInfo(data.cardId, cardContent);
+      const cardName = card ? card.name : data.cardId;
+      const playerName = findPlayerName(data.playerId, gameState?.players);
+      const templateByDeck = {
+        event: `${playerName}：發生了 ${cardName}`,
+        item: `${playerName} 在房間裡找到了 ${cardName}`,
+        omen: `${playerName}看到了一個怪異的現象（${cardName}）`,
+      };
+      setMessages((prev) => [...prev, templateByDeck[data.deckType] || `${playerName} 抽到了 ${cardName}`]);
     }
     function onCheckResolved(data) {
       setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data }]);
+      const playerName = findPlayerName(data.playerId, gameState?.players);
+      const STAT_LABELS_LOCAL = { might: '力量', speed: '速度', knowledge: '知識', sanity: '意志' };
+      const statLabel = STAT_LABELS_LOCAL[data.stat] || data.stat;
+      setMessages((prev) => [
+        ...prev,
+        `${playerName}：${statLabel}考驗${data.passed ? '成功' : '失敗'}（擲出 ${data.rolled} 點）`,
+      ]);
+    }
+    function onRoomEntered(data) {
+      const room = findRoomInfo(data.roomId, roomContent);
+      const playerName = findPlayerName(data.playerId, gameState?.players);
+      setMessages((prev) => [...prev, `${playerName} 進入了「${room ? room.name : data.roomId}」`]);
     }
     function onEffectPendingChoice(data) {
       setPendingEffectChoice(data);
@@ -109,6 +134,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.on('game:effectResolved', onEffectResolved);
     socket.on('game:diceChoicePending', onDiceChoicePending);
     socket.on('game:checkResolved', onCheckResolved);
+    socket.on('game:roomEntered', onRoomEntered);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -122,6 +148,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       socket.off('game:effectResolved', onEffectResolved);
       socket.off('game:diceChoicePending', onDiceChoicePending);
       socket.off('game:checkResolved', onCheckResolved);
+      socket.off('game:roomEntered', onRoomEntered);
     };
   }, [socket]);
 

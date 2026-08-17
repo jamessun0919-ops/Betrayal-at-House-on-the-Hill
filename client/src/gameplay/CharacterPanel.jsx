@@ -132,10 +132,10 @@ export default function CharacterPanel({ player, messages, cardContent, onSelect
         }}
       >
         {messages.length === 0 && (
-          <p style={{ margin: '2px 0', fontSize: '0.85em', color: '#888' }}>（尚無訊息）</p>
+          <p style={{ margin: '2px 0', fontSize: 24, color: '#888' }}>（尚無訊息）</p>
         )}
         {[...messages].reverse().map((m, i) => (
-          <p key={messages.length - i} style={{ margin: '2px 0', fontSize: '0.8em' }}>
+          <p key={messages.length - i} style={{ margin: '2px 0', fontSize: 24 }}>
             {m}
           </p>
         ))}
