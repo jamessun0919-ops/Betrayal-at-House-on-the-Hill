@@ -529,6 +529,14 @@ function findRoomDefinition(content, roomId) {
   );
 }
 
+function findSourceKind(content, sourceId) {
+  if (content.cards.items.some((c) => c.id === sourceId)) return 'item';
+  if (content.cards.events.some((c) => c.id === sourceId)) return 'event';
+  if (content.cards.omens.some((c) => c.id === sourceId)) return 'omen';
+  if (content.rooms.some((r) => r.id === sourceId) || content.startingRooms.some((r) => r.id === sourceId)) return 'room';
+  return null;
+}
+
 function finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
   // Any modifier gated on "meets another player" (e.g. 電池耗盡) clears
   // once the mover shares a room with someone -- check everyone now
@@ -687,7 +695,8 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     return { pending: false };
   }
   const card = drawCard(deck);
-  io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name });
+  const hasCheck = Array.isArray(card.effects) && card.effects.some((e) => e.type === 'dice_check');
+  io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name, hasCheck });
 
   if (deckType === 'omen') {
     // Omens are kept by the player like items -- some (crystal ball, mask) have
@@ -770,6 +779,19 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
   // modifiers (e.g. 電池耗盡 clearing once the player picks up 蠟燭).
   for (const item of player.inventory) {
     checkRemoveConditions(player, { type: 'holdsItem', itemId: item.id });
+  }
+  if (effectResult.diceCheckResult && content) {
+    io.to(roomCode).emit('game:checkResolved', {
+      playerId,
+      checkKind: 'cardCheck',
+      sourceKind: findSourceKind(content, sourceId),
+      sourceId,
+      stat: effectResult.diceCheckResult.stat,
+      rolled: effectResult.diceCheckResult.rolled,
+      threshold: null,
+      tierEffects: effectResult.diceCheckResult.tierEffects,
+      passed: !effectResult.diceCheckResult.tierEffects.some((e) => e.type === 'stat_change' && e.delta < 0),
+    });
   }
   io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });
   const outcome = { pending: false };

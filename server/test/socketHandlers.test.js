@@ -1340,6 +1340,95 @@ test('game:move into a room with a populated item deck draws a card and resolves
   httpServer.close();
 });
 
+// event_001 (腐敗惡臭) is a real content card with a genuine dice_check effect on
+// sanity -- used here (rather than an invented fixture id) per the developer's
+// explicit request, since hasCheck/checkResolved must reflect real card shapes.
+const EVENT_001_DICE_CHECK = {
+  id: 'event_001',
+  name: '腐敗惡臭',
+  effects: [{
+    type: 'dice_check',
+    stat: 'sanity',
+    tiers: [
+      { min: 5, max: 8, effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] },
+      { min: 1, max: 4, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+      { min: 0, max: 0, effects: [
+        { type: 'stat_change', stat: 'might', delta: -1 },
+        { type: 'stat_change', stat: 'speed', delta: -1 },
+        { type: 'stat_change', stat: 'knowledge', delta: -1 },
+        { type: 'stat_change', stat: 'sanity', delta: -1 },
+      ] },
+    ],
+  }],
+};
+
+test('game:cardDrawn reports hasCheck:true when the drawn card has a dice_check effect', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: { events: [EVENT_001_DICE_CHECK], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.cardId).toBe('event_001');
+  expect(cardDrawn.hasCheck).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:cardDrawn reports hasCheck:false when the drawn card has no dice_check effect', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{ id: 'item_001', name: '測試道具', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.cardId).toBe('item_001');
+  expect(cardDrawn.hasCheck).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('drawing a card whose effect is a dice_check broadcasts a cardCheck game:checkResolved to the whole room', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: { events: [EVENT_001_DICE_CHECK], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const checkResolvedPromise = new Promise((resolve) => otherClient.once('game:checkResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+
+  const checkResolved = await checkResolvedPromise;
+  expect(checkResolved.playerId).toBe(currentPlayerId);
+  expect(checkResolved.checkKind).toBe('cardCheck');
+  expect(checkResolved.sourceKind).toBe('event');
+  expect(checkResolved.sourceId).toBe('event_001');
+  expect(checkResolved.stat).toBe('sanity');
+  expect(checkResolved.threshold).toBeNull();
+  expect(Array.isArray(checkResolved.tierEffects)).toBe(true);
+  expect(typeof checkResolved.passed).toBe('boolean');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into a room whose deck is empty draws nothing and does not crash', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
