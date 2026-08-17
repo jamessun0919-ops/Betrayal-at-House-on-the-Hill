@@ -48,4 +48,14 @@ function findRoomInfo(roomId, roomContent) {
   );
 }
 
-export { DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo };
+function findCardInfo(cardId, cardContent) {
+  if (!cardContent) return null;
+  return (
+    (cardContent.items || []).find((c) => c.id === cardId) ||
+    (cardContent.events || []).find((c) => c.id === cardId) ||
+    (cardContent.omens || []).find((c) => c.id === cardId) ||
+    null
+  );
+}
+
+export { DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo };
