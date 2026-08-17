@@ -166,7 +166,11 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   const { interjectionChoice, ...restContext } = context;
   const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice || null, restContext);
   const tier = evaluateTiers(finalSum, effect.tiers);
-  return resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
+  const nestedResult = resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
+  return {
+    ...nestedResult,
+    diceCheckResult: { stat: effect.stat, diceCount: baseCount, rolled: finalSum, tierEffects: tier.effects },
+  };
 }
 
 function handleDrawCard(gameState, playerId, effect) {
@@ -282,6 +286,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   requirePlayer(gameState, playerId);
   let appliedCount = 0;
   let drawnCards = [];
+  let diceCheckResult = null;
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -295,10 +300,16 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     if (result && Array.isArray(result.drawnCards)) {
       drawnCards = drawnCards.concat(result.drawnCards);
     }
+    if (result && result.diceCheckResult) {
+      diceCheckResult = result.diceCheckResult;
+    }
   }
   const output = { pending: false, appliedCount };
   if (drawnCards.length > 0) {
     output.drawnCards = drawnCards;
+  }
+  if (diceCheckResult) {
+    output.diceCheckResult = diceCheckResult;
   }
   return output;
 }

@@ -517,6 +517,25 @@ test('resolveEffects dice_check does not leak interjectionChoice into a nested e
   expect(player.inventory).toEqual([]); // the outer's consumable item was removed exactly once, not twice
 });
 
+test('resolveEffects dice_check attaches diceCheckResult (stat/diceCount/rolled/tierEffects) so callers can broadcast the outcome', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const tierEffects = [{ type: 'stat_change', stat: 'might', delta: 1 }];
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 2,
+      tiers: [{ min: 4, max: 4, effects: tierEffects }],
+    },
+  ], { rng });
+  expect(result.diceCheckResult).toEqual({
+    stat: undefined,
+    diceCount: 2,
+    rolled: 4,
+    tierEffects,
+  });
+});
+
 test('resolveEffects choice creates a pending prompt and returns the full options with nested effects', () => {
   const gameState = makeGameStateWithPlayer();
   const promptState = createPromptState();
@@ -599,29 +618,39 @@ test('resolveEffects appliedCount counts each top-level effect processed', () =>
 test('resolveEffects appliedCount propagates from a dice_check tier that actually applied effects', () => {
   const gameState = makeGameStateWithPlayer();
   const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2, sum with 1 die = 2
+  const tierEffects = [{ type: 'stat_change', stat: 'might', delta: 1 }, { type: 'stat_change', stat: 'speed', delta: 1 }];
   const result = resolveEffects(gameState, createPromptState(), 'p1', [
     {
       type: 'dice_check',
       diceCount: 1,
       tiers: [
-        { min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }, { type: 'stat_change', stat: 'speed', delta: 1 }] },
+        { min: 0, max: 8, effects: tierEffects },
       ],
     },
   ], { rng });
-  expect(result).toEqual({ pending: false, appliedCount: 2 });
+  expect(result).toEqual({
+    pending: false,
+    appliedCount: 2,
+    diceCheckResult: { stat: undefined, diceCount: 1, rolled: 2, tierEffects },
+  });
 });
 
 test('resolveEffects appliedCount is 0 when the matched dice_check tier has no effects (e.g. a failed check)', () => {
   const gameState = makeGameStateWithPlayer();
   const rng = jest.fn().mockReturnValue(0); // every die -> face 0, sum = 0
+  const tierEffects = [];
   const result = resolveEffects(gameState, createPromptState(), 'p1', [
     {
       type: 'dice_check',
       diceCount: 1,
-      tiers: [{ min: 0, max: 8, effects: [] }],
+      tiers: [{ min: 0, max: 8, effects: tierEffects }],
     },
   ], { rng });
-  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(result).toEqual({
+    pending: false,
+    appliedCount: 0,
+    diceCheckResult: { stat: undefined, diceCount: 1, rolled: 0, tierEffects },
+  });
 });
 
 test('computeInterjectedRoll is exported and applies a chosen interjection\'s cost/bonus directly', () => {
