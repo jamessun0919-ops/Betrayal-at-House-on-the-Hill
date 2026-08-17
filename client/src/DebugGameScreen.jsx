@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
-import { getAvailableDirections } from './gameplay/mapUtils';
+import CheckModal from './gameplay/CheckModal';
+import { getAvailableDirections, findCardInfo } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
 // Centers a corner button inside the blank peek-size x peek-size square at
@@ -48,6 +49,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   const [overviewFloor, setOverviewFloor] = useState('ground');
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
   const [pendingRollChoice, setPendingRollChoice] = useState(null);
+  const [pendingCheckQueue, setPendingCheckQueue] = useState([]);
   const [overrideInput, setOverrideInput] = useState('0');
 
   useEffect(() => {
@@ -74,7 +76,16 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setMessages((prev) => [...prev, `待處理動作：${JSON.stringify(data)}`]);
     }
     function onCardDrawn(data) {
-      setMessages((prev) => [...prev, `抽到的卡：${JSON.stringify(data)}`]);
+      if (!data.hasCheck) {
+        setPendingCheckQueue((prev) => [
+          ...prev,
+          { noCheck: true, playerId: data.playerId, sourceKind: data.deckType, sourceId: data.cardId },
+        ]);
+      }
+      setMessages((prev) => [...prev, `抽到的卡：${JSON.stringify(data)}`]); // Task 7 會把這行換成人類可讀句子
+    }
+    function onCheckResolved(data) {
+      setPendingCheckQueue((prev) => [...prev, { noCheck: false, ...data }]);
     }
     function onEffectPendingChoice(data) {
       setPendingEffectChoice(data);
@@ -97,6 +108,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.on('game:effectPendingChoice', onEffectPendingChoice);
     socket.on('game:effectResolved', onEffectResolved);
     socket.on('game:diceChoicePending', onDiceChoicePending);
+    socket.on('game:checkResolved', onCheckResolved);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -109,6 +121,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       socket.off('game:effectPendingChoice', onEffectPendingChoice);
       socket.off('game:effectResolved', onEffectResolved);
       socket.off('game:diceChoicePending', onDiceChoicePending);
+      socket.off('game:checkResolved', onCheckResolved);
     };
   }, [socket]);
 
@@ -357,6 +370,46 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                   <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
                 </div>
               )}
+              </div>
+            </div>
+          )}
+          {pendingCheckQueue.length > 0 && !pendingCheckQueue[0].noCheck && (
+            <CheckModal
+              check={pendingCheckQueue[0]}
+              roomContent={roomContent}
+              cardContent={cardContent}
+              onDone={() => setPendingCheckQueue((prev) => prev.slice(1))}
+            />
+          )}
+          {pendingCheckQueue.length > 0 && pendingCheckQueue[0].noCheck && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 70,
+              }}
+            >
+              <div style={{ width: 320, maxWidth: '90%', backgroundColor: '#111', color: '#f5f5f0', borderRadius: 12, padding: 20, boxSizing: 'border-box' }}>
+                {(() => {
+                  const noCheckEntry = pendingCheckQueue[0];
+                  const card = findCardInfo(noCheckEntry.sourceId, cardContent);
+                  return (
+                    <>
+                      <p style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10 }}>{card ? card.name : noCheckEntry.sourceId}</p>
+                      <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>{card ? (card.text || card.description || '') : ''}</p>
+                    </>
+                  );
+                })()}
+                <button
+                  style={{ width: '100%', fontSize: 18, padding: 12 }}
+                  onClick={() => setPendingCheckQueue((prev) => prev.slice(1))}
+                >
+                  確認
+                </button>
               </div>
             </div>
           )}
