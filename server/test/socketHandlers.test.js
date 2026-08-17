@@ -729,6 +729,22 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
   httpServer.close();
 });
 
+test('game:move into a plain (no leaveCheck) neighbor broadcasts game:roomEntered with the entered room id', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+
+  const roomEnteredPromise = new Promise((resolve) => otherClient.once('game:roomEntered', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(result.error).toBeUndefined();
+
+  const roomEntered = await roomEnteredPromise;
+  expect(roomEntered.playerId).toBe(currentPlayerId);
+  expect(roomEntered.roomId).toBe('room_new');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move applies a room\'s leaveCheck before allowing the player to move out, blocking on a failed roll', async () => {
   const content = makeContent({
     startingRooms: [
@@ -752,6 +768,38 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
   expect(result.kind).toBe('leaveCheckFailed');
   expect(player.x).toBe(0); // unmoved
   expect(player.actionPoints).toBe(startingAP - 1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move with a failing leaveCheck broadcasts game:checkResolved to the whole room, not just the mover', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const checkResolvedPromise = new Promise((resolve) => otherClient.once('game:checkResolved', resolve));
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> face 0, guaranteed fail
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  const checkResolved = await checkResolvedPromise;
+  expect(checkResolved.playerId).toBe(currentPlayerId);
+  expect(checkResolved.checkKind).toBe('leaveCheck');
+  expect(checkResolved.sourceKind).toBe('room');
+  expect(checkResolved.sourceId).toBe('room_lobby_a');
+  expect(checkResolved.stat).toBe('might');
+  expect(checkResolved.threshold).toBe(3);
+  expect(checkResolved.tierEffects).toBeNull();
+  expect(checkResolved.passed).toBe(false);
 
   clientA.close();
   clientB.close();
@@ -826,6 +874,34 @@ test('game:move into room_collapsed_room: failing the speed check drops the play
   expect(player.floor).toBe('basement');
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into the collapsed room broadcasts a collapseCheck game:checkResolved', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const checkResolvedPromise = new Promise((resolve) => otherClient.once('game:checkResolved', resolve));
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> face 0, guaranteed fail
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  const checkResolved = await checkResolvedPromise;
+  expect(checkResolved.playerId).toBe(currentPlayerId);
+  expect(checkResolved.checkKind).toBe('collapseCheck');
+  expect(checkResolved.sourceKind).toBe('room');
+  expect(checkResolved.sourceId).toBe('room_collapsed_room');
+  expect(checkResolved.stat).toBe('speed');
+  expect(checkResolved.tierEffects).toBeNull();
+  expect(checkResolved.passed).toBe(false);
 
   clientA.close();
   clientB.close();

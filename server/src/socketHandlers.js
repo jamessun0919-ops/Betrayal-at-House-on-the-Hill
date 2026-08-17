@@ -544,6 +544,39 @@ function finishMoveResult(io, socket, gameState, roomCode, playerId, result, eff
     }
   }
 
+  if (result.leaveCheckResult) {
+    io.to(roomCode).emit('game:checkResolved', {
+      playerId,
+      checkKind: 'leaveCheck',
+      sourceKind: 'room',
+      sourceId: result.leaveCheckResult.roomId,
+      stat: result.leaveCheckResult.stat,
+      rolled: result.leaveCheckResult.rolled,
+      threshold: result.leaveCheckResult.required,
+      tierEffects: null,
+      passed: result.leaveCheckResult.passed,
+    });
+  }
+
+  if (result.collapseResult) {
+    io.to(roomCode).emit('game:checkResolved', {
+      playerId,
+      checkKind: 'collapseCheck',
+      sourceKind: 'room',
+      sourceId: result.roomId,
+      stat: result.collapseResult.stat,
+      rolled: result.collapseResult.rolled,
+      threshold: result.collapseResult.required,
+      tierEffects: null,
+      passed: !result.collapseResult.fell,
+    });
+  }
+
+  if (result.kind === 'move' || result.kind === 'open_door') {
+    const enteredRoom = gameState.board[mover.floor].get(coordKey(mover.x, mover.y));
+    io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
+  }
+
   if (result.pendingCardDraw) {
     try {
       const drawOutcome = resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, result.pendingCardDraw.deck, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
@@ -609,7 +642,7 @@ function handleCollapseCheckRollPending(io, effectResolverManager, gameState, ro
     deadline: prompt.deadline,
     options: moveResult.options,
     resumeKind: 'collapseCheck',
-    resumeContext: { pendingCardDraw: moveResult.pendingCardDraw },
+    resumeContext: { pendingCardDraw: moveResult.pendingCardDraw, leaveCheckResult: moveResult.leaveCheckResult },
   };
   resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
   io.to(roomCode).emit('game:diceChoicePending', {
@@ -843,6 +876,7 @@ function resumeCollapseCheckRollChoice(io, socket, effectResolverManager, gameSt
     roomId: room.roomId,
     pendingCardDraw: resumeContext.pendingCardDraw,
     collapseResult,
+    ...(resumeContext.leaveCheckResult ? { leaveCheckResult: resumeContext.leaveCheckResult } : {}),
   };
   finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
   return { pending: false };
