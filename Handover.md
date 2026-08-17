@@ -1,10 +1,10 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-17（第 16-19 次工作階段，手機直式版面改版全部完成：橫直式並存、遊戲畫面精簡為視野／角色資訊兩區域並完全鎖定捲動、方向按鈕移入視野區域、四顆動作按鈕移到視野四角、樓梯功能合併進「行動」按鈕、狀態欄依開發者規格定案。全程未能用截圖驗證，改用 JS 結構化量測，詳見下方除錯注意事項）
+最後更新：2026-08-17（第 5-7 次工作階段〔接續同日第 1-4 次之後〕：三樓層架構＋座標式房間連接機制＋leaveCheck 失敗扣屬性引擎缺口全部完成；大廳背景圖／選角立繪／遊戲內角色 ICON 三項版面調整完成並實測；「統一考驗彈窗機制」設計文件已寫成並提交，**下階段第一件事是呼叫 `writing-plans` 拆任務清單**，開發者已明確指示這次先收工不繼續執行）
 
-**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架、`lobby:players` 競態條件修復、房間／角色資料稽核與內容補完（2026-08-16）皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
+**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架、`lobby:players` 競態條件修復、房間／角色資料稽核與內容補完、手機直式版面改版、三樓層＋座標式房間連接機制、leaveCheck 失敗扣屬性引擎缺口、角色圖示串接與版面調整（背景圖／立繪／ICON）皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
 
-**手機直式版面改版（2026-08-17，已完成）**：開發者從上次收工記錄的 4 項待辦中選了這項優先做。橫式／直式版面用 CSS Grid + media query 並存（不是互斥切換），遊戲進行畫面精簡成「視野／角色資訊行動區」兩區域且完全鎖定捲動，方向按鈕與 4 顆動作按鈕都移進視野正方形內浮動定位，樓梯功能併入「行動」按鈕（新增 `move_to_room` 通用效果類型），狀態欄面板歷經 3 輪迭代後定案。詳見下方「已完成進度」與「關鍵設定」的完整記錄。
+**統一考驗彈窗機制＋訊息欄可讀化（2026-08-17，設計已完成並提交，尚未進入 writing-plans／實作）**：開發者要求訊息欄字體放大到 24px、內容從代碼式文字改成人類可讀句子，並設計「進入房間跳出考驗彈窗（描述＋擲骰按鈕）→ 動畫 → 結果彈窗」的機制。範圍在討論過程中由開發者明確擴大為：`leaveCheck`／崩塌房間速度考驗／卡片內建考驗三個現有各自獨立的考驗觸發點，全部統一整合進同一套彈窗機制，且此機制做完後未來任何新的考驗行為都要掛上同一套。設計文件已用瀏覽器 mockup 跟開發者確認版面後寫成並提交：[docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md](docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md)。**下階段開工第一件事就是針對這份設計文件呼叫 `writing-plans` 拆成實作任務清單**，開發者已明確要求這次先結束階段，不要在本階段內繼續往下做。
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -42,6 +42,8 @@
 - **已評估過、不採用的外部資源**：`Claude-Code-Game-Studios`——技術棧/規模都跟本專案不符
 - **房間／角色資料稽核與內容補完（2026-08-16，已完成，`data/rooms/rooms.json`/`data/rooms/starting-rooms.json`/`data/characters/characters.json` 仍是開發者自己持有並填寫的內容資料，agent 依開發者指示直接編輯）**：稽核報告 [docs/2026-08-16-room-data-audit.md](docs/2026-08-16-room-data-audit.md)（JSON 格式檢查、邪祟降臨房間比對、美術圖缺漏清單）。`characters.json` 修正 `flieicon`→`fileicon` 手誤（6 筆，尚未被任何前端程式碼讀取，開發者說明用途是遊戲地圖上顯示的 icon 圖樣，M2D 之後的待辦）。`rooms.json` 從 32 筆擴充到 49 筆：11 筆先前佔位房間（餐廳／手術室／天花閣樓／五芒星室／墓園／地下墓穴／地底深淵／鍋爐室／地窖／酒窖／倉庫）已依 `_rule.pdf` 房間附錄官方原文補上具體機制（天花閣樓/五芒星室/墓園用既有 `leaveCheck`；地下墓穴/地底深淵「房間分兩側，通過需檢定」/鍋爐室/地窖「停留結束回合受傷」機制超出現有 schema，標記 `needsCustomLogic:true`＋官方原文，程式邏輯未寫；餐廳/手術室/酒窖/倉庫查證後確認官方就是純板塊無特殊機制）；新增髒亂的房間（`room_junk_room`，官方力量檢定3+機制，獨立於既有 `room_messy_room`）／風琴室／地下湖／包廂房／臥房／崩塌的房間共 6 筆；`room_ballroom` 樓層從 `"any"` 改為 `"ground"`（配合包廂房綁定機制需要明確樓層對應）。`starting-rooms.json` 新增地下平台（`room_basement_landing`，`floor:"basement"`，`filename:null` 待開發者補圖）。跨全部 50 個劇本（不限本專案 2 個選定劇本）查核 10 間房間的使用情形：老朽迴廊／塵封迴廊／客房 3 間確認全劇本 0 筆命中；其餘 7 間（地下湖/風琴室/崩塌的房間/包廂房/神秘電梯/煤導槽/臥房）都查到具體劇本用法，詳見下方「目前的瓶頸或停頓點」的地下室新機制段落。
 - **手機直式版面改版（2026-08-17，已完成並合併進 `main`）**：見下方「關鍵設定」的完整技術記錄，這裡只列開發者可見的成果——橫式／直式版面並存（自動依螢幕方向切換，不需要手動選擇）；遊戲進行畫面精簡成「視野畫面」／「角色資訊＋行動區域」兩個區域，兩者都完全鎖定、玩家不能上下左右滑動；移動/開門方向按鈕浮在視野正方形四邊的鄰房預覽帶上；行動／總覽地圖／襲擊／回合結束 4 顆按鈕浮在視野正方形四個角落；原本獨立的樓梯按鈕拿掉，改成走到 LobbyC 或二樓平台時按「行動」就會上下樓（維持免費，不扣行動力）；狀態欄最終版面是上（姓名/行動力＋力量/速度/意志/知識由上到下各一排，字體與刻度格已放大）下（訊息欄，跟整個面板同寬）兩段，道具清單移到狀態欄右側 20% 寬的獨立區域，點道具名稱會跳出「使用／遺留／取消」選項（**「給予」尚未實作**，見下方「目前的瓶頸或停頓點」）。
+- **三樓層架構＋座標式房間連接機制＋leaveCheck 失敗扣屬性引擎缺口（2026-08-17，已完成並合併進 `main`，開發者已確認）**：`boardGenerator.js` 的 `FLOORS` 新增 `'basement'`（現為 `['ground','upper','basement']`），`createBoard` 新增 `basement` Map 並放置 `room_basement_landing`（北/東/西三門，跟二樓平台同形狀），但**目前沒有走樓梯可以到地下室**——地下室平台本身只是佔位，實際能抵達地下室的唯一途徑是崩塌的房間掉落（見下）。`turnFlow.js` 的 `moveToRoom` 新增崩塌房間（`room_collapsed_room`）速度檢定 5+（`COLLAPSE_CHECK_STAT`/`COLLAPSE_CHECK_MIN`，沿用既有道具介入擲骰模式），失敗會在正下方**同座標**生成一張新地下室房間卡並把玩家移過去（`applyCollapseCheck`，掉落連結記在 `placedRoom.collapseLink`）；新增舞廳／包廂房雙向綁定（`placeBallroomGalleryPair`：生成其中一間時同步在對應樓層同座標生成另一間，位置衝突則重抽，牌堆僅存最後一張時改隨機位置不強制同座標）。`leaveCheck` 的 `failPenalty`（塔橋/雜亂的房間/藤蔓糾纏的溫室/天花閣樓/五芒星室/墓園/髒亂的房間共 7 間房，此前只會擋住移動不會真的扣屬性）現在會呼叫 `changeStat` 真的執行扣屬性。**因為本次對話中途發生過一次視窗壓縮，這部分工作的原始逐字對話紀錄沒有完整保留**，chatlog 只能記錄重點摘要，如需更多實作細節請直接讀程式碼（`turnFlow.js`/`boardGenerator.js`/`roomDeck.js`）或問開發者。
+- **角色圖示串接與版面調整：大廳背景圖／選角立繪／遊戲內角色 ICON（2026-08-17，已完成並合併進 `main`，雙分頁模擬雙人流程實測通過）**：大廳初始頁面背景改為 `house_cloudy_day.webp`；選角頁面／遊戲內玩家圓形徽章的圖片來源整批換成開發者提供的新角色圖（`male_priest`/`female_Nurse`/`male_worker`/`female_police`/`male_athlrte`/`female_painter`，含對應 `_icon` 版本），從 `img/`（開發者個人暫存資料夾，不進版控）複製進 `client/public/images/`。**過程中發現並修補一個先前沒人注意到的伺服器缺口**：`gameManager.js` 的 `startGame` 雖然早就會依 `player.characterId` 查角色 `stats`/`itemID`，但這個 `characterId` 從未被寫回遊戲內玩家物件本身（`playerEntity.js` 的 `createPlayer` 原本沒有這個欄位），代表前端原理上不可能知道某個在場玩家對應哪個角色——已補上 `characterId` 從 `playerEntity`→`gameState`→`gameManager`→`socketHandlers` 的完整串接，`game:started` 新增 `characterContent` 廣播（比照既有 `roomContent`/`cardContent` 的一次性靜態資料模式）。`FocusedRoomView.jsx` 新增 `findCharacterIcon` 查表函式，`PlayerBadge.jsx` 有 `iconSrc` 時顯示角色圖示、否則維持原本顏色圓圈+字母的 fallback。
 
 ## 除錯注意事項 (Debug Notes — 審查發現的問題與後續慣例)
 
@@ -120,20 +122,17 @@
 - **`peek_and_reorder`（原本 M2c-1 就故意留空的「偷看牌堆+洗牌重排」效果）仍未實作**：水晶球原本需要這個機制，但開發者已經把水晶球簡化成「展示牌庫前 3 張供選 1 張，牌庫順序完全不調整」（見下方 `preview_and_choose`），改用更簡單的新機制解決，不需要真的做 `peek_and_reorder`。唯一還卡在這個缺口的只剩通靈板，已確認整張延後到 M3
 - **預兆牌現在會在抽到時加進玩家背包（跟道具共用同一個 `inventory`）**：原本抽到預兆牌只會解析一次性 `effects` 就結束，牌本身完全不會被追蹤持有。但水晶球/面具這類卡片文字是「當玩家**使用**...時」，代表需要「持有後、之後某回合主動使用」的道具式流程——`resolveCardDraw` 現在對 `deckType==='omen'` 一律 `addItem`，`game:selectAction` 的 `item` 分支查找內容時同時查 `content.cards.items` 跟 `content.cards.omens`。**副作用**：預兆牌現在也會出現在玩家背包清單裡，前端顯示道具清單時要注意這點（M2d 待辦）
 
+**收工關閉自啟動 server 時，不可用全域 `taskkill /IM node.exe`（2026-08-17，操作疏失記錄）**：收工前關閉本次啟動的測試伺服器，直接用 `taskkill /F /IM node.exe` 依「映像檔名稱」全域關閉，結果一次殺掉 4 個 node.exe（預期只有 2 個，backend／frontend 各自的 npm/npx 包裝行程+實際執行行程剛好各佔 2 個，數字對得上但無法回溯證明），如果開發者當下有其他跟本專案無關的 Node 服務在跑，會被一併誤殺且無法察覺。**已改用的正確作法**：先用 `netstat -ano` 找出目標 port（例如 3001/5173）對應的 PID，再用 `tasklist /FI "PID eq <PID>"` 確認該 PID 確實是 `node.exe`，最後用 `taskkill /F /PID <PID>`（可疊加多個 `/PID`）只關閉這些精準鎖定的行程，關閉後再用 `tasklist /FI "IMAGENAME eq node.exe"` 確認沒有其他殘留。**通用教訓：關閉自己啟動的背景服務，一律用「啟動時記下的 port/PID」精準關閉，絕對不要用全域的 image name／process name 條件，即使當下自己覺得系統上應該只有這幾個同名行程在跑**
+
 **環境問題（M2c-4/M2c-5 執行期間發現）——`server/test/socketHandlers.test.js` 執行後 Jest 進程不會自然結束**：用 `-t` 篩選單一測試（例如 `npx jest test/socketHandlers.test.js -t "..."`）時，測試本身 1 秒內就跑完並印出正確結果，但 Jest 之後會卡住印出 `Jest did not exit one second after the test run has completed. ... asynchronous operations that weren't stopped`，導致包住它的 shell 指令永遠不會回傳（背景執行也一樣，指令本身「完成」但底層 node 進程持續存活）。已重複驗證兩次，結果一致，確認是這個測試檔案既有的非同步 handle（很可能是 socket.io client/server 或計時器）未關閉的問題，跟任何一次程式改動無關。**後續在這個檔案（或整個 `server` 測試套件）上跑測試時的因應方式**：加上 `--forceExit` 旗標（例如 `npx jest --forceExit`）即可正常在數秒內返回，已驗證有效（279/279 全數通過）。如果沒加這個旗標又不想背景執行，改用背景執行＋直接讀取輸出檔案內容判斷測試結果，不要等待指令本身回傳完成；如果懷疑跟先前殘留行程搶資源，先用 `Get-CimInstance Win32_Process | Where-Object CommandLine -like '*jest*'` 檢查並清掉舊的 jest 行程鏈。尚未排查 handle 洩漏的實際來源，也還沒決定要不要修（可能是刻意的 fire-and-forget 設計，也可能是遺漏的 teardown），如果要修，屬於架構決策，需要先跟開發者討論方向，不要自行動手
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
 
-**開發者 2026-08-16 收工時記錄的 4 項待辦，UI 直式版面（原第 4 項）已於 2026-08-17 完成，剩下 3 項尚未排優先順序**：
+**最優先：「統一考驗彈窗機制」設計文件已完成並提交，尚未拆成實作任務清單**：[docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md](docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md)。開發者已明確指示「下一個階段再進行 writing-plans」——這不是卡住，是開發者主動要求停在這個點，下階段開工第一件事就是呼叫 `writing-plans` 技能把這份設計文件拆成任務清單，再決定用 `subagent-driven-development` 還是 inline 執行。
 
-1. **未通過考驗扣屬性的引擎缺口**：`leaveCheck` 房間（塔橋/雜亂的房間/藤蔓糾纏的溫室，2026-08-16 新增天空閣樓/五芒星室/墓園/髒亂的房間）的官方原文都寫明「檢定失敗時額外損失 1 級指定屬性」（例如天花閣樓失敗扣力量），但 `turnFlow.js` 的 `moveToRoom` 目前失敗只會擋住移動、扣 1 點行動力，完全沒有真的執行屬性損失。這個缺口從 `room_junk_room`/`room_messy_room` 就存在，2026-08-16 這次新增 3 間同類房間後範圍擴大到 4 間房，需要決定要不要／如何補上這段引擎邏輯。
-2. **寫死的二樓層（ground/upper）擴充成三樓層（＋basement）**：`boardGenerator.js` 的 `createBoard` 只認 `room_lobby_a/b/c`/`room_upper_landing` 四個固定 id，`board` 物件只有 `ground`/`upper` 兩個 Map；`placeNewRoom`/`canMoveBetween`（`boardGenerator.js`）與 `roomDeck.js` 的樓層檢查都寫死只接受 `'ground'`/`'upper'`，遇到 `'basement'` 會直接丟 `INVALID_FLOOR`；`stairsLink` 是寫死的一組 `{groundRoomId, upperRoomId}` 二選一配對。**2026-08-17 更新**：`useStairs`/`canUseStairs` 雖然還留著沒動，但實際的樓層移動已經改走更通用的 `move_to_room` 效果類型（見下方「關鍵設定」），未來擴充第三樓層時，這個效果類型本身不需要改，只要 `gameState.board` 多一個 `basement` Map、`placeNewRoom`/`canMoveBetween`/`roomDeck.js` 認得 `'basement'` 就會自動生效。這是牽動 `boardGenerator.js`/`turnFlow.js`/`roomDeck.js`/`gameState.js` 多檔案的結構性改動，開發者已明確要求獨立列為一個工作階段，不要跟其他項目混著做。
-3. **座標式房間連接機制設計**：現有系統只有「同樓層、東西南北四方向」的橫向開門，樓層切換是綁定特定房間 id 的獨立動作，完全沒有「同座標、跨樓層垂直連接」的概念。2026-08-16 已跟開發者確認 2 個需要這套機制的具體案例並把設計寫進 `rooms.json` 的 `text` 欄位（實際程式邏輯都還沒寫，`needsCustomLogic:true`）：
-   - **崩塌的房間 `room_collapsed_room`**（`floor:"ground"`）：速度檢定 5+／骰子物理傷害沿用官方原文，但掉落位置改用開發者自創的「正下方同座標地下室」規則（開發者理由：更符合探險遊戲的物理直覺，且後續原創劇本會用到這套座標機制；官方原文其實是「接到隨機一間已存在地下室房間的隨機未開門」，不需要座標系統，只需要三樓層系統——這個分歧已跟開發者確認過，開發者選了自創版）
-   - **舞廳 `room_ballroom` ↔ 包廂房 `room_gallery` 雙向綁定**：生成其中一間時，需在對應樓層的相同座標同步生成另一間；對應位置已被佔用時整個抽卡動作要重抽；例外情況（其中一間是該樓層牌堆僅存最後一張）改為在該樓層隨機位置生成另一間，不強制同座標
-   - 依賴第 2 項（三樓層）先做完，這套機制才有意義；開發者已明確要求跟第 2 項分開，獨立列為一個工作階段
+**2026-08-16 收工時記錄的 4 項待辦，全部已完成**（UI 直式版面／leaveCheck 失敗扣屬性／三樓層架構／座標式房間連接機制），不再是待辦。
 
-以下是這 3 項待辦出現之前，已經完成並確認無阻塞的既有進度：`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**、**`lobby:players` 競態條件修復**、**房間／角色資料稽核與內容補完**、**手機直式版面改版**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
+以下是既有、已確認無阻塞的完成進度：`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**、**`lobby:players` 競態條件修復**、**房間／角色資料稽核與內容補完**、**手機直式版面改版**、**三樓層＋座標式房間連接機制＋leaveCheck 扣屬性**、**角色圖示串接與版面調整**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
 
 **道具「給予」選項尚未實作（2026-08-17 新記錄）**：狀態欄道具區點選道具名稱後跳出的選項彈窗目前只有「使用」／「遺留」，沒有「給予」——伺服器 `turnFlow.js` 的 `giveItemAction` 已經支援（`mode:'give'` + `targetPlayerId`），純粹是前端 `CharacterPanel.jsx` 目前沒有拿到同房玩家名單，沒辦法做選人介面。要補的話需要從 `DebugGameScreen.jsx` 把 `gameState.players`（篩選同房間）傳進 `CharacterPanel`。
 
@@ -143,7 +142,7 @@
 
 **其餘一般房間的美術圖，持續由開發者生成中**：一般房間的地圖顯示元件（`FocusedRoomView`/`RoomTile`）已經完成，沒有美術圖的房間會自動顯示色塊＋名稱佔位，不會壞掉。目前 `rooms.json` 31 筆裡有 16 筆已補上 `filename`（對照 `img/rooms/` 資料夾），15 筆仍是 `filename:null`。31 間房間的美術圖 prompt 全數已產出（[room-art-prompts.md](docs/superpowers/specs/2026-08-13-m2d3-room-art-prompts.md) 30 張＋設計文件裡的禮拜堂 1 張），開發者陸續拿去生圖引擎生成中，之後只需要重跑一次補 `filename` 的腳本（或手動補）即可接上，不需要再改程式碼。
 
-**角色圖片去背，明確卡在等開發者輸入**：開發者反應「角色圖片去背後再放置入角色選擇畫面」的版面需求。Agent 已用本機既有工具（Pillow/numpy/scipy，無需新依賴/連網）試過簡單色彩距離門檻＋邊界連通去背，在遊戲內實際顯示尺寸（約 400×720px）下效果算乾淨，但殘留兩個小瑕疵（腳下陰影殘影、右下角浮水印圖示未去除）；嘗試調高門檻或改用鄰接色彩容忍度擴散去背，反而會啃食到臉部/手部（因為這批 AI 生成人像的膚色亮度跟灰色背板很接近，是這批素材本身的限制，不是參數調校問題）。**開發者已決定自行處理去背、提供新圖檔**，agent 這邊維持現狀不動作，等開發者提供新圖後再協助替換 `client/public/images/` 對應檔名（含依現行約 600px 寬規格重新縮圖）。
+**角色圖片去背問題已解決（2026-08-17）**：舊版角色圖去背瑕疵（腳下陰影殘影、浮水印未去除）的問題已經不存在——開發者自行處理完成，2026-08-17 直接提供了一整批全新命名的角色圖檔（`male_priest`/`female_Nurse`/`male_worker`/`female_police`/`male_athlrte`/`female_painter`，含 `_icon` 版本），舊檔名（`HighScholl.png`/`Lumberjack.png`/`girl.png`/`nurse.png`/`oldman.png`/`police.png`）已被取代，見上方「已完成進度」的角色圖示串接條目。
 
 **舊的 worktree 清理問題已解決**：`.claude/worktrees/m2c4-m2c5-action-and-haunt`、`.claude/worktrees/m2d2-character-select` 皆已不存在（`git worktree list`/`git branch -a` 皆確認），不需要再處理。
 
@@ -153,16 +152,14 @@
 
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 讀最近一次工作階段範圍即可
-2. **開工第一件事：跟開發者確認上方「目前的瓶頸或停頓點」列出的 3 項待辦要先做哪一項**：①leaveCheck 失敗扣屬性的引擎缺口②二樓層擴充三樓層③座標式房間連接機制。②③開發者已明確要求分開成獨立工作階段，且③邏輯上依賴②先完成；①跟另外兩項彼此獨立，理論上可以插在任何時候做。
+2. **開工第一件事：針對「統一考驗彈窗機制」設計文件（[docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md](docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md)）呼叫 `writing-plans` 技能拆成實作任務清單**，開發者已明確指示這是下一階段的第一件事。拆完計畫後跟開發者確認要用 `subagent-driven-development` 還是 inline 執行。
 3. **道具「給予」選項**：`CharacterPanel.jsx` 目前的道具彈窗只有使用/遺留，要補「給予」需要從 `DebugGameScreen.jsx` 把同房玩家名單傳進去，伺服器端已支援（`giveItemAction`，`mode:'give'`），純前端 UI 缺口
 4. **確認版面無誤後，移除暫時除錯框線**（`playingLayout.css`/`DebugGameScreen.jsx` 裡視野正方形／狀態面板的綠／藍虛線 border）
-5. **角色圖片去背**：等開發者提供去背完成的新圖檔（`img/` 資料夾原始檔或直接給處理好的檔案皆可），agent 協助替換 `client/public/images/` 對應檔名並重新縮圖至約 600px 寬，確認畫面顯示效果
-6. **其餘一般房間的美術圖**：開發者持續生成中，補齊後只需要重跑補 `filename` 欄位的流程（可參考 `data/rooms/rooms.json` 已有 filename 的既有寫法），不需要改程式碼
-7. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；通靈板整張延後到 M3；`item_008`（中世紀鎧甲，減傷＋防偷竊）也綁在 M3 傷害/偷竊機制上
-8. **M2D3 骨架完成之後的細節項目**：公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「擲骰道具介入」選擇畫面（`dice_check`/`leaveCheck` 兩條路徑現在都完成了，目前除錯頁面都只有最小可用版本）
-9. **執行順序已跟開發者確認**：M2c-3 與 M2D3 其餘細節項目何時交錯進行，待開發者決定
-10. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→選角（現在是正式畫面，非隨機/佔位）→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（注意不是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
-11. **地下室新機制的三個工作階段（見上方「目前的瓶頸或停頓點」第 1-3 項）**：leaveCheck 失敗扣屬性引擎缺口／三樓層架構擴充／座標式房間連接機制（含崩塌的房間掉落、舞廳↔包廂房綁定），依開發者指示分開處理，第 3 項邏輯上要等第 2 項完成
+5. **其餘一般房間的美術圖**：開發者持續生成中，補齊後只需要重跑補 `filename` 欄位的流程（可參考 `data/rooms/rooms.json` 已有 filename 的既有寫法），不需要改程式碼
+6. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；通靈板整張延後到 M3；`item_008`（中世紀鎧甲，減傷＋防偷竊）也綁在 M3 傷害/偷竊機制上
+7. **M2D3 骨架完成之後的細節項目**：公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「擲骰道具介入」選擇畫面（`dice_check`/`leaveCheck` 兩條路徑現在都完成了，目前除錯頁面都只有最小可用版本）——**統一考驗彈窗機制做完後，這裡的擲骰道具介入畫面會不會一併整合進去，值得跟開發者確認**
+8. **執行順序已跟開發者確認**：M2c-3 與 M2D3 其餘細節項目何時交錯進行，待開發者決定
+9. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→選角（現在是正式畫面，非隨機/佔位）→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（注意不是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
 
 ## 關鍵設定 (Key Context & Rules)
 - **技術棧**：Node.js + Express + Socket.IO（伺服器持有權威遊戲狀態）＋ React (Vite) 前端；純 JavaScript，不使用 TypeScript；單一程式碼庫同時支援區網與雲端部署
@@ -215,6 +212,9 @@
 - **地下室新機制設計（2026-08-16 已跟開發者確認，資料已寫入 `rooms.json`/`starting-rooms.json`，程式邏輯全部未實作）**：
   - **崩塌的房間 `room_collapsed_room`**：`floor:"ground"`，速度檢定 5+／骰子物理傷害沿用官方 `_rule.pdf` 原文，掉落位置改用開發者自創的「正下方同座標地下室」規則（不是官方原文的「接到隨機已存在地下室房間」）
   - **舞廳 `room_ballroom` ↔ 包廂房 `room_gallery` 雙向綁定**：生成其中一間時需在對應樓層同座標同步生成另一間；位置衝突則整個抽卡動作重抽；牌堆僅存最後一張的例外改隨機位置生成，不強制同座標。`room_ballroom` 的 `floor` 已從 `"any"` 改為 `"ground"`（綁定邏輯需要明確樓層對應）
-  - 兩者都標記 `needsCustomLogic:true`，`text` 欄位已寫入完整機制說明供之後實作參考，實際程式碼要等「三樓層架構」＋「座標式房間連接機制」兩個工作階段完成
-  - 「開鎖道具解開大門廳地下室門」「原創逃生通道 B1/1F 房間」這兩個開發者最初提出的機制構想，目前只在對話中討論過，**尚未落成任何資料或設計文件**，下次進入「座標式房間連接機制」工作階段時要重新跟開發者確認細節
-- **`leaveCheck` 房間的「失敗扣屬性」官方原文，已補齊到 4 間房但引擎不執行**：塔橋/雜亂的房間/藤蔓糾纏的溫室（原有）＋天花閣樓/五芒星室/墓園/髒亂的房間（2026-08-16 新增），`text` 欄位都寫明檢定失敗時額外損失 1 級指定屬性，但 `moveToRoom` 目前只會擋住移動＋扣 1 點行動力，完全沒有扣屬性的程式碼——這是資料先於程式碼的既有慣例（跟 `needsCustomLogic:true` 的房間不同，這幾間房 `needsCustomLogic` 仍是 `false`，因為「擋住移動」這半部分確實能正常運作，只是「扣屬性」那半部分是缺口）
+  - **2026-08-17 更新：兩者程式邏輯皆已實作完成並合併進 `main`**，`needsCustomLogic:true` 標記與 `text` 欄位維持原樣不動（`needsCustomLogic` 這個欄位在這兩間房的語意仍然成立：即使程式邏輯已經寫好，也不代表房間的「一般結束回合/離開考驗」通用機制適用於它們，維持這個旗標是刻意的，不是遺漏）。技術細節見下方新增的「三樓層＋座標式房間連接機制」條目。
+  - 「開鎖道具解開大門廳地下室門」「原創逃生通道 B1/1F 房間」這兩個開發者最初提出的機制構想，目前只在對話中討論過，**尚未落成任何資料或設計文件**，仍待開發者未來提出時再確認細節（目前地下室平台唯一的抵達方式是崩塌房間掉落，見下方新條目）
+- **三樓層＋座標式房間連接機制（2026-08-17，已完成並合併進 `main`）**：`boardGenerator.js` 的 `FLOORS` 新增 `'basement'`；`createBoard` 新增 `basement` Map 並固定放置 `room_basement_landing`（北/東/西三門，跟二樓平台同形狀），但**目前沒有任何樓梯/門可以直接走到地下平台**——它單純是「地下室這個 Map 裡已經有一個錨點房間」的角色，實際抵達地下室的唯一途徑是下面的崩塌房間掉落機制。`turnFlow.js` 的 `moveToRoom` 新增：①崩塌的房間（`room_collapsed_room`）速度檢定 5+（`COLLAPSE_CHECK_STAT`/`COLLAPSE_CHECK_MIN` 常數，沿用既有 `pendingRollChoice` 道具介入擲骰模式，`resumeCollapseCheck` 是介入流程回復後的接續函式），失敗時 `applyCollapseCheck` 在正下方**同座標**生成一張新地下室房間卡並把玩家移過去（連結記在 `placedRoom.collapseLink`，供之後查詢「這間崩塌房間通到哪間地下室」用）；②舞廳／包廂房雙向綁定（`placeBallroomGalleryPair`）：生成其中一間時同步在對應樓層同座標生成另一間，座標衝突則整個抽卡動作重抽，牌堆僅存最後一張時改隨機位置生成、不強制同座標。**已知限制（尚未實作、非本次範圍）**：物理傷害（`_rule.pdf` 原文的「受到1顆骰子的物理傷害」）尚未套用，等 M3 傷害分配系統做出來才會補上，見上方除錯注意事項「M2c-3 盤點期間發現的架構缺口」。
+- **`leaveCheck` 房間的「失敗扣屬性」引擎缺口（2026-08-17，已完成並合併進 `main`）**：塔橋/雜亂的房間/藤蔓糾纏的溫室/天花閣樓/五芒星室/墓園/髒亂的房間共 7 間房，`moveToRoom` 現在檢定失敗時會真的呼叫 `changeStat(player, leaveCheck.failPenalty.stat, leaveCheck.failPenalty.delta, gameState.hauntStarted)` 扣屬性（`failPenalty` 為 `undefined` 的房間——塔橋/雜亂的房間/藤蔓糾纏的溫室——照舊不扣，這是官方原文本來就沒有這個懲罰，不是缺漏）。
+- **玩家物件的 `characterId` 串接＋一次性 `characterContent` 廣播（2026-08-17，已完成並合併進 `main`）**：`playerEntity.js` 的 `createPlayer` 新增 `characterId` 欄位（未提供則為 `null`）；`gameState.js` 的 `addPlayer`、`gameManager.js` 的 `startGame` 依序把角色選擇階段確定的 `character.id` 傳下去。`socketHandlers.js` 的 `game:started` 廣播新增 `characterContent: content.characters`（比照既有 `roomContent`/`cardContent` 的一次性靜態資料模式，**只在這裡送一次，之後的 `game:stateUpdate` 不會再帶，前端要用獨立 `useState` 存，不能塞進會被覆蓋的 `gameState`**——這是既有慣例，程式碼裡有註解警告）。前端 `FocusedRoomView.jsx` 的 `findCharacterIcon(characterId, characterContent)` 查 `character.fileicon` 組出圖片路徑，`PlayerBadge.jsx` 有 `iconSrc` 就顯示圖片，沒有則維持原本顏色圓圈+字母 fallback。
+- **統一考驗彈窗機制＋訊息欄可讀化，設計文件已完成，尚未進入 writing-plans（2026-08-17）**：[docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md](docs/superpowers/specs/2026-08-17-check-modal-and-readable-messages-design.md)。核心決定：`leaveCheck`／崩塌房間速度考驗／卡片內建 `dice_check` 三個現有各自獨立的考驗觸發點，全部統一改發新的 broadcast 事件 `game:checkResolved`；前端建立「考驗佇列」依序播放「考驗前彈窗（描述＋擲骰按鈕）→ 動畫佔位 → 結果彈窗」，一次只處理一個考驗；`passed`（成功/失敗）對 `leaveCheck`/崩塌房間是二元判定，對卡片考驗（`tiers` 非二元）採用「命中那層有負面 `stat_change` 就判失敗」的啟發式規則，不是資料裡明確定義的，之後如果不準確需要再討論。文件裡也記錄了 2 個真實程式碼缺口：`moveToRoom` 的 leaveCheck 成功分支目前會把 `rolled` 骰值直接丟掉；`effectResolver.js` 的 `handleDiceCheck` 算出的 `finalSum`/`tier` 完全沒有回傳出去。**這份文件是下一階段的起點，`writing-plans` 還沒跑過**。
