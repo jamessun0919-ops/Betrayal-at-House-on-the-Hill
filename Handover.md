@@ -1,8 +1,8 @@
 # 交接文檔 Handover
 
-最後更新：2026-08-18（第 1 次工作階段：處理完上階段整分支審查的 6 項 Minor 建議〔4 修復／1 維持現狀／1 確認安全〕；修正 `item-cards.json` 語法錯誤；產出 33 間缺美術圖房間的新版 prompt 文件；依開發者最新規格更新 16 間房間的門數/樓層；記錄 2 項道具設計待討論事項）
+最後更新：2026-08-18（第 2 次工作階段：完成道具合成機制〔廚房烹飪配方〕與搜索機制〔取代 item 類型房間自動抽卡〕兩個完整功能，皆走 `brainstorming`→`writing-plans`→`subagent-driven-development` 全流程；武器/消耗品分類問題已確認併入 M3 戰鬥系統設計）
 
-**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架、`lobby:players` 競態條件修復、房間／角色資料稽核與內容補完、手機直式版面改版、三樓層＋座標式房間連接機制、leaveCheck 失敗扣屬性引擎缺口、角色圖示串接與版面調整（背景圖／立繪／ICON）、統一考驗彈窗機制＋訊息欄可讀化、統一考驗彈窗機制 6 項 Minor 修正皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
+**`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、M2D3 後端資料串接計畫、大門廳整合＋遊戲開始畫面、M2D3 一般房間地圖骨架、`lobby:players` 競態條件修復、房間／角色資料稽核與內容補完、手機直式版面改版、三樓層＋座標式房間連接機制、leaveCheck 失敗扣屬性引擎缺口、角色圖示串接與版面調整（背景圖／立繪／ICON）、統一考驗彈窗機制＋訊息欄可讀化、統一考驗彈窗機制 6 項 Minor 修正、道具合成機制（廚房烹飪配方）、搜索機制（取代 item 類型房間自動抽卡）皆已完成並合併進 `main`**：所有 worktree 與分支（本機與遠端）都已依標準流程清理刪除。目前工作目錄就是 `main`，無待接續的 worktree。
 
 ## 專案目標 (Project Goal)
 將實體桌遊「山中小屋」(Betrayal at House on the Hill) 移植為可供多位使用者同時連線遊玩的網頁遊戲，兼具技術學習與朋友圈實際遊玩用途，並保留未來擴充原創劇本與 AI 玩家的彈性。
@@ -42,7 +42,9 @@
 - **手機直式版面改版（2026-08-17，已完成並合併進 `main`）**：見下方「關鍵設定」的完整技術記錄，這裡只列開發者可見的成果——橫式／直式版面並存（自動依螢幕方向切換，不需要手動選擇）；遊戲進行畫面精簡成「視野畫面」／「角色資訊＋行動區域」兩個區域，兩者都完全鎖定、玩家不能上下左右滑動；移動/開門方向按鈕浮在視野正方形四邊的鄰房預覽帶上；行動／總覽地圖／襲擊／回合結束 4 顆按鈕浮在視野正方形四個角落；原本獨立的樓梯按鈕拿掉，改成走到 LobbyC 或二樓平台時按「行動」就會上下樓（維持免費，不扣行動力）；狀態欄最終版面是上（姓名/行動力＋力量/速度/意志/知識由上到下各一排，字體與刻度格已放大）下（訊息欄，跟整個面板同寬）兩段，道具清單移到狀態欄右側 20% 寬的獨立區域，點道具名稱會跳出「使用／遺留／取消」選項（**「給予」尚未實作**，見下方「目前的瓶頸或停頓點」）。
 - **三樓層架構＋座標式房間連接機制＋leaveCheck 失敗扣屬性引擎缺口（2026-08-17，已完成並合併進 `main`，開發者已確認）**：`boardGenerator.js` 的 `FLOORS` 新增 `'basement'`（現為 `['ground','upper','basement']`），`createBoard` 新增 `basement` Map 並放置 `room_basement_landing`（北/東/西三門，跟二樓平台同形狀），但**目前沒有走樓梯可以到地下室**——地下室平台本身只是佔位，實際能抵達地下室的唯一途徑是崩塌的房間掉落（見下）。`turnFlow.js` 的 `moveToRoom` 新增崩塌房間（`room_collapsed_room`）速度檢定 5+（`COLLAPSE_CHECK_STAT`/`COLLAPSE_CHECK_MIN`，沿用既有道具介入擲骰模式），失敗會在正下方**同座標**生成一張新地下室房間卡並把玩家移過去（`applyCollapseCheck`，掉落連結記在 `placedRoom.collapseLink`）；新增舞廳／包廂房雙向綁定（`placeBallroomGalleryPair`：生成其中一間時同步在對應樓層同座標生成另一間，位置衝突則重抽，牌堆僅存最後一張時改隨機位置不強制同座標）。`leaveCheck` 的 `failPenalty`（塔橋/雜亂的房間/藤蔓糾纏的溫室/天花閣樓/五芒星室/墓園/髒亂的房間共 7 間房，此前只會擋住移動不會真的扣屬性）現在會呼叫 `changeStat` 真的執行扣屬性。**因為本次對話中途發生過一次視窗壓縮，這部分工作的原始逐字對話紀錄沒有完整保留**，chatlog 只能記錄重點摘要，如需更多實作細節請直接讀程式碼（`turnFlow.js`/`boardGenerator.js`/`roomDeck.js`）或問開發者。
 - **角色圖示串接與版面調整：大廳背景圖／選角立繪／遊戲內角色 ICON（2026-08-17，已完成並合併進 `main`，雙分頁模擬雙人流程實測通過）**：大廳初始頁面背景改為 `house_cloudy_day.webp`；選角頁面／遊戲內玩家圓形徽章的圖片來源整批換成開發者提供的新角色圖（`male_priest`/`female_Nurse`/`male_worker`/`female_police`/`male_athlrte`/`female_painter`，含對應 `_icon` 版本），從 `img/`（開發者個人暫存資料夾，不進版控）複製進 `client/public/images/`。**過程中發現並修補一個先前沒人注意到的伺服器缺口**：`gameManager.js` 的 `startGame` 雖然早就會依 `player.characterId` 查角色 `stats`/`itemID`，但這個 `characterId` 從未被寫回遊戲內玩家物件本身（`playerEntity.js` 的 `createPlayer` 原本沒有這個欄位），代表前端原理上不可能知道某個在場玩家對應哪個角色——已補上 `characterId` 從 `playerEntity`→`gameState`→`gameManager`→`socketHandlers` 的完整串接，`game:started` 新增 `characterContent` 廣播（比照既有 `roomContent`/`cardContent` 的一次性靜態資料模式）。`FocusedRoomView.jsx` 新增 `findCharacterIcon` 查表函式，`PlayerBadge.jsx` 有 `iconSrc` 時顯示角色圖示、否則維持原本顏色圓圈+字母的 fallback。
-- **統一考驗彈窗機制＋訊息欄可讀化（2026-08-17，已完成並合併進 `main`）**：`leaveCheck`／崩塌房間速度考驗／卡片內建 `dice_check` 三個原本各自獨立的考驗機制，全部統一改發新的 broadcast 事件 `game:checkResolved`（另新增 `game:roomEntered` 給一般進房訊息），前端建立考驗佇列，依序播放「考驗前彈窗（描述＋擲骰按鈕）→ 動畫佔位 → 結果彈窗」，一次只處理一個考驗。訊息欄從 `JSON.stringify` 傾印改成人類可讀句子（含玩家署名），字體放大到 24px。技術細節見下方「關鍵設定」。**開發流程**：`writing-plans` 拆成 7 個任務的完整計畫（[docs/superpowers/plans/2026-08-17-check-modal-and-readable-messages.md](docs/superpowers/plans/2026-08-17-check-modal-and-readable-messages.md)）→ `subagent-driven-development` 在獨立 worktree 逐任務執行＋審查 → 整分支最終審查（Opus 模型，特別要求聚焦「沒有實機驗證過」的路徑）抓到 1 個 Critical＋4 個 Important（見下方除錯注意事項），修復並經 2 輪複審確認乾淨後合併。後端測試 466/466、client build 全數通過。**6 項 Minor 建議開發者已明確指示列為下階段待辦**，詳見下方「目前的瓶頸或停頓點」。
+- **統一考驗彈窗機制＋訊息欄可讀化（2026-08-17，已完成並合併進 `main`）**：`leaveCheck`／崩塌房間速度考驗／卡片內建 `dice_check` 三個原本各自獨立的考驗機制，全部統一改發新的 broadcast 事件 `game:checkResolved`（另新增 `game:roomEntered` 給一般進房訊息），前端建立考驗佇列，依序播放「考驗前彈窗（描述＋擲骰按鈕）→ 動畫佔位 → 結果彈窗」，一次只處理一個考驗。訊息欄從 `JSON.stringify` 傾印改成人類可讀句子（含玩家署名），字體放大到 24px。技術細節見下方「關鍵設定」。**開發流程**：`writing-plans` 拆成 7 個任務的完整計畫（[docs/superpowers/plans/2026-08-17-check-modal-and-readable-messages.md](docs/superpowers/plans/2026-08-17-check-modal-and-readable-messages.md)）→ `subagent-driven-development` 在獨立 worktree 逐任務執行＋審查 → 整分支最終審查（Opus 模型，特別要求聚焦「沒有實機驗證過」的路徑）抓到 1 個 Critical＋4 個 Important（見下方除錯注意事項），修復並經 2 輪複審確認乾淨後合併。後端測試 466/466、client build 全數通過。6 項 Minor 建議已於 2026-08-18 第 1 次工作階段全數處理完畢。
+- **道具合成機制（廚房烹飪配方，2026-08-18 第 2 次工作階段，已完成並合併進 `main`）**：走完整 `brainstorming` 流程確認範圍（武器/消耗品分類三個問題〔複合分類、限定使用次數、屬性門檻〕已確認全部併入 M3 戰鬥系統設計時處理，這次只做道具合成）。設計文件 [2026-08-18-item-combine-mechanic-design.md](docs/superpowers/specs/2026-08-18-item-combine-mechanic-design.md)：`item_016`（礦泉水）／`item_017`（泡麵）新增 `isMaterial:true`（前端道具選單不顯示「使用」）；`room_kitchen` 新增 `"actions":["烹飪"]`＋`craftRecipes`（列表型態，材料＋成果道具）；`socketHandlers.js` 的 `room_action` 新增判斷：材料不足直接回 `MISSING_CRAFT_MATERIALS`（不扣行動力）、材料足夠則動態組出 `choice` 效果（「要不要進行烹飪？」是/否），**完全重用既有的 `choice`／`grant_item`／`lose_item` 效果類型，沒有新增任何效果解析邏輯**。直接在 `main` 上 TDD 實作（範圍小，未開 worktree），4 個新測試，測試 473/473 通過，瀏覽器實測角色選擇/一般道具流程無回歸（材料道具/廚房實際觸發因隨機抽卡限制未能實機驗證，同一類已知限制見下方除錯注意事項）。
+- **搜索機制（取代 item 類型房間自動抽卡，2026-08-18 第 2 次工作階段，已完成並合併進 `main`）**：走完整 `brainstorming`→`writing-plans`→`subagent-driven-development` 流程（5 任務＋整分支審查，直接在 `main` 上執行，開發者選擇不開 worktree）。設計文件 [2026-08-18-search-mechanic-design.md](docs/superpowers/specs/2026-08-18-search-mechanic-design.md)、實作計畫 [2026-08-18-search-mechanic.md](docs/superpowers/plans/2026-08-18-search-mechanic.md)。**過程中發現一個既有缺口**：`resolveCardDraw` 對 item/event 牌堆抽到的卡只會立即解析 `effects` 就結束，卡片本身從未真正進背包（只有 omen 牌堆才有 `addItem`）——這次順便修正，找到的道具現在會正確進背包。核心機制：10 間原本 `drawType:"item"` 的房間裡，9 間改為 `"actions":["搜索"]`＋`"item":"random_one"`（`room_vault` 因為已有非空 `effects` 開保險箱機制，只改 `drawType`，原本先决定不加新欄位，見下方 Minor 修正）；房間地圖實體新增 `item` 欄位（複製自靜態房間定義，避免污染共用資料，跨場遊戲互相干擾）；`player.searchedThisTurn` 每回合限一次；`game:selectAction room_action` 新增第三分支：沒有 `craftRecipes`、也沒有非空 `effects` 時預設走搜索，找到道具重用既有 `game:cardDrawn` 訊息樣板，沒找到廣播新事件 `game:searchEmpty`。5 個任務全數一次審查通過，後端測試 487/487。**整分支最終審查（Opus 模型）發現 1 個 Important（需開發者決定）＋1 個關聯 Important（既有 bug）**：食品儲藏室／健身房雖然依開發者指示也加了搜索欄位，但因為這兩間房已有非空 `effects`（結束回合被動加成），照分支優先序永遠讀不到，形同死資料；同時也暴露一個既有 bug——`room_action` 完全沒檢查 `onceOnlyPerPlayer`，理論上可以透過反覆按「行動」無限疊加結束回合加成。跟開發者確認後選擇「真的讓它們可以搜索」，修改分支邏輯（`effects` 全部是 `onceOnlyPerPlayer` 時視為沒有 effects 型行動、改走搜索），一次修復兩個問題，複審通過，486→487 測試。**7 項 Minor 建議開發者已明確指示列為下階段待辦**，詳見下方「目前的瓶頸或停頓點」。
 
 ## 除錯注意事項 (Debug Notes — 審查發現的問題與後續慣例)
 
@@ -115,7 +117,7 @@
 
 **M2c-3 盤點期間發現的架構缺口（已跟開發者確認方向，記錄供 M3 或未來小任務參考）**：
 - **傷害系統完全沒有實作，且不只是 M3 combat 需要，好幾張 M2 階段就會抽到的事件/預兆卡也需要**（駭人尖叫、蜘蛛失敗分支、濕滑的地板、天花板塌陷、噬咬）。**開發者已定案的設計**：多點傷害＝跳出 N 次單點選擇視窗（N＝傷害總點數），每次讓玩家選「力量或速度」（肉體傷害）／「知識或意志」（精神傷害）其中一項扣 1 點，且每次視窗都要顯示兩個候選屬性**當下**的級別與實際數值（角色屬性是刻度制，降級不代表數值一定下降，且邪祟後降到最低級別＝死亡，玩家需要真實數據才能判斷）。**逾時規則**：只要其中一點逾時（不管第幾點），從那一點開始（含當次）剩下的全部點數，改用 8/1 規則書原案「儘量平均分配，無法平分則給數值較高的屬性」批次處理，不再繼續逐點跳窗。需要新增：(1) 新效果類型 `damage`（`damageType`+`amount`，`amount` 可能是固定數字或卡片內部先擲一次獨立骰子決定）；(2) `effectResolverManager` 的 `pendingChoice` 要能記住「連續提示鏈」的進度（第幾點/還剩幾點/傷害類型），不是只記一個待解決選擇；(3) 提示廣播要能即時查詢並附上兩個候選屬性的當下級別+數值，不是卡片作者預先寫死的選項。**確認放在 M3 實作**（駭人尖叫等目前卡在這個缺口的卡片，`needsCustomLogic:true` 空著等 M3）
-- **房間「結束回合被動加成」跟「離開房間前考驗」都沒有觸發點**：`rooms.json` 裡禮拜堂/圖書室/食品儲藏室/健身房已經有 `effects`（`onceOnlyPerPlayer:true`），塔橋/雜亂的房間/藤蔓糾纏的溫室的文字是「離開房間前要考驗」——這兩種都不是「進房自動觸發」也不是「玩家主動操作」，目前完全沒有對應的觸發點，`onceOnlyPerPlayer` 欄位在程式碼裡也完全沒被讀取。**開發者已確認**：這是需要新增程式碼的獨立小任務，不算在 M2c-3 內容撰寫範圍內，有空再處理，不影響其他內容撰寫
+- **房間「結束回合被動加成」跟「離開房間前考驗」都沒有觸發點**：`rooms.json` 裡禮拜堂/圖書室/食品儲藏室/健身房已經有 `effects`（`onceOnlyPerPlayer:true`），塔橋/雜亂的房間/藤蔓糾纏的溫室的文字是「離開房間前要考驗」——這兩種都不是「進房自動觸發」也不是「玩家主動操作」，目前完全沒有對應的觸發點。**已於 2026-08-16／2026-08-17 分別接上觸發點**（結束回合被動加成走 `applyRoomEndTurnBonus`／`game:endTurn`，離開房間前考驗走 `leaveCheck`），這裡記錄的缺口已解決。**但 `onceOnlyPerPlayer` 欄位在 `room_action`（按「行動」）這條路徑上，直到 2026-08-18 搜索機制整分支審查才第一次被檢查**——在那之前，禮拜堂/圖書室/食品儲藏室/健身房如果被 `room_action` 的 `effects` 分支讀到（例如食品儲藏室/健身房這次因為新增搜索欄位才第一次被人注意到），可以透過反覆按「行動」無限疊加結束回合加成，是一個存在已久但沒被踩到的既有缺口，隨搜索機制的分支邏輯修正一併解決（見下方搜索機制條目）
 - **`draw_card` 效果的已知限制**：目前只有透過同步流程（`game:selectAction`/`game:move` 的 ack 回呼，或 `game:effectPromptRespond` 的 ack）才能私下通知玩家抽到什麼卡（`game:cardsDrawn` 私人事件）；如果未來卡片把 `draw_card` 放在**逾時自動觸發**的選擇路徑裡（`handleEffectChoiceTimeout`），目前沒有機制可以私訊——因為那條路徑是伺服器計時器觸發、沒有對應的 socket 可用。目前沒有任何卡片用到這個路徑，遇到了再回頭補
 - **保險庫（`room_vault`）的效果本體已經可以用 `dice_check`+`draw_card` 表達，但「開一次後永久變空房間」的一次性標記還沒有追蹤機制**（跟上面「房間結束回合/離開考驗」是同一類缺口）——`needsCustomLogic` 先保持 `true`，效果內容已經寫好可用，等追蹤機制做出來就完整了
 - **`peek_and_reorder`（原本 M2c-1 就故意留空的「偷看牌堆+洗牌重排」效果）仍未實作**：水晶球原本需要這個機制，但開發者已經把水晶球簡化成「展示牌庫前 3 張供選 1 張，牌庫順序完全不調整」（見下方 `preview_and_choose`），改用更簡單的新機制解決，不需要真的做 `peek_and_reorder`。唯一還卡在這個缺口的只剩通靈板，已確認整張延後到 M3
@@ -131,16 +133,26 @@
 - **`subagent-driven-development` 技能流程預設「每個任務最多一輪修正、整分支審查的修正只跑一輪」，但如果修正本身的副作用（複審抓到的新問題）直接命中使用者最初的核心需求，controller 應該主動說明利弊並詢問是否要破例多跑一輪，而不是逕自套用「不能有第二輪」的預設規則、也不是逕自決定要跑**——這次的案例：第一輪修正把 `CheckModal` 的 `key` 從無改成 `pendingCheckQueue.length`，複審發現這個 key 選得不夠精準（佇列長度在「附加到隊尾」時也會變，導致隊首元件被誤觸發重新掛載），這正好會讓「依序彈窗」這個核心功能在特定組合情境下失效，屬於值得破例的案例。開發者同意後才多跑一輪，第二輪複審確認乾淨
 - **合併後清理已合併的 worktree 資料夾，第三次踩到同一類「權限拒絕刪不掉」的問題**（前兩次分別記錄在上方 M2D1／dice-interjection 段落）：這次根因跟前兩次一樣——`socketHandlers.test.js` 已知會留下未正常結束的非同步 handle（見上方「環境問題」條目），某個任務執行/審查期間跑過的 jest 行程沒有自然結束，殘留著佔用 worktree 資料夾內檔案的控制代碼。修法一樣：`Get-CimInstance Win32_Process -Filter "name='node.exe'"` 查出 `CommandLine` 包含該 worktree 路徑的行程（這次是兩個殘留的 `jest test/socketHandlers.test.js` 行程），用 PID 精準關閉後才能刪除。**這是第三次踩到，考慮到頻率，未來如果又要對 `socketHandlers.test.js` 跑測試，可以考慮在派工指示裡直接要求 implementer/reviewer 加 `--forceExit` 旗標，從源頭減少殘留行程的機會，而不是每次都事後排查**
 
+**`game:selectAction room_action` 的三分支優先序（2026-08-18 道具合成機制＋搜索機制建立，未來新增房間機制要注意）**：`socketHandlers.js` 的 `room_action` 處理現在依序判斷——① `roomDefinition.craftRecipes` 非空 → 合成流程；② `roomDefinition.effects` 裡有任何一個**不是** `onceOnlyPerPlayer:true` 的項目 → 走既有的通用 effects 解析（保險庫的開保險箱等）；③ 都不符合（含只有 `onceOnlyPerPlayer` 效果、或完全沒有 `effects`）→ 預設走搜索。**這代表任何房間如果同時想要「結束回合被動加成」以外的真正 room_action，加的 `effects` 只要有一項不是 `onceOnlyPerPlayer`，就會自動搶走搜索/合成的機會**——新增房間機制時要記得檢查這個優先序會不會誤判。目前 `actions` 欄位本身只是描述性資料，沒有真正的多選單消費端，一個房間目前只能有一種 room_action 結果，這是已知限制（見下方「目前的瓶頸或停頓點」Minor 2）。
+
+**這次道具合成機制／搜索機制的開發流程都跳過了獨立 worktree（開發者主動選擇「直接在 main 上做」）**：跟過去每個里程碑用 `EnterWorktree`／獨立分支的慣例不同，這次 `subagent-driven-development` 的 5 個任務直接在 `main` 上逐一 commit，`SDD` workspace（`.superpowers/sdd/2026-08-18-search-mechanic/`）在整分支審查通過後正常清理刪除。功能範圍夠小、單人開發（不需要跟其他並行分支隔離）時這樣做流程更精簡，之後如果開發者又選擇不開 worktree，比照這次做法即可。
+
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
 
 **「統一考驗彈窗機制」整分支審查記錄的 6 項 Minor 建議，已於 2026-08-18 處理完畢**：項目 1（缺組合測試）、2（`roomId` 欄位路徑不一致）、4（`STAT_LABELS` 四檔重複）、6（樓梯/崩塌房間掉落缺少 `game:roomEntered`）皆已修復；項目 3（死碼防呆）依開發者指示維持現狀；項目 5（`useEffect` 閉包）已確認安全不需要改。過程中意外發現 `data/cards/item-cards.json` 有 9 處缺逗號的語法錯誤（開發者剛編輯完的內容），已修正（純語法，內容未變動）。詳見下方「除錯注意事項」與「關鍵設定」。
 
-**道具設計待討論事項（2026-08-18 新記錄，開發者明確要求記錄、非本階段處理）**：
-1. **武器/消耗品分類目前的 `category` 欄位表達不了的組合機制**：
-   - 武器同時具備「限定使用次數後道具消失」的消耗品性質，範例：精緻的十字弩（`item_020`）。目前 `category` 寫成字串 `"weapon,consumable"`（逗號分隔的單一字串，不是陣列），但引擎的 `consumeItemIfApplied = Boolean(itemContent && itemContent.category === 'consumable')` 只認得單一字串完全等於 `'consumable'`，`"weapon,consumable"` 永遠不會被判定為消耗品，這是資料格式跟引擎邏輯對不上，需要先決定 `category` 要不要改成陣列或其他表達方式
-   - 消耗品但不是「用一次就消失」，而是有限定次數（例如隨機 1～6 次）用完才消失，範例：左輪手槍（`item_001`，`text` 寫「本道具使用次數於取得時隨機決定１～６次」）。目前完全沒有「剩餘使用次數」這個資料欄位或引擎機制，`category:'consumable'` 現行邏輯是「只要生效過一次就整個移除」，跟這張卡真正的設計意圖不符
-   - 需要屬性達到門檻才能使用的武器，範例：斧頭（`item_011`，`text` 寫「玩家需要力量大於六才可使用」）。目前 `game:selectAction` 的道具使用路徑完全沒有任何屬性門檻檢查，任何人都能直接使用
-2. **道具合成機制（物品 A＋物品 B → 物品 C）**：目前完全沒有這個概念的資料欄位或引擎邏輯。已知的具體案例：`item_021`（烹飪過的食物）的 `text` 已經寫明「在廚房使用泡麵（`item_017`）跟礦泉水（`item_016`）加工出的食物」，暗示需要「特定房間才能合成」（廚房）；開發者另外提到的「化學實驗室合成藥物」範例，目前資料庫裡還沒有「化學實驗室」這間房，也沒有對應的藥物類道具。這兩點都需要先設計新的 schema（合成材料／合成結果／限定地點）才能實作，非同小可，建議另開一次 `brainstorming` 討論架構。
+**武器/消耗品分類問題（2026-08-18 記錄，已確認併入 M3 戰鬥系統設計，非本階段處理）**：`category` 欄位表達不了的三個問題——複合分類（例如精緻的十字弩 `item_020`、左輪手槍 `item_001` 的 `category:"weapon,consumable"` 是逗號分隔字串不是陣列，引擎的 `consumeItemIfApplied` 判斷式只認單一字串完全等於 `'consumable'`，永遠判定不了）、限定使用次數（左輪手槍隨機 1～6 次用完才消失，目前沒有「剩餘次數」欄位或機制）、屬性門檻（斧頭 `item_011` 需要力量大於六才能用，`game:selectAction` 完全沒有門檻檢查）。**跟開發者確認：這三個問題本質上是武器攻擊系統的一部分，等 M3 設計戰鬥機制（攻擊/傷害分配）時一併處理，不單獨開一場討論。**
+
+**道具合成機制的通用架構已完成上線（2026-08-18 第 2 次工作階段）**：詳見上方「已完成進度」的道具合成機制條目。目前只接了唯一一組真實配方（廚房：泡麵＋礦泉水→烹飪過的食物）；開發者原本提到的「化學實驗室合成藥物」範例，資料庫裡還沒有對應房間跟道具，之後有實際內容時，直接照 `craftRecipes` 的既有格式在該房間加一筆資料即可，不需要改程式碼。
+
+**搜索機制整分支審查記錄的 7 項 Minor 建議，開發者已指示列為下階段待辦（2026-08-18 第 2 次工作階段）**：
+1. `selectOptions.hasRoomAction` 現在恆為 `true`，`turnFlow.js` 的 `NO_ROOM_ACTION_AVAILABLE` 從 socket 路徑已經打不到（單元測試還在，只是這條路徑實質上變死碼）——建議加註解說明，避免以後誤以為還有拒絕路徑
+2. `rooms.json` 的 `actions` 欄位目前 server／client 都沒有真正的消費端（只有純前瞻性資料），前端「行動」按鈕仍是通用單一按鈕；未來如果做多行動選單，要注意 `room_larder`/`room_gymnasium` 現在的 `actions:["搜索"]` 是真的會生效的（走搜索分支），渲染邏輯不能自己猜
+3. `resolveCardDraw`（`socketHandlers.js`）的 item 牌堆分支仍然沒有 `addItem`——目前因為 `rooms.json` 已經沒有任何 `drawType:"item"` 房間，這條路徑無法被觸發，但函式本身的缺陷還在，之後如果有新房間或卡片效果又用到這個路徑會重現同一個問題
+4. `placedRoom.item` 會透過 `game:stateUpdate` 原樣廣播給所有玩家——目前只洩漏「這間房搜過了沒」（反正 `game:cardDrawn`/`game:searchEmpty` 也會廣播），但如果之後真的填了固定清單陣列，未搜索房間的道具內容會提前曝光給所有人，建議序列化時處理掉
+5. 缺一條跨回合的整合測試（搜索→結束回合→下回合再搜索成功），目前只有旗標單元測試＋同回合拒絕測試，兩者沒有串起來驗證
+6. 手動驗證時要注意：剛開門探索到的新房間，行動力會直接歸零（既有機制，不是新 bug），要先結束回合才能在該房間搜索
+7. 搜索分支在 `performSearch`/`addItem` 之前就先呼叫了 `ack(result)`，如果後續拋錯外層 catch 會二次呼叫 ack——`addItem` 只在道具 id 不合法時才會拋錯，發生機率趨近於零，記錄但不需要處理
 
 **房間美術圖 prompt 已補齊剩餘 33 間，但其中 14 間門框配置已經跟 `rooms.json` 對不上，開發者確認生圖時自行手動調整（2026-08-18）**：`rooms.json` 49 筆房間裡，之前只有 16 筆有 `filename`。比對舊文件 [2026-08-13-m2d3-room-art-prompts.md](docs/superpowers/specs/2026-08-13-m2d3-room-art-prompts.md) 後發現：10 間舊 prompt 仍然有效（門型未變，只是還沒生圖）、4 間舊 prompt 已經因為房間資料變動而過時、19 間是後續內容稽核新增、從未寫過 prompt 的全新房間。新文件 [2026-08-18-room-art-prompts-remaining.md](docs/superpowers/specs/2026-08-18-room-art-prompts-remaining.md) 把這 33 間全部合併成一份、依當時 `rooms.json` 的實際資料重新產出。**寫完新文件之後**，開發者又提供一份更精確的房間門數/樓層規格，更新了其中 16 間房間（見下方「房間門數/樓層規格更新」條目），導致新文件裡有 **14 間房間的「本房間配置」（門框位置/門數）跟現在的 `rooms.json` 已經不一致**（僅 2 間手術室/鍋爐室維持原樣，這 2 間開發者當時只是確認現況、沒有要求改動）。**開發者已明確指示這次不修 prompt 文件**，生圖時會自己手動對照新的門數調整——下次工作階段如果要處理房間美術圖，先跟開發者確認這 14 間是否已經手動調整過，不要直接照文件字面內容生圖。這 14 間分別是：餐廳／天花閣樓／五芒星室／墓園／地下墓穴／地底深淵／酒窖／倉庫／髒亂的房間／風琴室／地下湖／包廂房／崩塌的房間（以上 13 間門數或門型都變了）／臥房沒變不算（臥房本身沒被列入這次調整清單，維持文件原樣）。過程中也發現 17 間 `doors:2` 房間完全沒有 `doorPattern` 欄位，依開發者指示統一補上 `"adjacent"`（後續 16 間規格更新時，其中多間又因為門數變成 1/3/4 而移除了這個欄位，見下方條目）。
 
@@ -168,15 +180,15 @@
 
 ## 下一步行動 (Next Steps)
 1. 讀取本 Handover；worklog 讀最近一次工作階段範圍即可
-2. **開工第一件事：跟開發者確認房間美術圖進度**——[2026-08-18-room-art-prompts-remaining.md](docs/superpowers/specs/2026-08-18-room-art-prompts-remaining.md) 裡有 14 間房間的門框配置跟目前 `rooms.json` 對不上（開發者已知悉，說會在生圖時手動調整），先確認這些房間是否已經生圖、`filename` 要不要補
-3. **道具設計待討論事項**（2026-08-18 新記錄，見上方「目前的瓶頸或停頓點」）：武器/消耗品分類缺口（`category` 欄位表達不了複合分類、限定使用次數、屬性門檻）、道具合成機制（A+B→C，含地點限定）。開發者說要另外找時間討論，建議走 `brainstorming` 技能
+2. **開工第一件事：搜索機制的 7 項 Minor 建議**（見上方「目前的瓶頸或停頓點」），開發者已指示列為下階段待辦
+3. **開工第二件事：跟開發者確認房間美術圖進度**——[2026-08-18-room-art-prompts-remaining.md](docs/superpowers/specs/2026-08-18-room-art-prompts-remaining.md) 裡有 14 間房間的門框配置跟目前 `rooms.json` 對不上（開發者已知悉，說會在生圖時手動調整），先確認這些房間是否已經生圖、`filename` 要不要補
 4. **道具「給予」選項**：`CharacterPanel.jsx` 目前的道具彈窗只有使用/遺留，要補「給予」需要從 `DebugGameScreen.jsx` 把同房玩家名單傳進去，伺服器端已支援（`giveItemAction`，`mode:'give'`），純前端 UI 缺口
 5. **確認版面無誤後，移除暫時除錯框線**（`playingLayout.css`/`DebugGameScreen.jsx` 裡視野正方形／狀態面板的綠／藍虛線 border）
-6. **`data/cards/item-cards.json` 的 `category` 欄位有 2 筆逗號字串**（`item_001`／`item_020`，`"weapon,consumable"`），連結到上方道具設計待討論事項，一併討論時記得處理
-7. **其餘一般房間的美術圖**：開發者持續生成中，補齊後只需要重跑補 `filename` 欄位的流程（可參考 `data/rooms/rooms.json` 已有 filename 的既有寫法），不需要改程式碼
-8. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片留給 M3；通靈板整張延後到 M3；`item_008`（中世紀鎧甲，減傷＋防偷竊）也綁在 M3 傷害/偷竊機制上
-9. **M2D3 骨架完成之後的細節項目**：公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「擲骰道具介入」選擇畫面（`dice_check`/`leaveCheck` 兩條路徑現在都完成了，目前除錯頁面都只有最小可用版本）——**統一考驗彈窗機制做完後，這裡的擲骰道具介入畫面會不會一併整合進去，值得跟開發者確認**
-10. **執行順序已跟開發者確認**：M2c-3 與 M2D3 其餘細節項目何時交錯進行，待開發者決定
+6. **其餘一般房間的美術圖**：開發者持續生成中，補齊後只需要重跑補 `filename` 欄位的流程（可參考 `data/rooms/rooms.json` 已有 filename 的既有寫法），不需要改程式碼
+7. **M2c-3 其餘卡片**仍卡在幾個機制缺口（見上方除錯注意事項），依開發者已確認的方向處理——傷害系統（`damage` 效果類型＋連續提示鏈＋即時數值顯示）與武器攻擊類卡片（含 `category` 分類/限定次數/屬性門檻三個問題，見上方）留給 M3；通靈板整張延後到 M3；`item_008`（中世紀鎧甲，減傷＋防偷竊）也綁在 M3 傷害/偷竊機制上
+8. **M2D3 骨架完成之後的細節項目**：公開資訊（目前預兆數）、私人資訊區塊的預留版位（陣營/勝利條件，M3 後才有實際內容）、操控實體切換的完整 UI（犬靈是第一個真實案例，目前只有除錯頁面的最小按鈕，之後 M3 叛徒切換多隻怪物沿用同一套）、完整的「擲骰道具介入」選擇畫面（`dice_check`/`leaveCheck` 兩條路徑現在都完成了，目前除錯頁面都只有最小可用版本）——**統一考驗彈窗機制做完後，這裡的擲骰道具介入畫面會不會一併整合進去，值得跟開發者確認**
+9. **執行順序已跟開發者確認**：M2c-3 與 M2D3 其餘細節項目何時交錯進行，待開發者決定
+10. **LobbyC 新增下樓到地下室的樓梯**（2026-08-18 討論時提到，已確認另開一場設計討論，這次未實作）：目前地下室唯一能抵達的方式是崩塌的房間掉落，LobbyC 通往地下平台的樓梯還沒實作，跟一個房間可以同時有多個行動（`actions` 陣列真正被消費）的架構是同一個題目
 11. **全部完成後，開發者要手動從頭跑一次完整流程**：建房→加入→鎖門（目前是選角開始時隱含鎖門，不是獨立按鈕，已跟開發者確認這個理解一致）→選角（現在是正式畫面，非隨機/佔位）→開始遊戲→（迴圈）選擇行動/開門/移動/觸發房間效果/觸發卡片效果/改變狀態/**手動呼叫結束回合換人（注意不是行動力歸零自動換人）**，直到邪祟考驗觸發邪祟為止。邪祟觸發後的戰鬥內容是 M3，這次測試不涵蓋
 
 ## 關鍵設定 (Key Context & Rules)
