@@ -63,10 +63,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_master_bedroom.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_conservatory",
@@ -89,10 +91,12 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_game_room.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_gardens",
@@ -204,7 +208,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_larder.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "若在此房結束回合，可獲得1級力量。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
       {
@@ -214,7 +218,9 @@
         "onceOnlyPerPlayer": true
       }
     ],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_maid",
@@ -238,10 +244,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": null,
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_charred",
@@ -279,7 +287,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_gymnasium.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "若在此房結束回合，可獲得1級速度。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
       {
@@ -289,7 +297,9 @@
         "onceOnlyPerPlayer": true
       }
     ],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_vault",
@@ -299,7 +309,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_vault.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
     "effects": [
       {
@@ -336,10 +346,12 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": null,
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_specimen_room",
@@ -453,10 +465,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": null,
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_bathroom_ground",
@@ -466,10 +480,12 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_bathroom_ground.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_bathroom_upper",
@@ -479,10 +495,12 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_bathroom_upper.webp",
-    "drawType": "item",
+    "drawType": null,
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["搜索"],
+    "item": "random_one"
   },
   {
     "id": "room_beast",
