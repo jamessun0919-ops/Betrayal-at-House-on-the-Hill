@@ -247,6 +247,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             // room_action/effects path entirely.
             const jumpResult = jumpIntoCollapsedRoom(gameState, playerId);
             ack(jumpResult);
+            const enteredRoom = gameState.board.basement.get(coordKey(jumpResult.x, jumpResult.y));
+            io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
             io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
             return;
           }
@@ -268,8 +270,12 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           try {
             const resolverEntry = getResolver(effectResolverManager, roomCode);
             const targetForEffects = result.targetPlayerId || playerId;
+            const moveToRoomEffect = sourceEffects.find((e) => e.type === 'move_to_room');
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
+            if (moveToRoomEffect && !effectResult.pending) {
+              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: moveToRoomEffect.targetRoomId });
+            }
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
             }

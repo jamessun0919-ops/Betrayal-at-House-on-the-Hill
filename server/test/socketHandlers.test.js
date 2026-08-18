@@ -1023,6 +1023,81 @@ test('game:selectAction room_action jumps a later player down an already-collaps
   httpServer.close();
 });
 
+test('game:selectAction room_action jumping down an already-collapsed room broadcasts game:roomEntered for the basement room', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  // The fall-through move itself already broadcasts its own game:roomEntered
+  // (finishMoveResult reads the mover's actual final position, which by then
+  // is the basement room) -- drain that first so the listener below can only
+  // catch what the room_action jump itself broadcasts, not a race with this
+  // earlier one.
+  const firstRoomEnteredPromise = new Promise((resolve) => otherClient.once('game:roomEntered', resolve));
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // guaranteed fail -> falls immediately
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+  await firstRoomEnteredPromise;
+
+  player.actionPoints = 4;
+  player.floor = 'ground';
+  player.x = 1;
+  player.y = 1;
+
+  const roomEnteredPromise = new Promise((resolve) => otherClient.once('game:roomEntered', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const roomEntered = await roomEnteredPromise;
+
+  expect(roomEntered.playerId).toBe(currentPlayerId);
+  expect(roomEntered.roomId).toBe('room_basement_a');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action resolving a move_to_room effect (e.g. stairs) broadcasts game:roomEntered for the target room', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
+      {
+        id: 'room_lobby_c',
+        name: '大門廳',
+        floor: 'ground',
+        effects: [{ type: 'move_to_room', targetRoomId: 'room_upper_landing' }],
+        freeAction: true,
+      },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.floor = 'ground';
+  player.x = 0;
+  player.y = -1; // room_lobby_c's coordinate
+
+  const roomEnteredPromise = new Promise((resolve) => otherClient.once('game:roomEntered', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const roomEntered = await roomEnteredPromise;
+
+  expect(roomEntered.playerId).toBe(currentPlayerId);
+  expect(roomEntered.roomId).toBe('room_upper_landing');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 function makeLeaveCheckInterjectionContent() {
   return makeContent({
     startingRooms: [
