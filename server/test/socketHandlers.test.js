@@ -2451,6 +2451,66 @@ test('game:selectAction room_action: existing craftRecipes/effects rooms are una
   httpServer.close();
 });
 
+test('game:selectAction room_action: a room whose effects are ONLY a onceOnlyPerPlayer stat_change falls through to search instead of applying the stat_change', async () => {
+  const content = makeContent({
+    rooms: [{
+      id: 'room_new',
+      doors: 4,
+      floor: 'ground',
+      effects: [{ type: 'stat_change', stat: 'might', delta: 1, onceOnlyPerPlayer: true }],
+    }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const effectResolvedHandler = jest.fn();
+  currentClient.once('game:effectResolved', effectResolvedHandler);
+  const searchEmptyPromise = new Promise((resolve) => currentClient.once('game:searchEmpty', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const searchEmpty = await searchEmptyPromise;
+  expect(searchEmpty.playerId).toBe(currentPlayerId);
+  expect(effectResolvedHandler).not.toHaveBeenCalled();
+
+  expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(getPlayer(gameState, currentPlayerId).stats.might.baseIndex); // 未套用stat_change
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: a room mixing a onceOnlyPerPlayer stat_change with a real effect still takes the effects branch (regression)', async () => {
+  const content = makeContent({
+    rooms: [{
+      id: 'room_new',
+      doors: 4,
+      floor: 'ground',
+      effects: [
+        { type: 'stat_change', stat: 'might', delta: 1, onceOnlyPerPlayer: true },
+        { type: 'stat_change', stat: 'speed', delta: 1 },
+      ],
+    }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.sourceId).toBe('room_new');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 function makeCraftRoomContent() {
   return makeContent({
     rooms: [{

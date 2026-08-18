@@ -279,7 +279,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
                 { optionId: 'no', label: '否', effects: [] },
               ],
             }];
-          } else if (roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0) {
+          } else if (roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.some((e) => !e.onceOnlyPerPlayer)) {
             sourceEffects = roomDefinition.effects;
           } else {
             isSearchAction = true;
