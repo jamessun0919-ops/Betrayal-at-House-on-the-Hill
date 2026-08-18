@@ -259,3 +259,42 @@ test('placeAtRandomOpenDoor throws NO_OPEN_COORD_FOUND when every existing room 
     'NO_OPEN_COORD_FOUND'
   );
 });
+
+test('placeNewRoom copies the room definition\'s item list onto the placed room, independent of the shared definition', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const roomDefinition = { id: 'room_a', doors: 4, item: ['item_003', 'item_009'] };
+
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'north', roomDefinition);
+  expect(placed.item).toEqual(['item_003', 'item_009']);
+
+  placed.item.push('item_099');
+  expect(roomDefinition.item).toEqual(['item_003', 'item_009']); // 靜態定義不受污染
+});
+
+test('placeNewRoom defaults item to null when the room definition has no item field', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'north', { id: 'room_a', doors: 4 });
+  expect(placed.item).toBeNull();
+});
+
+test('placeNewRoom preserves a string item value like "random_one" as-is', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'north', { id: 'room_a', doors: 4, item: 'random_one' });
+  expect(placed.item).toBe('random_one');
+});
+
+test('placeRoomAt copies the room definition\'s item field onto the placed room, independent of the shared definition', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const roomDefinition = { id: 'room_a', doors: 4, item: ['item_003'] };
+  const placed = placeRoomAt(board, 'basement', 5, 5, roomDefinition, 'north');
+  expect(placed.item).toEqual(['item_003']);
+});
+
+test('createBoard sets item to null on the five starting rooms', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(board.ground.get(coordKey(0, 1)).item).toBeNull(); // room_lobby_a
+  expect(board.ground.get(coordKey(0, 0)).item).toBeNull(); // room_lobby_b
+  expect(board.ground.get(coordKey(0, -1)).item).toBeNull(); // room_lobby_c
+  expect(board.upper.get(coordKey(0, 0)).item).toBeNull(); // room_upper_landing
+  expect(board.basement.get(coordKey(0, 0)).item).toBeNull(); // room_basement_landing
+});

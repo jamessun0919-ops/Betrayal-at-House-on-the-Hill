@@ -13,8 +13,13 @@ function coordKey(x, y) {
   return `${x},${y}`;
 }
 
+function cloneRoomItem(item) {
+  if (Array.isArray(item)) return item.slice();
+  return item === undefined ? null : item;
+}
+
 function placeFixedRoom(grid, roomId, x, y, doorSides) {
-  grid.set(coordKey(x, y), { roomId, x, y, doorSides: doorSides.slice(), droppedItems: [] });
+  grid.set(coordKey(x, y), { roomId, x, y, doorSides: doorSides.slice(), droppedItems: [], item: null });
 }
 
 function createBoard(startingRooms) {
@@ -103,6 +108,7 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
     y: newCoord.y,
     doorSides: Array.from(doorSides),
     droppedItems: [],
+    item: cloneRoomItem(roomDefinition.item),
   };
   grid.set(key, placedRoom);
   return placedRoom;
@@ -151,6 +157,7 @@ function placeRoomAt(board, floor, x, y, roomDefinition, guaranteedSide) {
     y,
     doorSides: Array.from(doorSides),
     droppedItems: [],
+    item: cloneRoomItem(roomDefinition.item),
   };
   grid.set(key, placedRoom);
   return placedRoom;
