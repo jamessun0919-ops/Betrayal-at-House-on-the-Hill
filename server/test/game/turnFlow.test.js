@@ -860,6 +860,16 @@ test('advanceTurn resets the outgoing player\'s diceInterjectionUsedThisTurn to 
   expect(player.diceInterjectionUsedThisTurn).toEqual([]);
 });
 
+test('advanceTurn resets the outgoing player\'s searchedThisTurn to false', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player.searchedThisTurn = true;
+  advanceTurn(gameState);
+  expect(player.searchedThisTurn).toBe(false);
+});
+
 test('advanceTurn drops the outgoing summon\'s carried item into its room instead of destroying it', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   gameState.turnOrder = ['p1', 'p2'];
