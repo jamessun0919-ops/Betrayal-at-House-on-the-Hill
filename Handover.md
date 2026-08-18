@@ -133,17 +133,20 @@
 
 ## 目前的瓶頸或停頓點 (Current Blocker/Status)
 
-**最優先：「統一考驗彈窗機制」整分支審查記錄的 6 項 Minor 建議，開發者已明確指示列為下階段待辦**（本階段不處理）：
-1. `client/src/gameplay/mapUtils.js` 沒有涵蓋 Task 3 缺少的組合測試（leaveCheck 通過＋崩塌房間檢定同時觸發時的 `game:checkResolved` 廣播），程式碼邏輯已人工確認正確，只是沒有自動化測試覆蓋
-2. `server/src/socketHandlers.js` 的 `game:checkResolved` 廣播，`leaveCheck` 讀 `result.leaveCheckResult.roomId`、`collapseCheck` 讀 `result.roomId`，兩邊欄位取值位置不一致（外觀不統一，個別都正確）
-3. `handleEffectResolveResult` 裡卡片考驗廣播的 `content` null 防呆是死碼（六個呼叫點都一定會傳 `content`），與函式簽章預設值一致，留著無害
-4. `STAT_LABELS`（力量/速度/知識/意志中文對照）目前在 `CharacterPanel.jsx`／`CheckModal.jsx`／`CharacterSelectScreen.jsx`／`DebugGameScreen.jsx` 四個檔案各自重複定義一份，候選收斂位置是 `mapUtils.js`（前端唯一已經被多檔共用的工具模組）
-5. `DebugGameScreen.jsx` 主要 `useEffect` 依賴陣列只有 `[socket]`，`gameState`/`roomContent`/`cardContent` 透過閉包在掛載當下就凍結——已確認實務上安全（見下方「關鍵設定」的完整分析），但這是既有架構模式，之後若要改成更保守的寫法可以考慮
-6. 崩塌房間掉落、走樓梯（`game:useStairs`）目前不會發送 `game:roomEntered`，這兩種進房方式不會出現在訊息欄（計畫書當初只要求涵蓋 `move`/`open_door` 兩種 kind，符合規格但不是完整涵蓋所有進房情境）
+**「統一考驗彈窗機制」整分支審查記錄的 6 項 Minor 建議，已於 2026-08-18 處理完畢**：項目 1（缺組合測試）、2（`roomId` 欄位路徑不一致）、4（`STAT_LABELS` 四檔重複）、6（樓梯/崩塌房間掉落缺少 `game:roomEntered`）皆已修復；項目 3（死碼防呆）依開發者指示維持現狀；項目 5（`useEffect` 閉包）已確認安全不需要改。過程中意外發現 `data/cards/item-cards.json` 有 9 處缺逗號的語法錯誤（開發者剛編輯完的內容），已修正（純語法，內容未變動）。詳見下方「除錯注意事項」與「關鍵設定」。
+
+**道具設計待討論事項（2026-08-18 新記錄，開發者明確要求記錄、非本階段處理）**：
+1. **武器/消耗品分類目前的 `category` 欄位表達不了的組合機制**：
+   - 武器同時具備「限定使用次數後道具消失」的消耗品性質，範例：精緻的十字弩（`item_020`）。目前 `category` 寫成字串 `"weapon,consumable"`（逗號分隔的單一字串，不是陣列），但引擎的 `consumeItemIfApplied = Boolean(itemContent && itemContent.category === 'consumable')` 只認得單一字串完全等於 `'consumable'`，`"weapon,consumable"` 永遠不會被判定為消耗品，這是資料格式跟引擎邏輯對不上，需要先決定 `category` 要不要改成陣列或其他表達方式
+   - 消耗品但不是「用一次就消失」，而是有限定次數（例如隨機 1～6 次）用完才消失，範例：左輪手槍（`item_001`，`text` 寫「本道具使用次數於取得時隨機決定１～６次」）。目前完全沒有「剩餘使用次數」這個資料欄位或引擎機制，`category:'consumable'` 現行邏輯是「只要生效過一次就整個移除」，跟這張卡真正的設計意圖不符
+   - 需要屬性達到門檻才能使用的武器，範例：斧頭（`item_011`，`text` 寫「玩家需要力量大於六才可使用」）。目前 `game:selectAction` 的道具使用路徑完全沒有任何屬性門檻檢查，任何人都能直接使用
+2. **道具合成機制（物品 A＋物品 B → 物品 C）**：目前完全沒有這個概念的資料欄位或引擎邏輯。已知的具體案例：`item_021`（烹飪過的食物）的 `text` 已經寫明「在廚房使用泡麵（`item_017`）跟礦泉水（`item_016`）加工出的食物」，暗示需要「特定房間才能合成」（廚房）；開發者另外提到的「化學實驗室合成藥物」範例，目前資料庫裡還沒有「化學實驗室」這間房，也沒有對應的藥物類道具。這兩點都需要先設計新的 schema（合成材料／合成結果／限定地點）才能實作，非同小可，建議另開一次 `brainstorming` 討論架構。
+
+**房間美術圖 prompt 已補齊剩餘 33 間（2026-08-18）**：`rooms.json` 49 筆房間裡，之前只有 16 筆有 `filename`。比對舊文件 [2026-08-13-m2d3-room-art-prompts.md](docs/superpowers/specs/2026-08-13-m2d3-room-art-prompts.md) 後發現：10 間舊 prompt 仍然有效（門型未變，只是還沒生圖）、4 間舊 prompt 已經因為房間資料變動（門數或 `doorPattern` 改變）而過時、19 間是後續內容稽核新增、從未寫過 prompt 的全新房間。新文件 [2026-08-18-room-art-prompts-remaining.md](docs/superpowers/specs/2026-08-18-room-art-prompts-remaining.md) 把這 33 間全部合併成一份、依目前 `rooms.json` 的實際資料重新產出，取代舊文件裡尚未生圖的部分（舊文件已生圖的 16 間不受影響）。過程中也發現 17 間 `doors:2` 房間完全沒有 `doorPattern` 欄位，依開發者指示統一補上 `"adjacent"`（`data/rooms/rooms.json` 已更新並通過測試）。**下一步**：開發者拿新文件的 33 個 prompt 去生圖引擎生成，之後只需要重跑/手動補 `filename` 欄位即可接上，不需要再改程式碼。
 
 **2026-08-16 收工時記錄的 4 項待辦，全部已完成**（UI 直式版面／leaveCheck 失敗扣屬性／三樓層架構／座標式房間連接機制），不再是待辦。
 
-以下是既有、已確認無阻塞的完成進度：`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**、**`lobby:players` 競態條件修復**、**房間／角色資料稽核與內容補完**、**手機直式版面改版**、**三樓層＋座標式房間連接機制＋leaveCheck 扣屬性**、**角色圖示串接與版面調整**、**統一考驗彈窗機制＋訊息欄可讀化**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
+以下是既有、已確認無阻塞的完成進度：`summon-control-and-item-drop`、房間獨立小任務、`dice-interjection`（Part A + Part B）、M2D1（大廳流程）、M2D2（角色選擇正式畫面）、**M2D3 後端資料串接計畫**、**大門廳整合＋遊戲開始畫面**、**M2D3 一般房間地圖骨架**、**`lobby:players` 競態條件修復**、**房間／角色資料稽核與內容補完**、**手機直式版面改版**、**三樓層＋座標式房間連接機制＋leaveCheck 扣屬性**、**角色圖示串接與版面調整**、**統一考驗彈窗機制＋訊息欄可讀化**、**統一考驗彈窗機制 6 項 Minor 修正**皆已完成並合併進 `main`，目前工作目錄就是 `main`，worktree 全部清理乾淨。
 
 **道具「給予」選項尚未實作（2026-08-17 新記錄）**：狀態欄道具區點選道具名稱後跳出的選項彈窗目前只有「使用」／「遺留」，沒有「給予」——伺服器 `turnFlow.js` 的 `giveItemAction` 已經支援（`mode:'give'` + `targetPlayerId`），純粹是前端 `CharacterPanel.jsx` 目前沒有拿到同房玩家名單，沒辦法做選人介面。要補的話需要從 `DebugGameScreen.jsx` 把 `gameState.players`（篩選同房間）傳進 `CharacterPanel`。
 
