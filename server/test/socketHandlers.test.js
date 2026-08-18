@@ -8,6 +8,7 @@ const { createEffectResolverManager, getResolver } = require('../src/game/effect
 const { getGameState } = require('../src/game/gameManager');
 const { getPlayer } = require('../src/game/gameState');
 const { attachModifier } = require('../src/game/modifiers');
+const { coordKey } = require('../src/game/boardGenerator');
 
 function makeContent(overrides = {}) {
   return {
@@ -2293,12 +2294,157 @@ test('game:selectAction room_action: resolves the current room\'s effects', asyn
   httpServer.close();
 });
 
-test('game:selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when the current room has no effects', async () => {
-  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
-  // Default starting room (entrance hall) has no `effects` field.
+test('game:selectAction room_action: a room with no effects/craftRecipes defaults to search, and the starting entrance hall finds nothing (item defaults to null)', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGame();
+  // Default starting room (entrance hall) has no `effects`/`craftRecipes`/`item` field -- search defaults apply.
+  const gameState = getGameState(gameManager, roomCode);
+  const apBeforeSearch = getPlayer(gameState, currentPlayerId).actionPoints;
+
+  const searchEmptyPromise = new Promise((resolve) => currentClient.once('game:searchEmpty', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const searchEmpty = await searchEmptyPromise;
+  expect(searchEmpty.playerId).toBe(currentPlayerId);
+
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(apBeforeSearch - 1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+function makeSearchRoomContent(itemField) {
+  return makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', item: itemField }],
+  });
+}
+
+test('game:selectAction room_action with item:"random_one": finds a card from the shared item deck, adds it to inventory, and clears the room to null', async () => {
+  const content = makeSearchRoomContent('random_one');
+  content.cards.items = [{ id: 'item_001', name: '測試道具', effects: [] }];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.deckType).toBe('item');
+  expect(cardDrawn.cardId).toBe('item_001');
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_001' }]);
+  expect(gameState.itemDeck.cards).toEqual([]);
+  const placedRoom = gameState.board.ground.get(coordKey(1, 1));
+  expect(placedRoom.item).toBeNull();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with item:"random_one": finds nothing when the shared item deck is empty, and the item field is unchanged', async () => {
+  const content = makeSearchRoomContent('random_one');
+  content.cards.items = [];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const searchEmptyPromise = new Promise((resolve) => currentClient.once('game:searchEmpty', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await searchEmptyPromise;
+
+  const placedRoom = gameState.board.ground.get(coordKey(1, 1));
+  expect(placedRoom.item).toBe('random_one'); // 沒有真的抽到，狀態不變
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with a fixed item list: finds one of the listed ids still present in the shared deck and removes it from the room\'s own list', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002']);
+  content.cards.items = [{ id: 'item_002', name: '測試道具', effects: [] }]; // item_001 already taken elsewhere
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.cardId).toBe('item_002');
+
+  const placedRoom = gameState.board.ground.get(coordKey(1, 1));
+  expect(placedRoom.item).toEqual(['item_001']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with a fixed item list: finds nothing when every listed id has already been taken from the shared deck', async () => {
+  const content = makeSearchRoomContent(['item_001']);
+  content.cards.items = []; // item_001 already gone (taken by another room's random_one)
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const searchEmptyPromise = new Promise((resolve) => currentClient.once('game:searchEmpty', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await searchEmptyPromise;
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: a second search in the same turn is rejected with ALREADY_SEARCHED_THIS_TURN, without spending an action point', async () => {
+  const content = makeSearchRoomContent('random_one');
+  content.cards.items = [
+    { id: 'item_001', name: '測試道具1', effects: [] },
+    { id: 'item_002', name: '測試道具2', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 2;
+
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const afterFirst = getPlayer(gameState, currentPlayerId).actionPoints;
 
   const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
-  expect(result.error).toBe('NO_ROOM_ACTION_AVAILABLE');
+  expect(result.error).toBe('ALREADY_SEARCHED_THIS_TURN');
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(afterFirst); // 沒有再扣一次
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: existing craftRecipes/effects rooms are unaffected by the search branch (regression)', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const effectResolved = await effectResolvedPromise;
+  expect(effectResolved.sourceId).toBe('room_new');
 
   clientA.close();
   clientB.close();

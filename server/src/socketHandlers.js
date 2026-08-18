@@ -254,9 +254,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           }
 
           const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
+          let isSearchAction = false;
 
           if (roomDefinition && Array.isArray(roomDefinition.craftRecipes) && roomDefinition.craftRecipes.length > 0) {
-            const currentPlayer = getPlayer(gameState, playerId);
             const heldIds = currentPlayer.inventory.map((item) => item.id);
             const recipe = roomDefinition.craftRecipes.find((r) => r.ingredients.every((id) => heldIds.includes(id)));
             if (!recipe) {
@@ -279,15 +279,32 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
                 { optionId: 'no', label: '否', effects: [] },
               ],
             }];
+          } else if (roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0) {
+            sourceEffects = roomDefinition.effects;
           } else {
-            sourceEffects =
-              roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
-                ? roomDefinition.effects
-                : null;
+            isSearchAction = true;
+            if (currentPlayer.searchedThisTurn) {
+              throw new Error('ALREADY_SEARCHED_THIS_TURN');
+            }
           }
-          selectOptions.hasRoomAction = Boolean(sourceEffects);
+          selectOptions.hasRoomAction = Boolean(sourceEffects) || isSearchAction;
           selectOptions.freeRoomAction = Boolean(roomDefinition && roomDefinition.freeAction);
           sourceId = placedRoom.roomId;
+
+          if (isSearchAction) {
+            const result = selectAction(gameState, playerId, actionType, selectOptions);
+            ack(result);
+            currentPlayer.searchedThisTurn = true;
+            const searchOutcome = performSearch(gameState, placedRoom);
+            if (searchOutcome.found) {
+              addItem(currentPlayer, { id: searchOutcome.card.id });
+              io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: searchOutcome.card.id, cardName: searchOutcome.card.name, hasCheck: false });
+            } else {
+              io.to(roomCode).emit('game:searchEmpty', { playerId, roomId: placedRoom.roomId });
+            }
+            io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+            return;
+          }
         }
 
         const result = selectAction(gameState, playerId, actionType, selectOptions);
@@ -716,6 +733,33 @@ function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, p
   const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now(), itemCatalog: content.cards.items });
   handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition.id, effectResult, effectChoiceTimeouts, false, content, rollChoiceTimeouts, rollChoiceTimeoutMs);
   player.roomBonusesReceived = [...received, roomDefinition.id];
+}
+
+function performSearch(gameState, placedRoom) {
+  const itemDeck = gameState.itemDeck;
+
+  if (placedRoom.item === 'random_one') {
+    if (!hasCards(itemDeck)) {
+      return { found: false };
+    }
+    const card = drawCard(itemDeck);
+    placedRoom.item = null;
+    return { found: true, card };
+  }
+
+  if (Array.isArray(placedRoom.item) && placedRoom.item.length > 0) {
+    const availableIds = placedRoom.item.filter((id) => itemDeck.cards.some((c) => c.id === id));
+    if (availableIds.length === 0) {
+      return { found: false };
+    }
+    const chosenId = availableIds[Math.floor(Math.random() * availableIds.length)];
+    const index = itemDeck.cards.findIndex((c) => c.id === chosenId);
+    const [card] = itemDeck.cards.splice(index, 1);
+    placedRoom.item = placedRoom.item.filter((id) => id !== chosenId);
+    return { found: true, card };
+  }
+
+  return { found: false };
 }
 
 function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs) {
