@@ -3,7 +3,7 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import CheckModal from './gameplay/CheckModal';
-import { getAvailableDirections, findRoomInfo, findCardInfo } from './gameplay/mapUtils';
+import { getAvailableDirections, findRoomInfo, findCardInfo, STAT_LABELS } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
 function findPlayerName(playerId, players) {
@@ -104,8 +104,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     }
     function onCheckResolved(data) {
       const playerName = findPlayerName(data.playerId, gameState?.players);
-      const STAT_LABELS_LOCAL = { might: '力量', speed: '速度', knowledge: '知識', sanity: '意志' };
-      const statLabel = STAT_LABELS_LOCAL[data.stat] || '';
+      const statLabel = STAT_LABELS[data.stat] || '';
       // Message text is precomputed here but only appended to the message log
       // once the player dismisses this check's CheckModal (see the onDone
       // handler below) -- writing it immediately would spoil the result

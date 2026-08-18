@@ -1,3 +1,5 @@
+const STAT_LABELS = { might: '力量', speed: '速度', knowledge: '知識', sanity: '意志' };
+
 const DIRECTION_DELTA = {
   north: { dx: 0, dy: -1 },
   south: { dx: 0, dy: 1 },
@@ -58,4 +60,4 @@ function findCardInfo(cardId, cardContent) {
   );
 }
 
-export { DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo };
+export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo };

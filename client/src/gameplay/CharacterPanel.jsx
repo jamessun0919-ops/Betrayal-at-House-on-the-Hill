@@ -1,11 +1,5 @@
 import { useState } from 'react';
-
-const STAT_LABELS = {
-  might: '力量',
-  speed: '速度',
-  knowledge: '知識',
-  sanity: '意志',
-};
+import { STAT_LABELS } from './mapUtils';
 
 // 由上到下排列的順序：力量／速度／意志／知識
 const STAT_ORDER = ['might', 'speed', 'sanity', 'knowledge'];

@@ -1,14 +1,11 @@
 import { useState } from 'react';
 import { translateError } from './errorMessages';
+import { STAT_LABELS } from '../gameplay/mapUtils';
 
 const MAX_HEIGHT_VH = 66.67; // 2/3 of viewport height, for the tallest character
 
-const STAT_LABELS = [
-  ['might', '力量'],
-  ['speed', '速度'],
-  ['knowledge', '知識'],
-  ['sanity', '意志'],
-];
+// 這個畫面顯示屬性的順序：力量／速度／知識／意志
+const STAT_ORDER = ['might', 'speed', 'knowledge', 'sanity'];
 
 function CharacterStatCard({ character, isMyTurn, isLocked, isMine, onFlip, onExit, onConfirm, error }) {
   const canConfirm = isMyTurn && !isLocked;
@@ -28,9 +25,9 @@ function CharacterStatCard({ character, isMyTurn, isLocked, isMine, onFlip, onEx
         <h3>{character.codename}</h3>
         <p>{character.occupation}</p>
         <ul className="cs-stat-list">
-          {STAT_LABELS.map(([key, label]) => (
+          {STAT_ORDER.map((key) => (
             <li key={key}>
-              {label}：{character.stats[key].track[character.stats[key].baseIndex]}
+              {STAT_LABELS[key]}：{character.stats[key].track[character.stats[key].baseIndex]}
             </li>
           ))}
         </ul>

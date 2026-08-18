@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { findRoomInfo, findCardInfo } from './mapUtils';
-
-const STAT_LABELS = { might: '力量', speed: '速度', knowledge: '知識', sanity: '意志' };
+import { findRoomInfo, findCardInfo, STAT_LABELS } from './mapUtils';
 
 const TITLE_BY_KIND = {
   leaveCheck: '離開房間考驗',
