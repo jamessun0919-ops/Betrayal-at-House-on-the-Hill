@@ -241,7 +241,7 @@ function placeBallroomGalleryPair(gameState, roomDefinition, placedRoom) {
 // doesn't exist yet. This is a known, deliberate gap, not an oversight.
 function applyCollapseCheck(gameState, player, placedRoom, rolled) {
   if (rolled >= COLLAPSE_CHECK_MIN) {
-    return { fell: false, rolled, stat: COLLAPSE_CHECK_STAT, required: COLLAPSE_CHECK_MIN };
+    return { fell: false, rolled, stat: COLLAPSE_CHECK_STAT, required: COLLAPSE_CHECK_MIN, roomId: placedRoom.roomId };
   }
   const guaranteedSide = SIDES[Math.floor(Math.random() * SIDES.length)];
   const basementRoomDefinition = drawRoom(gameState.roomDeck, 'basement');
@@ -263,6 +263,7 @@ function applyCollapseCheck(gameState, player, placedRoom, rolled) {
     rolled,
     stat: COLLAPSE_CHECK_STAT,
     required: COLLAPSE_CHECK_MIN,
+    roomId: placedRoom.roomId,
     basementRoomId: basementRoom.roomId,
     x: basementRoom.x,
     y: basementRoom.y,

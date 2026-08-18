@@ -429,7 +429,7 @@ test('moveToRoom into room_collapsed_room: passing the speed check (5+) leaves t
   const result = moveToRoom(gameState, 'p1', 'east', null, { rng: passRng });
   expect(result.kind).toBe('open_door');
   expect(result.roomId).toBe('room_collapsed_room');
-  expect(result.collapseResult).toEqual({ fell: false, rolled: 8, stat: 'speed', required: 5 });
+  expect(result.collapseResult).toEqual({ fell: false, rolled: 8, stat: 'speed', required: 5, roomId: 'room_collapsed_room' });
   expect(player.floor).toBe('ground');
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);

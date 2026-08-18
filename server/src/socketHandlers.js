@@ -571,7 +571,7 @@ function finishMoveResult(io, socket, gameState, roomCode, playerId, result, eff
       playerId,
       checkKind: 'collapseCheck',
       sourceKind: 'room',
-      sourceId: result.roomId,
+      sourceId: result.collapseResult.roomId,
       stat: result.collapseResult.stat,
       rolled: result.collapseResult.rolled,
       threshold: result.collapseResult.required,

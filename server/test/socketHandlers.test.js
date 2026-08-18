@@ -908,6 +908,44 @@ test('game:move into the collapsed room broadcasts a collapseCheck game:checkRes
   httpServer.close();
 });
 
+test('game:move that passes a leaveCheck and then opens into the collapsed room broadcasts both game:checkResolved events, in order', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+    rooms: [
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_basement_a', doors: 2, floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const checkResolvedEvents = [];
+  otherClient.on('game:checkResolved', (data) => checkResolvedEvents.push(data));
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // every die -> face 2, both checks pass
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await new Promise((resolve) => setTimeout(resolve, 0)); // let both broadcasts land
+  rngSpy.mockRestore();
+
+  expect(checkResolvedEvents).toHaveLength(2);
+  expect(checkResolvedEvents[0].playerId).toBe(currentPlayerId);
+  expect(checkResolvedEvents[0].checkKind).toBe('leaveCheck');
+  expect(checkResolvedEvents[0].sourceId).toBe('room_lobby_a');
+  expect(checkResolvedEvents[0].passed).toBe(true);
+  expect(checkResolvedEvents[1].playerId).toBe(currentPlayerId);
+  expect(checkResolvedEvents[1].checkKind).toBe('collapseCheck');
+  expect(checkResolvedEvents[1].sourceId).toBe('room_collapsed_room');
+  expect(checkResolvedEvents[1].passed).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into room_collapsed_room with an eligible interjection item pauses for a roll choice, then game:diceChoiceRespond resolves the fall', async () => {
   const content = makeContent({
     rooms: [
