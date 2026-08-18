@@ -117,6 +117,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       const playerName = findPlayerName(data.playerId, gameState?.players);
       setMessages((prev) => [...prev, `${playerName} 進入了「${room ? room.name : data.roomId}」`]);
     }
+    function onSearchEmpty(data) {
+      const playerName = findPlayerName(data.playerId, gameState?.players);
+      setMessages((prev) => [...prev, `${playerName} 搜索了房間，但沒有找到任何東西`]);
+    }
     function onEffectPendingChoice(data) {
       setPendingEffectChoice(data);
     }
@@ -140,6 +144,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.on('game:diceChoicePending', onDiceChoicePending);
     socket.on('game:checkResolved', onCheckResolved);
     socket.on('game:roomEntered', onRoomEntered);
+    socket.on('game:searchEmpty', onSearchEmpty);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -154,6 +159,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       socket.off('game:diceChoicePending', onDiceChoicePending);
       socket.off('game:checkResolved', onCheckResolved);
       socket.off('game:roomEntered', onRoomEntered);
+      socket.off('game:searchEmpty', onSearchEmpty);
     };
   }, [socket]);
 
