@@ -176,7 +176,11 @@
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "actions": ["烹飪"],
+    "craftRecipes": [
+      { "id": "recipe_cooked_food", "ingredients": ["item_016", "item_017"], "result": "item_021" }
+    ]
   },
   {
     "id": "room_abandoned",

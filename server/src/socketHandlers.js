@@ -254,10 +254,37 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           }
 
           const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
-          sourceEffects =
-            roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
-              ? roomDefinition.effects
-              : null;
+
+          if (roomDefinition && Array.isArray(roomDefinition.craftRecipes) && roomDefinition.craftRecipes.length > 0) {
+            const currentPlayer = getPlayer(gameState, playerId);
+            const heldIds = currentPlayer.inventory.map((item) => item.id);
+            const recipe = roomDefinition.craftRecipes.find((r) => r.ingredients.every((id) => heldIds.includes(id)));
+            if (!recipe) {
+              throw new Error('MISSING_CRAFT_MATERIALS');
+            }
+            sourceEffects = [{
+              type: 'choice',
+              description: '要不要進行烹飪？',
+              timeoutMs: 20000,
+              defaultOptionId: 'no',
+              options: [
+                {
+                  optionId: 'yes',
+                  label: '是',
+                  effects: [
+                    ...recipe.ingredients.map((itemId) => ({ type: 'lose_item', itemId })),
+                    { type: 'grant_item', itemId: recipe.result },
+                  ],
+                },
+                { optionId: 'no', label: '否', effects: [] },
+              ],
+            }];
+          } else {
+            sourceEffects =
+              roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.length > 0
+                ? roomDefinition.effects
+                : null;
+          }
           selectOptions.hasRoomAction = Boolean(sourceEffects);
           selectOptions.freeRoomAction = Boolean(roomDefinition && roomDefinition.freeAction);
           sourceId = placedRoom.roomId;

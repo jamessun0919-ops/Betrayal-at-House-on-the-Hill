@@ -32,6 +32,8 @@
      [{
        type: 'choice',
        description: '要不要進行烹飪？',
+       timeoutMs: 20000,
+       defaultOptionId: 'no',
        options: [
          { optionId: 'yes', label: '是', effects: [
            { type: 'lose_item', itemId: 'item_016' },

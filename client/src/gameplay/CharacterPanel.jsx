@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { STAT_LABELS } from './mapUtils';
+import { STAT_LABELS, findCardInfo } from './mapUtils';
 
 // 由上到下排列的順序：力量／速度／意志／知識
 const STAT_ORDER = ['might', 'speed', 'sanity', 'knowledge'];
@@ -38,14 +38,12 @@ function StatRow({ label, stat }) {
 }
 
 function findCardName(id, cardContent) {
-  if (!cardContent) return id;
-  const all = [...(cardContent.items || []), ...(cardContent.events || []), ...(cardContent.omens || [])];
-  const found = all.find((c) => c.id === id);
-  return found ? found.name : id;
+  const card = findCardInfo(id, cardContent);
+  return card ? card.name : id;
 }
 
 export default function CharacterPanel({ player, messages, cardContent, onSelectAction }) {
-  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name } | null
+  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial } | null
 
   const speed = player.stats.speed;
   const maxActionPoints = speed.track[speed.currentIndex] + (speed.overflow || 0);
@@ -95,7 +93,7 @@ export default function CharacterPanel({ player, messages, cardContent, onSelect
             player.inventory.map((item, i) => (
               <button
                 key={`${item.id}-${i}`}
-                onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent) })}
+                onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial) })}
                 style={{
                   border: '1px solid #999',
                   borderRadius: 4,
@@ -151,7 +149,7 @@ export default function CharacterPanel({ player, messages, cardContent, onSelect
           <div style={{ backgroundColor: '#fff', padding: 16, borderRadius: 8, minWidth: 200 }} onClick={(e) => e.stopPropagation()}>
             <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{selectedItem.name}</p>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={handleUseItem}>使用</button>
+              {!selectedItem.isMaterial && <button onClick={handleUseItem}>使用</button>}
               <button onClick={handleLeaveItem}>遺留</button>
               <button onClick={() => setSelectedItem(null)}>取消</button>
             </div>

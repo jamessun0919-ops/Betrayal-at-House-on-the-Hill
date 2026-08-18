@@ -2305,6 +2305,112 @@ test('game:selectAction room_action: throws NO_ROOM_ACTION_AVAILABLE when the cu
   httpServer.close();
 });
 
+function makeCraftRoomContent() {
+  return makeContent({
+    rooms: [{
+      id: 'room_new',
+      doors: 4,
+      floor: 'ground',
+      craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }],
+    }],
+  });
+}
+
+test('game:selectAction room_action with craftRecipes: holding both ingredients broadcasts a yes/no choice and spends 1 action point', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(makeCraftRoomContent());
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_016' }, { id: 'item_017' });
+  player.actionPoints = 1;
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const pendingChoice = await pendingChoicePromise;
+
+  expect(pendingChoice.description).toBe('要不要進行烹飪？');
+  expect(pendingChoice.options.map((o) => o.optionId)).toEqual(['yes', 'no']);
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with craftRecipes: choosing "yes" consumes the ingredients and grants the result item', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(makeCraftRoomContent());
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_016' }, { id: 'item_017' });
+  player.actionPoints = 1;
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'yes' }, resolve);
+  });
+  await effectResolvedPromise;
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_021' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with craftRecipes: choosing "no" keeps the ingredients and does not refund the spent action point', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(makeCraftRoomContent());
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_016' }, { id: 'item_017' });
+  player.actionPoints = 1;
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'no' }, resolve);
+  });
+  await updatePromise;
+
+  const finalPlayer = getPlayer(gameState, currentPlayerId);
+  expect(finalPlayer.inventory).toEqual([{ id: 'item_016' }, { id: 'item_017' }]);
+  expect(finalPlayer.actionPoints).toBe(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with craftRecipes: missing an ingredient throws MISSING_CRAFT_MATERIALS without spending an action point', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(makeCraftRoomContent());
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_016' }); // missing item_017
+  player.actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBe('MISSING_CRAFT_MATERIALS');
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(1);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('drawing an omen card increments omenCount and broadcasts a haunt check', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],

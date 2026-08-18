@@ -173,7 +173,8 @@
     "effects": [],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "isMaterial": true
   },
   {
     "id": "item_017",
@@ -183,7 +184,8 @@
     "effects": [],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "isMaterial": true
   },
   {
     "id": "item_018",
