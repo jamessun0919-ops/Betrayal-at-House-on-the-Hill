@@ -2,10 +2,10 @@
   {
     "id": "item_001",
     "name": "左輪手槍",
-    "description": "",
+    "description": "一把警用手槍，手槍裡只有一顆子彈",
     "text": "玩家回合中進行襲擊時可改以速度進行考驗，並多擲一顆骰子。可對相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。本道具使用次數於取得時隨機決定１～６次。",
     "effects": [],
-    "category": "weapon",
+    "category": "weapon,consumable",
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
@@ -148,8 +148,8 @@
   {
     "id": "item_014",
     "name": "維修工具組",
-    "description": "",
-    "text": "包含了螺絲起子、老虎鉗等簡易維修工具，也許在某些房間中會使用到",
+    "description": "包含了螺絲起子、老虎鉗等簡易維修工具，也許在某些房間中會使用到",
+    "text": "",
     "effects": [],
     "category": "general",
     "canTargetOthers": false,
@@ -158,8 +158,8 @@
   {
     "id": "item_015",
     "name": "古老的金幣",
-    "description": "",
-    "text": "看上去是一件歷史悠久的古物，如果能順利逃生的話，也許可以變賣不少錢。",
+    "description": "看上去是一件歷史悠久的古物，如果能順利逃生的話，也許可以變賣不少錢。",
+    "text": "",
     "effects": [],
     "category": "general",
     "canTargetOthers": false,
@@ -168,18 +168,108 @@
   {
     "id": "item_016",
     "name": "礦泉水",
+    "description": "可以用來解渴的一罐礦泉水，除了解渴可能還有其他用處",
+    "text": "",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_017",
+    "name": "沾滿灰塵的包裝泡麵",
+    "description": "可以用來充飢的一包泡麵，看上去不太美味",
+    "text": "",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_018",
+    "name": "生鏽的菜刀",
+    "description": "玩家以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
+    "text": "",
+    "effects": [],
+    "category": "weapon",
+    "canTargetOthers": false,
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_019",
+    "name": "銀製的拆信刀",
+    "description": "銀製的精緻文具，勉強可以可以當作武器使用，可能對某些情況下會有意想不到的效果",
+    "text": "玩家回合中進行襲擊時可改以速度進行考驗。",
+    "effects": [],
+    "category": "weapon",
+    "canTargetOthers": false,
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_020",
+    "name": "精緻的十字弩",
+    "description": "保養良好還可以使用的十字弩，弩身側只有一支弩箭",
+    "text": "玩家回合中進行襲擊時可改以速度進行考驗。可對相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。",
+    "effects": [],
+    "category": "weapon,consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": true
+  },
+  {
+    "id": "item_021",
+    "name": "烹飪過的食物",
+    "description": "在廚房使用泡麵跟礦泉水加工出的食物，稱不上美味，但總能恢復一些體力",
+    "text": "對自己或對同房間玩家使用，力量增加一個級別",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": true,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "",
+    "name": "",
     "description": "",
-    "text": "可以用來解渴的一罐礦泉水，也許有其他用處",
+    "text": "",
     "effects": [],
     "category": "general",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "item_017",
-    "name": "壓縮餅乾",
+    "id": "",
+    "name": "",
     "description": "",
-    "text": "可以用來充飢的一小包壓縮餅乾，看上去不太美味",
+    "text": "",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "",
+    "name": "",
+    "description": "",
+    "text": "",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "",
+    "name": "",
+    "description": "",
+    "text": "",
+    "effects": [],
+    "category": "general",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "",
+    "name": "",
+    "description": "",
+    "text": "",
     "effects": [],
     "category": "general",
     "canTargetOthers": false,
@@ -195,5 +285,5 @@
     "canTargetOthers": false,
     "needsCustomLogic": false
   }
-    
+        
 ]
