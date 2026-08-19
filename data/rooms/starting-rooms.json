@@ -7,16 +7,19 @@
     "floor": "ground",
     "stairsTo": "room_upper_landing",
     "filename": "LobbyC.webp",
-    "effects": [{ "type": "move_to_room", "targetRoomId": "room_upper_landing" }],
-    "freeAction": true
+    "actions": [
+      { "label": "上樓", "kind": "effects", "effects": [{ "type": "move_to_room", "targetRoomId": "room_upper_landing" }], "freeAction": true },
+      { "label": "下樓", "kind": "effects", "effects": [{ "type": "move_to_room", "targetRoomId": "room_basement_landing" }], "freeAction": true }
+    ]
   },
   {
     "id": "room_upper_landing",
     "name": "二樓平台",
     "floor": "upper",
     "filename": "2Fladder.webp",
-    "effects": [{ "type": "move_to_room", "targetRoomId": "room_lobby_c" }],
-    "freeAction": true
+    "actions": [
+      { "label": "下樓", "kind": "effects", "effects": [{ "type": "move_to_room", "targetRoomId": "room_lobby_c" }], "freeAction": true }
+    ]
   },
   { "id": "room_basement_landing", "name": "地下平台", "floor": "basement", "filename": null }
 ]

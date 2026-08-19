@@ -67,7 +67,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -95,7 +95,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -181,7 +181,11 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["烹飪"],
+    "actions": [
+      { "label": "搜索", "kind": "search" },
+      { "label": "烹飪", "kind": "craft" }
+    ],
+    "item": "random_one",
     "craftRecipes": [
       { "id": "recipe_cooked_food", "ingredients": ["item_016", "item_017"], "result": "item_021" }
     ]
@@ -219,7 +223,7 @@
       }
     ],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -248,7 +252,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -298,7 +302,7 @@
       }
     ],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -311,26 +315,34 @@
     "filename": "room_vault.webp",
     "drawType": null,
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
-    "effects": [
+    "item": "random_one",
+    "actions": [
+      { "label": "搜索", "kind": "search" },
       {
-        "type": "dice_check",
-        "stat": "knowledge",
-        "tiers": [
+        "label": "考驗",
+        "kind": "effects",
+        "effects": [
           {
-            "min": 6,
-            "max": 8,
-            "effects": [
+            "type": "dice_check",
+            "stat": "knowledge",
+            "tiers": [
               {
-                "type": "draw_card",
-                "deck": "item",
-                "count": 2
+                "min": 6,
+                "max": 8,
+                "effects": [
+                  {
+                    "type": "draw_card",
+                    "deck": "item",
+                    "count": 2
+                  }
+                ]
+              },
+              {
+                "min": 0,
+                "max": 5,
+                "effects": []
               }
             ]
-          },
-          {
-            "min": 0,
-            "max": 5,
-            "effects": []
           }
         ]
       }
@@ -350,7 +362,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -469,7 +481,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -484,7 +496,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -499,7 +511,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": ["搜索"],
+    "actions": [{ "label": "搜索", "kind": "search" }],
     "item": "random_one"
   },
   {
@@ -744,7 +756,12 @@
     "drawType": "event",
     "text": "與一樓的舞廳形成綁定房間：生成包廂房時，需在一樓對應座標同步生成舞廳；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。在舞廳被探索出來之後，玩家可選擇從包廂房躍下，進入舞廳中，並受到1顆骰的物理傷害。此跳躍無需耗移動點數。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "actions": [
+      { "label": "搜索", "kind": "search" },
+      { "label": "跳下", "kind": "teleport" }
+    ],
+    "item": "random_one"
   },
   {
     "id": "room_bedroom",
@@ -771,6 +788,11 @@
     "drawType": "event",
     "text": "首位進入者，接受速度檢定，5+得以閃過地板大洞！若檢定失敗，探險者掉進地下室，在正下方座標（同一水平位置，地下室樓層）生成一張新地下室房間卡，並受到1顆骰子的物理傷害。之後進來的玩家可自由選擇是否跳入地板大洞抵達同一間地下室房間，無需耗移動點數，同樣受到1顆骰子的物理傷害。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "actions": [
+      { "label": "搜索", "kind": "search" },
+      { "label": "跳下", "kind": "teleport" }
+    ],
+    "item": "random_one"
   }
 ]
