@@ -1119,6 +1119,31 @@ test('game:selectAction room_action with actionIndex selecting teleport: jumps f
   httpServer.close();
 });
 
+test('game:selectAction room_action with actionIndex selecting teleport: a Gallery with no paired Ballroom throws NO_TELEPORT_TARGET without spending an action point', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_gallery', doors: 4, floor: 'upper', actions: [{ label: '搜索', kind: 'search' }, { label: '跳下', kind: 'teleport' }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  gameState.board.upper.set(coordKey(5, 5), { roomId: 'room_gallery', x: 5, y: 5, doorSides: ['north'], droppedItems: [], item: null });
+  // No room placed on the ground floor at (5, 5) -- no paired Ballroom.
+  player.floor = 'upper';
+  player.x = 5;
+  player.y = 5;
+  player.actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 1 }, resolve));
+  expect(result.error).toBe('NO_TELEPORT_TARGET');
+  expect(player.floor).toBe('upper'); // did not move
+  expect(player.actionPoints).toBe(1); // unchanged -- validated before selectAction spent anything
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction room_action: no actionIndex and a multi-action room throws INVALID_ACTION_INDEX without spending an action point', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '烹飪', kind: 'craft' }], craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }] }],

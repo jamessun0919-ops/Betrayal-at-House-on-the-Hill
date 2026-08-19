@@ -285,24 +285,42 @@ function getRoomAt(gameState, floor, x, y) {
   return gameState.board[floor].get(coordKey(x, y));
 }
 
+// Computes the teleport destination without moving anyone -- lets callers
+// validate a jump is actually possible BEFORE spending an action point on
+// it (see socketHandlers.js's teleport branch), matching this project's
+// established "validate before consuming" pattern (see MISSING_CRAFT_MATERIALS/
+// ALREADY_SEARCHED_THIS_TURN). Also used by performTeleport itself.
+function resolveTeleportDestination(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  if (room.roomId === COLLAPSED_ROOM_ID && room.collapseLink) {
+    return { floor: 'basement', x: room.collapseLink.x, y: room.collapseLink.y };
+  }
+  if (isBallroomOrGallery(room.roomId)) {
+    const targetFloor = pairedFloorFor(room.roomId);
+    const targetRoom = gameState.board[targetFloor].get(coordKey(room.x, room.y));
+    // placeBallroomGalleryPair has two escape paths where the pair does NOT
+    // end up at the same (x, y): the coordinate was already occupied (pair
+    // placed via placeAtRandomOpenDoor instead), or the pair's card wasn't
+    // in the deck at all (no pair placed, target cell may be empty or hold
+    // an unrelated room). Both must be rejected here, before any movement.
+    if (!targetRoom || targetRoom.roomId !== pairedIdFor(room.roomId)) {
+      throw new Error('NO_TELEPORT_TARGET');
+    }
+    return { floor: targetFloor, x: room.x, y: room.y };
+  }
+  throw new Error('NO_TELEPORT_TARGET');
+}
+
 // 「跳下」的兩個具體案例：崩塌的房間（已有 collapseLink 才能跳）、包廂房/舞廳配對
 // （放置時就決定好座標，永遠可跳）。純粹是「知道目的地在哪就移過去」，不檢查
 // NOT_YOUR_TURN/行動力——呼叫方（socketHandlers.js）已經透過 selectAction 檢查過
 // 回合與行動力，這裡只負責移動本身。
 function performTeleport(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
-  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
-  if (room.roomId === COLLAPSED_ROOM_ID && room.collapseLink) {
-    const { x, y } = room.collapseLink;
-    movePlayerTo(player, 'basement', x, y, null);
-    return { floor: 'basement', x, y };
-  }
-  if (isBallroomOrGallery(room.roomId)) {
-    const targetFloor = pairedFloorFor(room.roomId);
-    movePlayerTo(player, targetFloor, room.x, room.y, null);
-    return { floor: targetFloor, x: room.x, y: room.y };
-  }
-  throw new Error('NO_TELEPORT_TARGET');
+  const destination = resolveTeleportDestination(gameState, playerId);
+  movePlayerTo(player, destination.floor, destination.x, destination.y, null);
+  return destination;
 }
 
 function moveSummon(gameState, playerId, direction) {
@@ -598,4 +616,5 @@ module.exports = {
   useStairs,
   resumeCollapseCheck,
   performTeleport,
+  resolveTeleportDestination,
 };

@@ -536,6 +536,18 @@ test('performTeleport moves a player from the Gallery to the paired Ballroom at 
   expect(player.y).toBe(3);
 });
 
+test('performTeleport throws NO_TELEPORT_TARGET when the Gallery has no paired room at the same coordinate', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.floor = 'upper';
+  player.x = 3;
+  player.y = 3;
+  gameState.board.upper.set(coordKey(3, 3), { roomId: 'room_gallery', x: 3, y: 3, doorSides: ['north'], droppedItems: [] });
+  // No room placed on the ground floor at (3, 3) -- simulates the
+  // placeBallroomGalleryPair escape path where the pair never landed here.
+  expect(() => performTeleport(gameState, 'p1')).toThrow('NO_TELEPORT_TARGET');
+  expect(player.floor).toBe('upper'); // did not move
+});
+
 test('performTeleport throws NO_TELEPORT_TARGET when the player is not standing in a teleport-capable room', () => {
   const { gameState } = makeGameStateWithPlayer();
   expect(() => performTeleport(gameState, 'p1')).toThrow('NO_TELEPORT_TARGET');

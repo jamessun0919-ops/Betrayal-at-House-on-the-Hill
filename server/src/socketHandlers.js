@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, performTeleport } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
@@ -289,11 +289,12 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             selectOptions.hasRoomAction = true;
             selectOptions.freeRoomAction = Boolean(chosenAction.freeAction);
           } else if (chosenAction.kind === 'teleport') {
+            resolveTeleportDestination(gameState, playerId); // throws NO_TELEPORT_TARGET before any action point is spent
             selectOptions.hasRoomAction = true;
             selectOptions.freeRoomAction = Boolean(chosenAction.freeAction);
             const result = selectAction(gameState, playerId, actionType, selectOptions);
-            ack(result);
             const destination = performTeleport(gameState, playerId);
+            ack(result);
             const enteredRoom = gameState.board[destination.floor].get(coordKey(destination.x, destination.y));
             io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
             io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
