@@ -225,7 +225,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
   // Precomputed once for the playing-phase render -- both the action panel
   // and the viewport room view need these.
-  let me, currentRoom, hasRoomForFloor, directions;
+  let me, currentRoom, hasRoomForFloor, directions, roommates;
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
     currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
@@ -237,6 +237,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           : gameState.roomDeck.hasRoomForBasement;
     directions = getAvailableDirections(me, currentRoom, gameState.board[me.floor]).filter(
       (d) => d.kind === 'move' || hasRoomForFloor
+    );
+    // Same-room players (excluding self) -- CharacterPanel's item "給予"
+    // option needs this to offer a target to give to.
+    roommates = gameState.players.filter(
+      (p) => p.playerId !== playerId && p.floor === me.floor && p.x === me.x && p.y === me.y
     );
   }
 
@@ -351,6 +356,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               messages={messages}
               cardContent={cardContent}
               onSelectAction={handleSelectAction}
+              roommates={roommates}
             />
           </div>
           {(pendingEffectChoice || pendingRollChoice) && (

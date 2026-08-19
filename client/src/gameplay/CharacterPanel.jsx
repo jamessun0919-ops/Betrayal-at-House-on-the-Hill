@@ -42,19 +42,28 @@ function findCardName(id, cardContent) {
   return card ? card.name : id;
 }
 
-export default function CharacterPanel({ player, messages, cardContent, onSelectAction }) {
+export default function CharacterPanel({ player, messages, cardContent, onSelectAction, roommates }) {
   const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial } | null
+  const [showGiveTargets, setShowGiveTargets] = useState(false);
 
   const speed = player.stats.speed;
   const maxActionPoints = speed.track[speed.currentIndex] + (speed.overflow || 0);
 
+  function closeItemMenu() {
+    setSelectedItem(null);
+    setShowGiveTargets(false);
+  }
   function handleUseItem() {
     onSelectAction('item', { itemId: selectedItem.itemId, mode: 'use' });
-    setSelectedItem(null);
+    closeItemMenu();
   }
   function handleLeaveItem() {
     onSelectAction('item', { itemId: selectedItem.itemId, mode: 'leave' });
-    setSelectedItem(null);
+    closeItemMenu();
+  }
+  function handleGiveItem(targetPlayerId) {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'give', targetPlayerId });
+    closeItemMenu();
   }
 
   return (
@@ -144,15 +153,29 @@ export default function CharacterPanel({ player, messages, cardContent, onSelect
             justifyContent: 'center',
             zIndex: 60,
           }}
-          onClick={() => setSelectedItem(null)}
+          onClick={closeItemMenu}
         >
           <div style={{ backgroundColor: '#fff', padding: 16, borderRadius: 8, minWidth: 200 }} onClick={(e) => e.stopPropagation()}>
             <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{selectedItem.name}</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {!selectedItem.isMaterial && <button onClick={handleUseItem}>使用</button>}
-              <button onClick={handleLeaveItem}>遺留</button>
-              <button onClick={() => setSelectedItem(null)}>取消</button>
-            </div>
+            {showGiveTargets ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {(roommates || []).map((p) => (
+                  <button key={p.playerId} onClick={() => handleGiveItem(p.playerId)}>
+                    {p.name}
+                  </button>
+                ))}
+                <button onClick={() => setShowGiveTargets(false)}>返回</button>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {!selectedItem.isMaterial && <button onClick={handleUseItem}>使用</button>}
+                {roommates && roommates.length > 0 && (
+                  <button onClick={() => setShowGiveTargets(true)}>給予</button>
+                )}
+                <button onClick={handleLeaveItem}>遺留</button>
+                <button onClick={closeItemMenu}>取消</button>
+              </div>
+            )}
           </div>
         </div>
       )}
