@@ -471,6 +471,12 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   }
 
   if (actionType === 'room_action') {
+    // Unreachable via the real socket path since the search mechanic (2026-08-18):
+    // socketHandlers.js's room_action branch always sets hasRoomAction true --
+    // craftRecipes/effects claim it, and any room that has neither defaults to
+    // the search branch. Kept (and still unit-tested directly) as a defensive
+    // guard, not a dead check to remove -- a future actionType or caller that
+    // doesn't go through that branch selection would still need this.
     if (!options.hasRoomAction) {
       throw new Error('NO_ROOM_ACTION_AVAILABLE');
     }

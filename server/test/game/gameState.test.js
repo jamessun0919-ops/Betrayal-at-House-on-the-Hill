@@ -1,4 +1,5 @@
 const { createGameState, addPlayer, getPlayer, serializeGameState } = require('../../src/game/gameState');
+const { placeNewRoom, coordKey } = require('../../src/game/boardGenerator');
 
 const STARTING_ROOMS = [
   { id: 'room_lobby_a', name: '大門廳', floor: 'ground' },
@@ -84,6 +85,23 @@ test('serializeGameState converts the board and players Maps into plain arrays',
   // Must survive an actual JSON round-trip (the real reason this function exists).
   expect(() => JSON.stringify(serialized)).not.toThrow();
   expect(JSON.parse(JSON.stringify(serialized)).players[0].playerId).toBe('p1');
+});
+
+test('serializeGameState strips the item field (search loot state) off board rooms, without touching the underlying Map entry', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms());
+  const placedRoom = placeNewRoom(gameState.board, 'ground', { x: 0, y: 1 }, 'east', {
+    id: 'room_with_loot', doors: 4, item: ['item_003', 'item_009'],
+  });
+
+  const serialized = serializeGameState(gameState);
+  const serializedRoom = serialized.board.ground.find((r) => r.roomId === 'room_with_loot');
+  expect(serializedRoom.item).toBeUndefined();
+  expect(serializedRoom.roomId).toBe('room_with_loot'); // other fields still present
+  expect(serializedRoom.droppedItems).toEqual([]);
+
+  // The server's own authoritative state is untouched by serialization.
+  expect(gameState.board.ground.get(coordKey(1, 1)).item).toEqual(['item_003', 'item_009']);
+  expect(placedRoom.item).toEqual(['item_003', 'item_009']);
 });
 
 test('serializeGameState exposes remainingCount/isEmpty/hasRoomForGround/hasRoomForUpper/hasRoomForBasement for the room deck, not its contents', () => {

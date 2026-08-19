@@ -39,12 +39,23 @@ function getPlayer(gameState, playerId) {
   return gameState.players.get(playerId);
 }
 
+// Strips the room's search-loot state (`item`: null / "random_one" / a
+// candidate-id array) out of what gets broadcast to clients -- players
+// should only learn a room's contents by actually spending an action point
+// to search it (game:cardDrawn / game:searchEmpty), not by reading it off
+// game:stateUpdate. Server-side code keeps using the un-stripped Map
+// entries directly (e.g. performSearch reads/mutates placedRoom.item).
+function serializeRoom(room) {
+  const { item, ...rest } = room;
+  return rest;
+}
+
 function serializeGameState(gameState) {
   return {
     board: {
-      ground: Array.from(gameState.board.ground.values()),
-      upper: Array.from(gameState.board.upper.values()),
-      basement: Array.from(gameState.board.basement.values()),
+      ground: Array.from(gameState.board.ground.values()).map(serializeRoom),
+      upper: Array.from(gameState.board.upper.values()).map(serializeRoom),
+      basement: Array.from(gameState.board.basement.values()).map(serializeRoom),
       stairsLink: gameState.board.stairsLink,
     },
     players: Array.from(gameState.players.values()),

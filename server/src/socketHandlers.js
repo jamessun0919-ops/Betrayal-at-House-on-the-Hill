@@ -775,9 +775,16 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   const hasCheck = !card.activatedOnUse && Array.isArray(card.effects) && card.effects.some((e) => e.type === 'dice_check');
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name, hasCheck });
 
-  if (deckType === 'omen') {
+  if (deckType === 'omen' || deckType === 'item') {
     // Omens are kept by the player like items -- some (crystal ball, mask) have
     // an active use ability invoked later via game:selectAction's 'item' path.
+    // Item-deck draws need the same treatment: the card must actually enter
+    // inventory, not just have its effects resolved once below and vanish
+    // (that was a real pre-existing bug -- see the 2026-08-18 search-mechanic
+    // review). No room currently has drawType:"item" (all 10 former ones were
+    // converted to the search mechanic), so this branch isn't reachable via
+    // room entry today, but the function stays correct for any future/other
+    // caller that draws from the item deck this way.
     addItem(getPlayer(gameState, playerId), { id: card.id });
   }
 

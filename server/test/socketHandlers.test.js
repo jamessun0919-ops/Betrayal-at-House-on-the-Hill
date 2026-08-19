@@ -1427,7 +1427,7 @@ test('when a move exhausts action points, the turn does not auto-advance -- game
   httpServer.close();
 });
 
-test('game:move into a room with a populated item deck draws a card and resolves its non-choice effects', async () => {
+test('game:move into a room with a populated item deck draws a card, adds it to inventory, and resolves its non-choice effects', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
     cards: {
@@ -1436,7 +1436,7 @@ test('game:move into a room with a populated item deck draws a card and resolves
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
 
   const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
   const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
@@ -1448,6 +1448,14 @@ test('game:move into a room with a populated item deck draws a card and resolves
 
   const effectResolved = await effectResolvedPromise;
   expect(effectResolved.sourceId).toBe('item_001');
+
+  // The 2026-08-18 search-mechanic review found this path never actually
+  // granted the drawn card to inventory (only omen draws did) -- fixed
+  // alongside the search mechanic; this path itself is currently
+  // unreachable via real room data (no room has drawType:"item" anymore)
+  // but stays correct for any future/synthetic caller, as tested here.
+  const gameState = getGameState(gameManager, roomCode);
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_001' }]);
 
   clientA.close();
   clientB.close();
@@ -2424,6 +2432,47 @@ test('game:selectAction room_action: a second search in the same turn is rejecte
   const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
   expect(result.error).toBe('ALREADY_SEARCHED_THIS_TURN');
   expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(afterFirst); // 沒有再扣一次
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: a player can search the same room again on their next turn, after searching it once and ending the turn', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002']);
+  content.cards.items = [
+    { id: 'item_001', name: '測試道具1', effects: [] },
+    { id: 'item_002', name: '測試道具2', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  // Turn 1: search once, get one of the two listed items.
+  const firstFoundPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const firstFound = await firstFoundPromise;
+
+  // Same-turn second search is rejected (already covered by another test);
+  // end the turn, let the other player also end theirs, and cycle back.
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  getPlayer(gameState, currentPlayerId).actionPoints = 1; // restore AP for the second search
+
+  // Turn 2 (same player, same room, no move needed -- they never left):
+  // search again and get the other listed item.
+  const secondFoundPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(result.error).toBeUndefined();
+  const secondFound = await secondFoundPromise;
+
+  const remainingId = ['item_001', 'item_002'].find((id) => id !== firstFound.cardId);
+  expect(secondFound.cardId).toBe(remainingId);
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual(
+    expect.arrayContaining([{ id: 'item_001' }, { id: 'item_002' }])
+  );
 
   clientA.close();
   clientB.close();
