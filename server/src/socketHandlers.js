@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, jumpIntoCollapsedRoom } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, performTeleport } = require('./game/turnFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
@@ -240,25 +240,28 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (actionType === 'room_action') {
           const currentPlayer = getPlayer(gameState, playerId);
           const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));
-
-          if (placedRoom.roomId === 'room_collapsed_room' && placedRoom.collapseLink) {
-            // Jumping down an already-fallen-through Collapsed Room is a pure
-            // teleport, not an effects-array resolution -- skip the normal
-            // room_action/effects path entirely.
-            const jumpResult = jumpIntoCollapsedRoom(gameState, playerId);
-            ack(jumpResult);
-            const enteredRoom = gameState.board.basement.get(coordKey(jumpResult.x, jumpResult.y));
-            io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
-            io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
-            return;
-          }
-
           const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
-          let isSearchAction = false;
+          const roomActions = getRoomActions(roomDefinition, placedRoom);
 
-          if (roomDefinition && Array.isArray(roomDefinition.craftRecipes) && roomDefinition.craftRecipes.length > 0) {
+          if (roomActions.length === 0) {
+            throw new Error('NO_ROOM_ACTION_AVAILABLE');
+          }
+          let actionIndex = 0;
+          const requestedIndex = payload && payload.actionIndex;
+          if (requestedIndex !== undefined) {
+            if (!Number.isInteger(requestedIndex) || requestedIndex < 0 || requestedIndex >= roomActions.length) {
+              throw new Error('INVALID_ACTION_INDEX');
+            }
+            actionIndex = requestedIndex;
+          } else if (roomActions.length > 1) {
+            throw new Error('INVALID_ACTION_INDEX');
+          }
+          const chosenAction = roomActions[actionIndex];
+          sourceId = placedRoom.roomId;
+
+          if (chosenAction.kind === 'craft') {
             const heldIds = currentPlayer.inventory.map((item) => item.id);
-            const recipe = roomDefinition.craftRecipes.find((r) => r.ingredients.every((id) => heldIds.includes(id)));
+            const recipe = (roomDefinition.craftRecipes || []).find((r) => r.ingredients.every((id) => heldIds.includes(id)));
             if (!recipe) {
               throw new Error('MISSING_CRAFT_MATERIALS');
             }
@@ -279,19 +282,27 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
                 { optionId: 'no', label: '否', effects: [] },
               ],
             }];
-          } else if (roomDefinition && Array.isArray(roomDefinition.effects) && roomDefinition.effects.some((e) => !e.onceOnlyPerPlayer)) {
-            sourceEffects = roomDefinition.effects;
+            selectOptions.hasRoomAction = true;
+            selectOptions.freeRoomAction = Boolean(chosenAction.freeAction);
+          } else if (chosenAction.kind === 'effects') {
+            sourceEffects = chosenAction.effects;
+            selectOptions.hasRoomAction = true;
+            selectOptions.freeRoomAction = Boolean(chosenAction.freeAction);
+          } else if (chosenAction.kind === 'teleport') {
+            selectOptions.hasRoomAction = true;
+            selectOptions.freeRoomAction = Boolean(chosenAction.freeAction);
+            const result = selectAction(gameState, playerId, actionType, selectOptions);
+            ack(result);
+            const destination = performTeleport(gameState, playerId);
+            const enteredRoom = gameState.board[destination.floor].get(coordKey(destination.x, destination.y));
+            io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
+            io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+            return;
           } else {
-            isSearchAction = true;
+            selectOptions.hasRoomAction = true;
             if (currentPlayer.searchedThisTurn) {
               throw new Error('ALREADY_SEARCHED_THIS_TURN');
             }
-          }
-          selectOptions.hasRoomAction = Boolean(sourceEffects) || isSearchAction;
-          selectOptions.freeRoomAction = Boolean(roomDefinition && roomDefinition.freeAction);
-          sourceId = placedRoom.roomId;
-
-          if (isSearchAction) {
             const result = selectAction(gameState, playerId, actionType, selectOptions);
             ack(result);
             currentPlayer.searchedThisTurn = true;
@@ -570,6 +581,21 @@ function hasPendingEffectChoice(effectResolverManager, roomCode) {
 function hasPendingRollChoice(effectResolverManager, roomCode) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   return Boolean(resolverEntry && resolverEntry.pendingRollChoice);
+}
+
+// 房間目前有效的行動清單。單一行動的房間（絕大多數）就是 roomDefinition.actions
+// 本身（或程式碼層級預設的搜索）；崩塌的房間是唯一的例外，「跳下」這個 teleport
+// 項目只有在已經有人摔下去過（collapseLink 存在）時才會出現。
+function getRoomActions(roomDefinition, placedRoom) {
+  const actions = (roomDefinition && Array.isArray(roomDefinition.actions) && roomDefinition.actions.length > 0)
+    ? roomDefinition.actions
+    : [{ label: '搜索', kind: 'search' }];
+  return actions.filter((action) => {
+    if (action.kind === 'teleport' && placedRoom.roomId === 'room_collapsed_room') {
+      return Boolean(placedRoom.collapseLink);
+    }
+    return true;
+  });
 }
 
 function findRoomDefinition(content, roomId) {

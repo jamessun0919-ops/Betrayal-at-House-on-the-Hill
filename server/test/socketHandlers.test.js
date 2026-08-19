@@ -989,10 +989,10 @@ test('game:move into room_collapsed_room with an eligible interjection item paus
   httpServer.close();
 });
 
-test('game:selectAction room_action jumps a later player down an already-collapsed room for free', async () => {
+test('game:selectAction room_action with actionIndex selecting teleport: jumps a later player down an already-collapsed room, costing 1 action point', async () => {
   const content = makeContent({
     rooms: [
-      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '跳下', kind: 'teleport' }] },
       { id: 'room_basement_a', doors: 2, floor: 'basement' },
     ],
   });
@@ -1003,31 +1003,29 @@ test('game:selectAction room_action jumps a later player down an already-collaps
   const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // guaranteed fail -> falls immediately
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   rngSpy.mockRestore();
-  expect(player.floor).toBe('basement'); // fell already -- simulate the room resetting AP to try the jump action too
+  expect(player.floor).toBe('basement'); // fell already -- simulate a later turn to try the jump action too
   player.actionPoints = 4;
   player.floor = 'ground';
   player.x = 1;
   player.y = 1;
-  const startingAP = player.actionPoints;
 
-  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 1 }, resolve));
 
   expect(result.error).toBeUndefined();
-  expect(result).toEqual({ kind: 'room_action', collapseJump: true, x: 1, y: 1 });
   expect(player.floor).toBe('basement');
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
-  expect(player.actionPoints).toBe(startingAP); // free
+  expect(player.actionPoints).toBe(3); // costs 1 AP now (unified with the gallery jump rule)
 
   clientA.close();
   clientB.close();
   httpServer.close();
 });
 
-test('game:selectAction room_action jumping down an already-collapsed room broadcasts game:roomEntered for the basement room', async () => {
+test('game:selectAction room_action with actionIndex selecting teleport: jumping down an already-collapsed room broadcasts game:roomEntered for the basement room', async () => {
   const content = makeContent({
     rooms: [
-      { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
+      { id: 'room_collapsed_room', doors: 2, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '跳下', kind: 'teleport' }] },
       { id: 'room_basement_a', doors: 2, floor: 'basement' },
     ],
   });
@@ -1052,11 +1050,128 @@ test('game:selectAction room_action jumping down an already-collapsed room broad
   player.y = 1;
 
   const roomEnteredPromise = new Promise((resolve) => otherClient.once('game:roomEntered', resolve));
-  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 1 }, resolve));
   const roomEntered = await roomEnteredPromise;
 
   expect(roomEntered.playerId).toBe(currentPlayerId);
   expect(roomEntered.roomId).toBe('room_basement_a');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: a Collapsed Room without a collapseLink yet does not offer teleport (only search)', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_collapsed_room', doors: 4, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '跳下', kind: 'teleport' }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  // Entering room_collapsed_room always triggers the automatic speed check
+  // (moveToRoom, unconditional on this specific room id) -- mock a guaranteed
+  // PASS (rolled >= 5) so the player does NOT fall through and collapseLink
+  // stays unset, matching this test's premise.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  expect(player.floor).toBe('ground'); // confirms the check passed -- did not fall
+  player.actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 1 }, resolve));
+  expect(result.error).toBe('INVALID_ACTION_INDEX'); // teleport filtered out -- list length is 1, index 1 is out of range
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action with actionIndex selecting teleport: jumps from the Gallery to the paired Ballroom, costing 1 action point, no damage applied', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_gallery', doors: 4, floor: 'upper', actions: [{ label: '搜索', kind: 'search' }, { label: '跳下', kind: 'teleport' }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  // Directly place the Gallery (upper) and its paired Ballroom (ground) at
+  // the same coordinate, and put the player in the Gallery -- game:move
+  // can't reach an upper-floor room from the ground-floor starting position
+  // with a single-room synthetic deck, so this bypasses draw/move entirely.
+  gameState.board.upper.set(coordKey(5, 5), { roomId: 'room_gallery', x: 5, y: 5, doorSides: ['north'], droppedItems: [], item: null });
+  gameState.board.ground.set(coordKey(5, 5), { roomId: 'room_ballroom', x: 5, y: 5, doorSides: ['north'], droppedItems: [], item: null });
+  player.floor = 'upper';
+  player.x = 5;
+  player.y = 5;
+  player.actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 1 }, resolve));
+
+  expect(result.error).toBeUndefined();
+  expect(player.floor).toBe('ground');
+  expect(player.x).toBe(5);
+  expect(player.y).toBe(5);
+  expect(player.actionPoints).toBe(0); // costs 1 AP, same rule as the collapsed room's jump
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: no actionIndex and a multi-action room throws INVALID_ACTION_INDEX without spending an action point', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '烹飪', kind: 'craft' }], craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve)); // no actionIndex
+  expect(result.error).toBe('INVALID_ACTION_INDEX');
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(1); // unchanged
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: an out-of-range actionIndex throws INVALID_ACTION_INDEX', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', actions: [{ label: '搜索', kind: 'search' }, { label: '烹飪', kind: 'craft' }], craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }] }],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 2 }, resolve));
+  expect(result.error).toBe('INVALID_ACTION_INDEX');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction room_action: a two-action room (search + craft) can select search via actionIndex 0', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', item: 'random_one', actions: [{ label: '搜索', kind: 'search' }, { label: '烹飪', kind: 'craft' }], craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }] }],
+  });
+  content.cards.items = [{ id: 'item_001', name: '測試道具', effects: [] }];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action', actionIndex: 0 }, resolve));
+  expect(result.error).toBeUndefined();
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.cardId).toBe('item_001');
 
   clientA.close();
   clientB.close();
@@ -1072,8 +1187,7 @@ test('game:selectAction room_action resolving a move_to_room effect (e.g. stairs
         id: 'room_lobby_c',
         name: '大門廳',
         floor: 'ground',
-        effects: [{ type: 'move_to_room', targetRoomId: 'room_upper_landing' }],
-        freeAction: true,
+        actions: [{ label: '上樓', kind: 'effects', effects: [{ type: 'move_to_room', targetRoomId: 'room_upper_landing' }], freeAction: true }],
       },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
       { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
@@ -2278,7 +2392,7 @@ test('game:selectAction room_action: resolves the current room\'s effects', asyn
       id: 'room_new',
       doors: 4,
       floor: 'ground',
-      effects: [{ type: 'stat_change', stat: 'might', delta: 1 }],
+      actions: [{ label: '考驗', kind: 'effects', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
     }],
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
@@ -2481,71 +2595,11 @@ test('game:selectAction room_action: a player can search the same room again on 
 
 test('game:selectAction room_action: existing craftRecipes/effects rooms are unaffected by the search branch (regression)', async () => {
   const content = makeContent({
-    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', actions: [{ label: '考驗', kind: 'effects', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }] }],
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
 
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
-  const gameState = getGameState(gameManager, roomCode);
-  getPlayer(gameState, currentPlayerId).actionPoints = 1;
-
-  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
-  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
-  expect(result.error).toBeUndefined();
-  const effectResolved = await effectResolvedPromise;
-  expect(effectResolved.sourceId).toBe('room_new');
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-test('game:selectAction room_action: a room whose effects are ONLY a onceOnlyPerPlayer stat_change falls through to search instead of applying the stat_change', async () => {
-  const content = makeContent({
-    rooms: [{
-      id: 'room_new',
-      doors: 4,
-      floor: 'ground',
-      effects: [{ type: 'stat_change', stat: 'might', delta: 1, onceOnlyPerPlayer: true }],
-    }],
-  });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
-
-  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
-  const gameState = getGameState(gameManager, roomCode);
-  getPlayer(gameState, currentPlayerId).actionPoints = 1;
-
-  const effectResolvedHandler = jest.fn();
-  currentClient.once('game:effectResolved', effectResolvedHandler);
-  const searchEmptyPromise = new Promise((resolve) => currentClient.once('game:searchEmpty', resolve));
-  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
-  expect(result.error).toBeUndefined();
-  const searchEmpty = await searchEmptyPromise;
-  expect(searchEmpty.playerId).toBe(currentPlayerId);
-  expect(effectResolvedHandler).not.toHaveBeenCalled();
-
-  expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(getPlayer(gameState, currentPlayerId).stats.might.baseIndex); // 未套用stat_change
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-test('game:selectAction room_action: a room mixing a onceOnlyPerPlayer stat_change with a real effect still takes the effects branch (regression)', async () => {
-  const content = makeContent({
-    rooms: [{
-      id: 'room_new',
-      doors: 4,
-      floor: 'ground',
-      effects: [
-        { type: 'stat_change', stat: 'might', delta: 1, onceOnlyPerPlayer: true },
-        { type: 'stat_change', stat: 'speed', delta: 1 },
-      ],
-    }],
-  });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
-
-  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
   const gameState = getGameState(gameManager, roomCode);
   getPlayer(gameState, currentPlayerId).actionPoints = 1;
 
@@ -2566,6 +2620,7 @@ function makeCraftRoomContent() {
       id: 'room_new',
       doors: 4,
       floor: 'ground',
+      actions: [{ label: '烹飪', kind: 'craft' }],
       craftRecipes: [{ id: 'recipe_cooked_food', ingredients: ['item_016', 'item_017'], result: 'item_021' }],
     }],
   });
