@@ -3,7 +3,7 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import CheckModal from './gameplay/CheckModal';
-import { getAvailableDirections, findRoomInfo, findCardInfo, STAT_LABELS } from './gameplay/mapUtils';
+import { getAvailableDirections, findRoomInfo, findCardInfo, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
 function findPlayerName(playerId, players) {
@@ -54,6 +54,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   const [overviewFloor, setOverviewFloor] = useState('ground');
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
   const [pendingRollChoice, setPendingRollChoice] = useState(null);
+  const [showRoomActionMenu, setShowRoomActionMenu] = useState(false);
   const [pendingCheckQueue, setPendingCheckQueue] = useState([]);
   // Monotonic id generator for pendingCheckQueue items -- CheckModal keys off
   // pendingCheckQueue[0].queueId (not the queue's length) so appending a new
@@ -194,6 +195,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     });
   }
 
+  function handleChooseRoomAction(actionIndex) {
+    setShowRoomActionMenu(false);
+    handleSelectAction('room_action', { actionIndex });
+  }
+
   function handleEndTurn() {
     socket.emit('game:endTurn', {}, (res) => {
       if (res && res.error) {
@@ -225,7 +231,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
   // Precomputed once for the playing-phase render -- both the action panel
   // and the viewport room view need these.
-  let me, currentRoom, hasRoomForFloor, directions, roommates;
+  let me, currentRoom, hasRoomForFloor, directions, roommates, roomActions;
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
     currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
@@ -243,6 +249,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     roommates = gameState.players.filter(
       (p) => p.playerId !== playerId && p.floor === me.floor && p.x === me.x && p.y === me.y
     );
+    roomActions = roomContent ? getRoomActions(findRoomInfo(currentRoom.roomId, roomContent), currentRoom) : [];
   }
 
   const header = (
@@ -336,7 +343,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 );
               })()}
               {/* 四個角落浮動按鈕：不管目前是聚焦房間還是總覽地圖都要顯示 */}
-              <button style={cornerButtonStyle('top-left')} onClick={() => handleSelectAction('room_action')}>
+              <button
+                style={cornerButtonStyle('top-left')}
+                onClick={() => (roomActions.length > 1 ? setShowRoomActionMenu(true) : handleSelectAction('room_action'))}
+              >
                 行動
               </button>
               <button style={cornerButtonStyle('top-right')} onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
@@ -359,6 +369,32 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               roommates={roommates}
             />
           </div>
+          {showRoomActionMenu && (
+            <div
+              style={{
+                position: 'fixed',
+                inset: 0,
+                backgroundColor: 'rgba(0,0,0,0.6)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 60,
+              }}
+              onClick={() => setShowRoomActionMenu(false)}
+            >
+              <div style={{ backgroundColor: '#fff', padding: 16, borderRadius: 8, minWidth: 200 }} onClick={(e) => e.stopPropagation()}>
+                <p style={{ fontWeight: 'bold', marginBottom: 8 }}>選擇行動</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {roomActions.map((action, i) => (
+                    <button key={i} onClick={() => handleChooseRoomAction(i)}>
+                      {action.label}
+                    </button>
+                  ))}
+                  <button onClick={() => setShowRoomActionMenu(false)}>取消</button>
+                </div>
+              </div>
+            </div>
+          )}
           {(pendingEffectChoice || pendingRollChoice) && (
             <div
               style={{

@@ -60,4 +60,19 @@ function findCardInfo(cardId, cardContent) {
   );
 }
 
-export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo };
+// 跟伺服器 socketHandlers.js 的 getRoomActions 同一套邏輯，前端自己重算一份
+// （不新增 socket 事件）。roomDefinition 來自 roomContent（一次性靜態資料），
+// placedRoom 是 gameState.board[floor] 裡目前房間的實體（含 collapseLink）。
+function getRoomActions(roomDefinition, placedRoom) {
+  const actions = (roomDefinition && Array.isArray(roomDefinition.actions) && roomDefinition.actions.length > 0)
+    ? roomDefinition.actions
+    : [{ label: '搜索', kind: 'search' }];
+  return actions.filter((action) => {
+    if (action.kind === 'teleport' && placedRoom.roomId === 'room_collapsed_room') {
+      return Boolean(placedRoom.collapseLink);
+    }
+    return true;
+  });
+}
+
+export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo, getRoomActions };
