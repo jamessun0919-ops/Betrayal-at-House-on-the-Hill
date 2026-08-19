@@ -285,25 +285,24 @@ function getRoomAt(gameState, floor, x, y) {
   return gameState.board[floor].get(coordKey(x, y));
 }
 
-// 之後進來的玩家，可自由選擇是否跳入地板大洞 -- once a Collapsed Room has a
-// recorded collapseLink (someone already fell through), any later player
-// standing in it can jump down for free (no action point cost, matching the
-// official rule's "無需耗移動點數"). Triggered via the same room_action /
-// "行動" button as any other room action, but this is a pure teleport, not
-// an effects-array resolution -- socketHandlers.js special-cases it before
-// falling through to the normal room_action/effects path.
-function jumpIntoCollapsedRoom(gameState, playerId) {
+// 「跳下」的兩個具體案例：崩塌的房間（已有 collapseLink 才能跳）、包廂房/舞廳配對
+// （放置時就決定好座標，永遠可跳）。純粹是「知道目的地在哪就移過去」，不檢查
+// NOT_YOUR_TURN/行動力——呼叫方（socketHandlers.js）已經透過 selectAction 檢查過
+// 回合與行動力，這裡只負責移動本身。
+function performTeleport(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
-  if (getCurrentTurnPlayerId(gameState) !== playerId) {
-    throw new Error('NOT_YOUR_TURN');
-  }
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
-  if (!room || room.roomId !== COLLAPSED_ROOM_ID || !room.collapseLink) {
-    throw new Error('NO_ROOM_ACTION_AVAILABLE');
+  if (room.roomId === COLLAPSED_ROOM_ID && room.collapseLink) {
+    const { x, y } = room.collapseLink;
+    movePlayerTo(player, 'basement', x, y, null);
+    return { floor: 'basement', x, y };
   }
-  const { x, y } = room.collapseLink;
-  movePlayerTo(player, 'basement', x, y, null);
-  return { kind: 'room_action', collapseJump: true, x, y };
+  if (isBallroomOrGallery(room.roomId)) {
+    const targetFloor = pairedFloorFor(room.roomId);
+    movePlayerTo(player, targetFloor, room.x, room.y, null);
+    return { floor: targetFloor, x: room.x, y: room.y };
+  }
+  throw new Error('NO_TELEPORT_TARGET');
 }
 
 function moveSummon(gameState, playerId, direction) {
@@ -598,5 +597,5 @@ module.exports = {
   canUseStairs,
   useStairs,
   resumeCollapseCheck,
-  jumpIntoCollapsedRoom,
+  performTeleport,
 };

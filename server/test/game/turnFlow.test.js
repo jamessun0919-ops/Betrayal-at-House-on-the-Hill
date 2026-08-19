@@ -14,7 +14,7 @@ const {
   canUseStairs,
   useStairs,
   resumeCollapseCheck,
-  jumpIntoCollapsedRoom,
+  performTeleport,
 } = require('../../src/game/turnFlow');
 
 const STARTING_ROOMS = [
@@ -500,7 +500,7 @@ test('resumeCollapseCheck resolves the outcome for a player already standing in 
   expect(player.y).toBe(5);
 });
 
-test('jumpIntoCollapsedRoom teleports a later player down a known collapseLink for free (no action point cost)', () => {
+test('performTeleport moves a player through a known collapseLink on a Collapsed Room', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   gameState.board.ground.set(coordKey(0, 1), {
     roomId: 'room_collapsed_room',
@@ -511,47 +511,34 @@ test('jumpIntoCollapsedRoom teleports a later player down a known collapseLink f
     collapseLink: { x: 7, y: 7 },
   });
   gameState.board.basement.set(coordKey(7, 7), { roomId: 'room_basement_a', x: 7, y: 7, doorSides: ['north'], droppedItems: [] });
-  const startingAP = player.actionPoints;
 
-  const result = jumpIntoCollapsedRoom(gameState, 'p1');
+  const result = performTeleport(gameState, 'p1');
 
-  expect(result).toEqual({ kind: 'room_action', collapseJump: true, x: 7, y: 7 });
+  expect(result).toEqual({ floor: 'basement', x: 7, y: 7 });
   expect(player.floor).toBe('basement');
   expect(player.x).toBe(7);
   expect(player.y).toBe(7);
-  expect(player.actionPoints).toBe(startingAP); // free -- not spent
 });
 
-test('jumpIntoCollapsedRoom throws NO_ROOM_ACTION_AVAILABLE when the room has no collapseLink yet', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  gameState.board.ground.set(coordKey(0, 1), {
-    roomId: 'room_collapsed_room',
-    x: 0,
-    y: 1,
-    doorSides: ['north'],
-    droppedItems: [],
-  });
-  expect(() => jumpIntoCollapsedRoom(gameState, 'p1')).toThrow('NO_ROOM_ACTION_AVAILABLE');
+test('performTeleport moves a player from the Gallery to the paired Ballroom at the same coordinate', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.floor = 'upper';
+  player.x = 3;
+  player.y = 3;
+  gameState.board.upper.set(coordKey(3, 3), { roomId: 'room_gallery', x: 3, y: 3, doorSides: ['north'], droppedItems: [] });
+  gameState.board.ground.set(coordKey(3, 3), { roomId: 'room_ballroom', x: 3, y: 3, doorSides: ['north'], droppedItems: [] });
+
+  const result = performTeleport(gameState, 'p1');
+
+  expect(result).toEqual({ floor: 'ground', x: 3, y: 3 });
+  expect(player.floor).toBe('ground');
+  expect(player.x).toBe(3);
+  expect(player.y).toBe(3);
 });
 
-test('jumpIntoCollapsedRoom throws NO_ROOM_ACTION_AVAILABLE when the player is not standing in a Collapsed Room', () => {
+test('performTeleport throws NO_TELEPORT_TARGET when the player is not standing in a teleport-capable room', () => {
   const { gameState } = makeGameStateWithPlayer();
-  expect(() => jumpIntoCollapsedRoom(gameState, 'p1')).toThrow('NO_ROOM_ACTION_AVAILABLE');
-});
-
-test('jumpIntoCollapsedRoom throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  gameState.board.ground.set(coordKey(0, 1), {
-    roomId: 'room_collapsed_room',
-    x: 0,
-    y: 1,
-    doorSides: ['north'],
-    droppedItems: [],
-    collapseLink: { x: 7, y: 7 },
-  });
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2'];
-  expect(() => jumpIntoCollapsedRoom(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+  expect(() => performTeleport(gameState, 'p1')).toThrow('NO_TELEPORT_TARGET');
 });
 
 test('canUseStairs returns true in room_lobby_c on the ground floor', () => {
