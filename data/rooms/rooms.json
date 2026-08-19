@@ -2,12 +2,12 @@
   {
     "id": "room_chapel",
     "name": "禮拜堂",
-    "description": "",
+    "description": "腐朽長椅整齊排列，蒙塵祭壇前燭台傾倒，空氣瀰漫陰冷肅穆氣息。",
     "floor": "ground",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_chapel.webp",
     "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級意志。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -18,26 +18,29 @@
         "onceOnlyPerPlayer": true
       }
     ],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_research_lab",
-    "name": "研究室",
-    "description": "",
-    "floor": "ground",
+    "name": "實驗室",
+    "description": "實驗桌擺滿泛黃試管與藥瓶，鏽蝕器材散發刺鼻氣味，牆角殘留不明藥劑與焦黑痕跡。",
+    "floor": "any",
     "size": "1x1",
-    "doors": 3,
+    "doors": 2,
+    "doorPattern": "adjacent",
     "filename": "room_research_lab.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_library",
     "name": "圖書室",
-    "description": "",
-    "floor": "upper",
+    "description": "高聳書架塞滿泛黃古籍，厚重灰塵覆蓋桌椅，散落書頁隨冷風微微翻動。角落梯架歪斜，腐朽紙張與霉味瀰漫整座昏暗圖書室。",
+    "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
@@ -52,12 +55,13 @@
         "onceOnlyPerPlayer": true
       }
     ],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_master_bedroom",
     "name": "主臥房",
-    "description": "",
+    "description": "華麗四柱床覆滿灰塵，褪色天鵝絨窗簾緊閉，衣櫥與梳妝台仍留著昔日主人的私人物品。壁爐早已熄滅，陰冷空氣中瀰漫著陳舊香水與霉味。",
     "floor": "upper",
     "size": "1x1",
     "doors": 2,
@@ -67,13 +71,18 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_conservatory",
     "name": "溫室",
-    "description": "",
+    "description": "破裂玻璃透入慘淡月光，枯萎藤蔓纏繞鏽蝕花架，失控植物爬滿牆角。潮濕泥土散發腐敗氣味，枝葉間不時傳來細碎窸窣聲。",
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
@@ -81,27 +90,33 @@
     "drawType": "omen",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
-    "id": "room_game_room",
-    "name": "遊戲室",
-    "description": "",
-    "floor": "upper",
+    "id": "room_gamble_room",
+    "name": "紙牌室",
+    "description": "褪色牌桌覆滿灰塵，泛黃紙牌與籌碼凌亂散落，皮椅歪斜圍繞桌旁。牆上掛鐘早已停擺，昏暗房內彷彿仍殘留昔日賭局的低語。",
+    "floor": "any",
     "size": "1x1",
     "doors": 4,
-    "filename": "room_game_room.webp",
+    "filename": "room_gamble.webp",
     "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_gardens",
     "name": "庭院",
-    "description": "",
+    "description": "久違的陽光穿過枯藤灑落庭院，斑駁石磚間長滿野草，鳥籠式花藝建築覆著青苔。暖光稍稍驅散宅邸陰霾，卻讓四周緊閉的窗戶更顯詭異。",
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
@@ -109,25 +124,27 @@
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_patio",
     "name": "露台",
-    "description": "",
+    "description": "斑駁石磚延伸至鏽蝕欄杆，枯藤纏繞破舊桌椅，遠處庭園籠罩在薄霧中。冷風吹動殘破遮棚，宅邸高窗在身後沉默矗立。",
     "floor": "ground",
     "size": "1x1",
-    "doors": 3,
+    "doors": 4,
     "filename": "room_patio.webp",
     "drawType": "omen",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_balcony",
     "name": "陽台",
-    "description": "",
+    "description": "鏽蝕欄杆纏滿枯藤，腳下石磚布滿裂痕。從高處可俯瞰荒廢庭院，冷風吹過宅邸外牆，帶來潮濕而陰森的氣息。",
     "floor": "upper",
     "size": "1x1",
     "doors": 3,
@@ -135,31 +152,33 @@
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_statuary_corridor",
     "name": "雕像長廊",
-    "description": "",
-    "floor": "upper",
+    "description": "石雕沉默佇立房內，殘缺的人像與怪異神祇排列四周。碎裂雕像散落地面，昏暗光線掠過冰冷面孔，彷彿每一道視線都悄悄注視著闖入者。",
+    "floor": "ground",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_statuary_corridor.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_bridge",
     "name": "塔橋",
-    "description": "",
+    "description": "狹長通道懸於兩棟建築之間，石板在腳下吱呀作響。冷風穿過裂縫，整條通道彷彿隨時可能崩塌。 ",
     "floor": "upper",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
-    "filename": null,
+    "filename": "room_bridge.webp",
     "drawType": "omen",
     "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
     "effects": [],
@@ -167,13 +186,14 @@
       "stat": "might",
       "min": 3
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_kitchen",
     "name": "廚房",
-    "description": "",
-    "floor": "any",
+    "description": "鏽蝕爐灶與沉重料理台覆滿油垢灰塵，鍋具凌亂懸掛，腐爛食材散落角落。潮濕霉味混著陳年油煙，黑暗櫥櫃深處不時傳來細碎聲響。",
+    "floor": "ground",
     "size": "1x1",
     "doors": 3,
     "filename": "room_kitchen.webp",
@@ -182,31 +202,45 @@
     "effects": [],
     "needsCustomLogic": false,
     "actions": [
-      { "label": "搜索", "kind": "search" },
-      { "label": "烹飪", "kind": "craft" }
+      {
+        "label": "搜索",
+        "kind": "search"
+      },
+      {
+        "label": "烹飪",
+        "kind": "craft"
+      }
     ],
     "item": "random_one",
     "craftRecipes": [
-      { "id": "recipe_cooked_food", "ingredients": ["item_016", "item_017"], "result": "item_021" }
+      {
+        "id": "recipe_cooked_food",
+        "ingredients": [
+          "item_016",
+          "item_017"
+        ],
+        "result": "item_021"
+      }
     ]
   },
   {
     "id": "room_abandoned",
     "name": "廢棄的房間",
-    "description": "",
+    "description": "房內空無一物，斑駁牆面與老舊木地板覆著薄灰。陽光穿過高窗斜照而入，塵埃在光束中緩緩飄浮，寂靜中透著難得的溫暖與安寧。",
     "floor": "any",
     "size": "1x1",
     "doors": 3,
-    "filename": null,
+    "filename": "room_abandoned.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_larder",
     "name": "食品儲藏室",
-    "description": "",
+    "description": "木製層架堆滿蒙塵罐頭、玻璃瓶與腐敗乾糧，破裂麻袋散落角落。潮濕霉味混著腐臭瀰漫空氣，黑暗架縫間偶爾傳來細微窸窣聲。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
@@ -223,70 +257,81 @@
       }
     ],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_maid",
     "name": "傭人房",
-    "description": "",
+    "description": "狹小房內擺著簡陋鐵床與老舊木櫃，褪色制服仍掛在牆邊。床鋪凌亂，地板散落少量私人物品，潮濕霉味瀰漫，彷彿僕人曾在某夜匆忙離去。。",
     "floor": "any",
     "size": "1x1",
     "doors": 3,
-    "filename": null,
+    "filename": "room_maid.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_guest_1",
     "name": "乾淨的客房",
-    "description": "",
+    "description": "整齊床鋪與木製家具幾乎未染灰塵，窗簾透入柔和日光，桌上物品仍擺放得井然有序。與宅邸其他房間相比，異常乾淨安靜，反而令人感到不安。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_guest_1.webp",
     "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
-    "item": "random_one"
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
+    "item": null
   },
   {
     "id": "room_charred",
     "name": "焦黑的房間",
-    "description": "",
+    "description": "牆壁與天花板被濃煙燻得焦黑，燒毀家具只剩扭曲殘骸，地面覆滿灰燼與碎木。空氣仍殘留刺鼻焦味，彷彿那場大火才剛熄滅不久。",
     "floor": "any",
     "size": "1x1",
-    "doors": 2,
+    "doors": 3,
     "drawType": "omen",
-    "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_charred.webp",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_bloody",
     "name": "染血的房間",
-    "description": "",
+    "description": "暗紅血跡沿著牆面與地板一路拖曳，翻倒家具間散落破碎物品。凝固血漬早已發黑，空氣瀰漫鐵鏽般腥味，彷彿某場慘劇曾在此突然發生。",
     "floor": "any",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "adjacent",
-    "filename": null,
+    "doors": 3,
+    "filename": "room_bloody.webp",
     "drawType": "omen",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_gymnasium",
     "name": "健身房",
-    "description": "",
+    "description": "老舊拳擊擂台佔據房間中央，繩索鬆垮、帆布滿是污漬，角落散落拳套與訓練器材。昏暗燈光映著斑駁牆面，彷彿昔日的搏鬥從未真正結束。",
     "floor": "any",
     "size": "1x1",
     "doors": 3,
@@ -302,13 +347,18 @@
       }
     ],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_vault",
     "name": "保險庫",
-    "description": "",
+    "description": "厚重鋼製保險庫門半掩，鏽蝕金屬櫃沿牆排列，地面散落泛黃帳冊與空盒。冰冷空氣中瀰漫鐵鏽味，黑暗深處似乎還藏著主人未曾帶走的祕密。",
     "floor": "upper",
     "size": "1x1",
     "doors": 1,
@@ -317,7 +367,10 @@
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
     "item": "random_one",
     "actions": [
-      { "label": "搜索", "kind": "search" },
+      {
+        "label": "搜索",
+        "kind": "search"
+      },
       {
         "label": "考驗",
         "kind": "effects",
@@ -350,71 +403,79 @@
     "needsCustomLogic": true
   },
   {
-    "id": "room_weapon_room",
+    "id": "room_weapon",
     "name": "武器室",
-    "description": "",
+    "description": "牆上陳列蒙塵長劍、戰斧與十字弩，沉重武器架因年代久遠而腐朽傾斜。鏽蝕刀刃在昏暗光線下泛著冷光，整座展覽室瀰漫肅殺而陰森的氣息。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
-    "filename": null,
+    "filename": "room_weapon.webp",
     "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
-    "id": "room_specimen_room",
+    "id": "room_specimen",
     "name": "標本室",
-    "description": "",
+    "description": "牆上懸掛褪色獸首，玻璃櫃內陳列鳥獸標本，乾裂眼珠在昏暗中泛著微光。空氣瀰漫防腐藥劑與霉味，彷彿無數目光正凝視闖入者。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "opposite",
-    "filename": null,
+    "filename": "room_specimen.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_ballroom",
     "name": "舞廳",
-    "description": "",
+    "description": "寬闊舞池覆滿灰塵，華麗吊燈歪斜懸掛，褪色窗簾垂落四周。角落留著破舊樂器與翻倒座椅，空蕩大廳中彷彿仍迴盪著昔日舞會的旋律。",
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
-    "filename": null,
+    "filename": "room_ballroom.webp",
     "drawType": "omen",
     "text": "與二樓的包廂房形成綁定房間：生成舞廳時，需在二樓對應座標同步生成包廂房；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "item": null
   },
   {
-    "id": "room_piano_room",
-    "name": "琴房",
-    "description": "",
+    "id": "room_piano",
+    "name": "鋼琴房",
+    "description": "鋼琴靜置房間中央，泛黃琴鍵已有數處碎裂，散落樂譜鋪滿地板。褪色肖像懸在牆上，冷風偶爾掠過琴弦，響起若有似無的低沉琴音。",
     "floor": "upper",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_piano.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
-    "id": "room_messy_room",
+    "id": "room_messy",
     "name": "雜亂的房間",
-    "description": "",
+    "description": "老舊木箱、碎裂家具與泛黃雜物散落滿地，幾乎遮住原本的木質地板。狹窄空隙勉強可供通行，灰塵與霉味瀰漫，翻找時不時傳出細碎聲響。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_messy.webp",
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於3才能離開",
     "effects": [],
@@ -422,12 +483,13 @@
       "stat": "speed",
       "min": 4
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_atrium",
     "name": "天井",
-    "description": "",
+    "description": "空曠天井直通宅邸上方，陽光從高處灑落，在斑駁地面映出明亮光影，寂靜空間裡只有風聲與飄落的塵埃。",
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
@@ -435,30 +497,32 @@
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_murder",
     "name": "兇殺現場",
-    "description": "",
+    "description": "地板上留著醒目的粉筆人形，周圍散落翻倒家具與破碎物品，暗褐色血跡早已乾涸。封閉房間異常寂靜，仍殘留著命案發生後令人窒息的不安。",
     "floor": "ground",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_murder.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
-    "id": "room_vine_conservatory",
+    "id": "room_vine_entangled",
     "name": "藤蔓糾纏的溫室",
-    "description": "",
+    "description": "破裂玻璃灑入斑駁微光，失控藤蔓沿著牆壁與花架瘋狂蔓延，彼此糾纏遮住通道。潮濕泥土散發腐敗氣味，茂密枝葉深處不時傳來詭異窸窣聲。",
     "floor": "any",
     "size": "1x1",
     "doors": 4,
-    "filename": "room_vine_conservatory.webp",
+    "filename": "room_vine_entangled.webp",
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於4才能離開",
     "effects": [],
@@ -466,28 +530,33 @@
       "stat": "speed",
       "min": 5
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_baby",
     "name": "嬰兒房",
-    "description": "",
+    "description": "褪色搖籃靜置房間中央，牆上童趣壁紙早已剝落，木馬與布偶散落地面。泛黃窗簾隨冷風輕晃，寂靜中偶爾傳來搖籃細微的吱呀聲。",
     "floor": "upper",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "adjacent",
-    "filename": null,
+    "doors": 3,
+    "filename": "room_baby.webp",
     "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_bathroom_ground",
     "name": "一樓浴廁",
-    "description": "",
+    "description": "泛黃浴缸佈滿水垢與鏽斑，破裂鏡面映著昏暗房間，洗手台旁散落老舊盥洗用品。潮濕霉味瀰漫四周，浴缸深處殘留一層混濁積水。",
     "floor": "ground",
     "size": "1x1",
     "doors": 1,
@@ -496,13 +565,18 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_bathroom_upper",
     "name": "二樓浴廁",
-    "description": "",
+    "description": "斑駁磁磚覆滿水垢與霉斑，鏽蝕蓮蓬頭仍滴著冰冷水珠，破舊浴簾垂落一旁。潮濕霧氣凝在牆面，排水孔深處不時傳來低沉的流水聲。",
     "floor": "upper",
     "size": "1x1",
     "doors": 1,
@@ -511,58 +585,66 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "actions": [{ "label": "搜索", "kind": "search" }],
+    "actions": [
+      {
+        "label": "搜索",
+        "kind": "search"
+      }
+    ],
     "item": "random_one"
   },
   {
     "id": "room_beast",
     "name": "野獸房",
-    "description": "",
+    "description": "沉重鐵籠遭猛烈撞開，彎曲欄杆沾著乾涸血跡，地板遍布巨大爪痕與凌亂獸毛。破碎鎖鏈一路拖向門口，彷彿某頭猛獸不久前才從此處逃脫。",
     "floor": "ground",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_beast.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_dining",
     "name": "餐廳",
-    "description": "",
+    "description": "長形餐桌覆著褪色桌布，蒙塵銀器與碎裂餐盤仍整齊擺放，彷彿宴席突然中止。高背椅靜靜環繞桌旁，空氣中瀰漫腐朽木材與陳年食物的氣味。",
     "floor": "ground",
     "size": "1x1",
-    "doors": 4,
-    "filename": null,
+    "doors": 3,
+    "filename": "room_dining.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_operating_lab",
     "name": "手術室",
-    "description": "",
+    "description": "冰冷手術台佇立房間中央，鏽蝕器械整齊排列在金屬托盤上，泛黃布簾沾著暗褐色污漬。刺鼻藥水與鐵鏽味瀰漫，地面仍留著難以清除的血痕。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
-    "doorPattern": "adjacent",
-    "filename": null,
+    "doorPattern": "opposite",
+    "filename": "room_operating_lab.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_attic",
-    "name": "天花閣樓",
-    "description": "",
+    "name": "天花板上閣樓",
+    "description": "低矮傾斜的屋頂壓迫著狹窄閣樓，木樑掛滿蛛網，舊木箱與蒙塵家具堆積四周。微光從屋瓦縫隙滲入，黑暗角落偶爾傳來細碎的抓搔聲。",
     "floor": "upper",
     "size": "1x1",
     "doors": 1,
-    "filename": null,
+    "filename": "room_attic.webp",
     "drawType": "event",
     "text": "離開時，地板突然不穩！需進行速度檢定達3+，否則失去1級力量",
     "effects": [],
@@ -574,16 +656,17 @@
         "delta": -1
       }
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_pentagram",
     "name": "五芒星室",
-    "description": "",
+    "description": "地板中央刻著巨大的五芒星法陣，四周排列燃盡蠟燭與神祕祭器。牆面布滿難以辨識的符號，空氣殘留焚香與焦味，彷彿禁忌儀式才剛結束。",
     "floor": "any",
     "size": "1x1",
     "doors": 1,
-    "filename": null,
+    "filename": "room_pentagram.webp",
     "drawType": "event",
     "text": "離開時，被儀式嚇到！需進行知識檢定達4+，否則失去1級神志",
     "effects": [],
@@ -595,16 +678,17 @@
         "delta": -1
       }
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_graveyard",
     "name": "墓園",
-    "description": "",
+    "description": "傾斜墓碑散落在荒草與枯樹之間，部分墳墓早已塌陷，鏽蝕鐵欄被藤蔓纏繞。薄霧貼著地面緩緩流動，遠處偶爾傳來烏鴉低沉的鳴叫聲。",
     "floor": "ground",
     "size": "1x1",
     "doors": 3,
-    "filename": null,
+    "filename": "room_graveyard.webp",
     "drawType": "event",
     "text": "氣氛陰沈⋯⋯離開時，需進行神志檢定達4+，否則失去1級知識",
     "effects": [],
@@ -616,95 +700,104 @@
         "delta": -1
       }
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_catacombs",
     "name": "地下墓穴",
-    "description": "",
+    "description": "狹窄石砌墓道向黑暗深處延伸，牆邊排列破損棺槨與蒙塵墓龕。潮濕石壁滲著水珠，腐朽氣味瀰漫其中，深處不時傳來難以分辨的細微回聲。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 3,
-    "filename": null,
+    "doors": 4,
+    "filename": "room_catacombs.webp",
     "drawType": "event",
-    "text": "這恐怖的地方像迷宮一樣走不出去⋯⋯請進行神志檢定，6+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
+    "text": "這恐怖的地方像迷宮一樣走不出去⋯⋯請進行神志檢定，6+得以離開。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "item": null
   },
   {
     "id": "room_chasm",
     "name": "地底深淵",
-    "description": "",
+    "description": "腐朽木板與老舊繩索勉強支撐著吊橋，在冷風中不斷搖晃。斷裂木板間露出下方無底深淵，黑暗中聽不見任何落地回聲，令人不敢久留。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 1,
-    "filename": null,
+    "doors": 2,
+    "doorPattern": "opposite",
+    "filename": "room_chasm.webp",
     "drawType": "event",
-    "text": "搖搖欲墜的吊橋跨過無底深淵⋯⋯請進行速度檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
+    "text": "進行速度檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "item": null
   },
   {
     "id": "room_furnace",
     "name": "鍋爐室",
-    "description": "",
+    "description": "巨大鍋爐散發灼人熱浪，鏽蝕管線不斷噴出滾燙蒸氣，整間房宛如火爐。空氣悶熱得令人窒息，汗水迅速浸透衣物，根本無法在此久留。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "adjacent",
-    "filename": null,
+    "doors": 3,
+    "filename": "room_furnace.webp",
     "drawType": "event",
     "text": "若你在此房結束你的回合，則受到1級物理傷害。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "item": null
   },
   {
     "id": "room_crypt",
     "name": "地窖",
-    "description": "",
+    "description": "潮濕地窖堆滿腐朽木桶與蒙塵雜物，石牆刻著詭異符號，角落散落早已熄滅的蠟燭。刺骨寒意籠罩四周，黑暗深處彷彿不斷傳來模糊低語。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 1,
-    "filename": null,
+    "doors": 3,
+    "filename": "room_crypt.webp",
     "drawType": "event",
     "text": "若你在此房結束你的回合，則受到1級神志傷害。",
     "effects": [],
-    "needsCustomLogic": true
+    "needsCustomLogic": true,
+    "item": null
   },
   {
     "id": "room_wine_cellar",
     "name": "酒窖",
-    "description": "",
+    "description": "潮濕石牆間排列著老舊酒架，蒙塵酒瓶與腐朽木桶堆滿四周。空氣瀰漫濃重酒香與霉味，破裂酒瓶留下暗紅酒漬，在昏暗中宛如乾涸血跡。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 3,
-    "filename": null,
+    "doors": 2,
+    "doorPattern": "adjacent",
+    "filename": "room_wine_cellar.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_storeroom",
     "name": "倉庫",
-    "description": "",
+    "description": "木箱、麻袋與蒙塵貨架堆滿昏暗倉庫，狹窄通道間散落破損雜物。腐朽木材與霉味瀰漫空氣，堆疊貨物形成大片陰影，彷彿藏著未知的東西。",
     "floor": "any",
     "size": "1x1",
-    "doors": 3,
-    "filename": null,
+    "doors": 2,
+    "doorPattern": "opposite",
+    "filename": "room_storeroom.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
-    "id": "room_junk_room",
+    "id": "room_junk",
     "name": "髒亂的房間",
-    "description": "",
+    "description": "木箱、老舊櫥櫃與各式雜物層層堆滿房間，只剩狹窄縫隙勉強通行。灰塵與霉味瀰漫，搖搖欲墜的雜物堆彷彿隨時可能倒塌。",
     "floor": "any",
     "size": "1x1",
     "doors": 3,
-    "filename": null,
+    "filename": "room_junk.webp",
     "drawType": "event",
     "text": "離開時，被垃圾絆住了！需進行力量檢定達3+，否則失去1級速度",
     "effects": [],
@@ -716,83 +809,140 @@
         "delta": -1
       }
     },
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
-    "id": "room_organ_room",
+    "id": "room_organ",
     "name": "風琴室",
-    "description": "",
+    "description": "巨大管風琴佔據整面牆壁，鏽蝕音管直達昏暗天花板，泛黃琴鍵覆滿灰塵。散落樂譜隨冷風翻動，彷彿還可聽見低沉而悠長的琴音。",
     "floor": "any",
     "size": "1x1",
     "doors": 3,
-    "filename": null,
+    "filename": "room_organ.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_underground_lake",
     "name": "地下湖",
-    "description": "",
+    "description": "幽暗地下湖佔據大半洞窟，冰冷黑水映著潮濕石壁，岸邊僅剩狹窄通道。水面看似平靜，深處卻偶爾泛起不明漣漪，彷彿有什麼正潛伏其中。",
     "floor": "basement",
     "size": "1x1",
-    "doors": 4,
-    "filename": null,
+    "doors": 1,
+    "filename": "room_underground_lake.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_gallery",
     "name": "包廂房",
-    "description": "",
+    "description": "舞池上方的私人包廂，褪色天鵝絨座椅沿著欄杆排列，桌面散落酒杯與泛黃節目單。從此處可俯瞰整座舞池，陰影中的空座位顯得格外寂寥。",
     "floor": "upper",
     "size": "1x1",
-    "doors": 2,
-    "doorPattern": "opposite",
-    "filename": null,
+    "doors": 3,
+    "filename": "room_gallery.webp",
     "drawType": "event",
     "text": "與一樓的舞廳形成綁定房間：生成包廂房時，需在一樓對應座標同步生成舞廳；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。在舞廳被探索出來之後，玩家可選擇從包廂房躍下，進入舞廳中，並受到1顆骰的物理傷害。此跳躍無需耗移動點數。",
     "effects": [],
     "needsCustomLogic": true,
     "actions": [
-      { "label": "搜索", "kind": "search" },
-      { "label": "跳下", "kind": "teleport" }
+      {
+        "label": "搜索",
+        "kind": "search"
+      },
+      {
+        "label": "跳下",
+        "kind": "teleport"
+      }
     ],
     "item": "random_one"
   },
   {
     "id": "room_bedroom",
     "name": "臥房",
-    "description": "",
+    "description": "簡單木床與矮櫃靠牆擺放，褪色床單整齊鋪著，牆面沒有多餘裝飾。老舊窗戶透入微弱光線，安靜房內瀰漫木材與灰塵的陳舊氣味。",
     "floor": "any",
     "size": "1x1",
     "doors": 2,
     "doorPattern": "adjacent",
-    "filename": null,
+    "filename": "room_bedroom.webp",
     "drawType": "event",
     "text": "",
     "effects": [],
-    "needsCustomLogic": false
+    "needsCustomLogic": false,
+    "item": null
   },
   {
     "id": "room_collapsed_room",
     "name": "崩塌的房間",
-    "description": "",
+    "description": "踏入房間瞬間，腐朽地板突然斷裂崩塌，碎木與灰塵大片墜入下方黑暗。僅剩牆邊狹窄立足處，斷裂木樑不斷發出令人不安的吱嘎聲。",
     "floor": "ground",
     "size": "1x1",
     "doors": 4,
-    "filename": null,
+    "filename": "room_collapsed.webp",
     "drawType": "event",
     "text": "首位進入者，接受速度檢定，5+得以閃過地板大洞！若檢定失敗，探險者掉進地下室，在正下方座標（同一水平位置，地下室樓層）生成一張新地下室房間卡，並受到1顆骰子的物理傷害。之後進來的玩家可自由選擇是否跳入地板大洞抵達同一間地下室房間，無需耗移動點數，同樣受到1顆骰子的物理傷害。",
     "effects": [],
     "needsCustomLogic": true,
     "actions": [
-      { "label": "搜索", "kind": "search" },
-      { "label": "跳下", "kind": "teleport" }
+      {
+        "label": "搜索",
+        "kind": "search"
+      },
+      {
+        "label": "跳下",
+        "kind": "teleport"
+      }
     ],
     "item": "random_one"
+  },
+  {
+    "id": "room_maze",
+    "name": "迷宮房",
+    "description": "高聳櫥櫃與木製隔牆將房間切割成錯綜狹道，轉角彼此相似，幾乎無法辨認方向。昏暗通道深處不時傳來腳步回音，彷彿有人始終走在前方。",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 4,
+    "filename": "room_maze.webp",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false,
+    "item": null
+  },
+  {
+    "id": "room_deephole",
+    "name": "巨大的深洞",
+    "description": "巨大的地底深洞吞沒了大半空間，破碎岩壁一路墜向望不見底的黑暗。冷風從深處不斷湧出，碎石落下許久仍聽不見回聲，令人難以靠近邊緣。",
+    "floor": "basement",
+    "size": "1x1",
+    "doors": 1,
+    "filename": "room_deephole.webp",
+    "drawType": "event",
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false,
+    "item": null
+  },
+  {
+    "id": "room_EtiquetteSavior",
+    "name": "美姿美儀救世主房間",
+    "description": "鮮花與翠綠藤蔓盛開於庭園四周，柔和陽光灑落中央的希臘風少女雕像。潔白石像被花叢環繞，寧靜而美麗，與陰森宅邸形成異常鮮明的對比。",
+    "floor": "any",
+    "size": "1x1",
+    "doors": 4,
+    "filename": "room_EtiquetteSavior.webp",
+    "drawType": null,
+    "text": "",
+    "effects": [],
+    "needsCustomLogic": false,
+    "item": null
   }
 ]
