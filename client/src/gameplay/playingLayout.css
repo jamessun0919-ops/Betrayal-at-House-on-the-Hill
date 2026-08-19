@@ -26,6 +26,20 @@ body {
   --peek-size: calc(var(--total-square) * 0.15);
 }
 
+/* 整個遊戲畫面（視野＋狀態面板）共用的淡化背景圖，像浮水印一樣墊在底層。
+   用 ::before 疊一層而不是直接對 .playing-layout 設 opacity，避免連房間圖／文字
+   也被一起淡化 -- position:absolute 讓它脫離 grid 排版，只當純視覺背景。 */
+.playing-layout::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url('/images/house_cloudy_day.webp');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
 @media (orientation: portrait) {
   .playing-layout {
     grid-template-columns: 1fr;

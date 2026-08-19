@@ -11,22 +11,50 @@ function findPlayerName(playerId, players) {
   return player ? player.name : playerId;
 }
 
-// Centers a corner button inside the blank peek-size x peek-size square at
-// one of the viewport's 4 corners -- the room tile (70%) plus the 4 edge
-// peek bands (15% each) never cover the corners of the total-square, so
-// these sit in otherwise-empty space regardless of which map mode (focused
-// room vs overview) is currently rendered inside the viewport.
+// Fills the blank peek-size x peek-size square at one of the viewport's 4
+// corners -- the room tile (70%) plus the 4 edge peek bands (15% each) never
+// cover the corners of the total-square, so these sit in otherwise-empty
+// space regardless of which map mode (focused room vs overview) is
+// currently rendered inside the viewport. Font size is derived from
+// --peek-size (width/height); font size is a fixed 24px per the developer's
+// direction (2-line labels via wrapLabel still keep the block compact).
 function cornerButtonStyle(corner) {
-  const base = { position: 'absolute', zIndex: 10, fontSize: 12, padding: '2px 6px', borderRadius: 4 };
-  const vOffset = corner.includes('top')
-    ? { top: 'calc(var(--peek-size) / 2)', transformY: '-50%' }
-    : { bottom: 'calc(var(--peek-size) / 2)', transformY: '50%' };
-  const hOffset = corner.includes('left')
-    ? { left: 'calc(var(--peek-size) / 2)', transformX: '-50%' }
-    : { right: 'calc(var(--peek-size) / 2)', transformX: '50%' };
-  const { transformY, ...vRest } = vOffset;
-  const { transformX, ...hRest } = hOffset;
-  return { ...base, ...vRest, ...hRest, transform: `translate(${transformX}, ${transformY})` };
+  const base = {
+    position: 'absolute',
+    zIndex: 10,
+    width: 'var(--peek-size)',
+    height: 'var(--peek-size)',
+    boxSizing: 'border-box',
+    fontSize: 20,
+    lineHeight: 1,
+    padding: 2,
+    border: '2px solid #555',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    textAlign: 'center',
+  };
+  const vSide = corner.includes('top') ? { top: 0 } : { bottom: 0 };
+  const hSide = corner.includes('left') ? { left: 0 } : { right: 0 };
+  return { ...base, ...vSide, ...hSide };
+}
+
+// Breaks a label into chunkSize-character lines (e.g. "總覽地圖" at chunkSize
+// 2 -> "總覽" / "地圖") so multi-character labels read as a compact square
+// block instead of a single wide line. A label no longer than chunkSize is
+// returned unchanged (single line).
+function wrapLabel(text, chunkSize) {
+  if (text.length <= chunkSize) return text;
+  const chunks = [];
+  for (let i = 0; i < text.length; i += chunkSize) chunks.push(text.slice(i, i + chunkSize));
+  return chunks.map((chunk, i) => (
+    <span key={i}>
+      {chunk}
+      {i < chunks.length - 1 && <br />}
+    </span>
+  ));
 }
 
 export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
@@ -303,7 +331,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       {phase === 'playing' && (
         <div className="playing-layout">
           {/* TEMP: 除錯用邊框，用來核對版面各區塊的實際範圍，確認後可移除 */}
-          <div className="playing-layout__viewport" style={{ border: '2px dashed green', boxSizing: 'border-box' }}>
+          <div className="playing-layout__viewport">
             <div style={{ position: 'relative', width: 'var(--total-square)', height: 'var(--total-square)' }}>
               {(() => {
                 if (mapMode === 'overview') {
@@ -347,24 +375,25 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 style={cornerButtonStyle('top-left')}
                 onClick={() => (roomActions.length > 1 ? setShowRoomActionMenu(true) : handleSelectAction('room_action'))}
               >
-                行動
+                {wrapLabel('房間行動', 2)}
               </button>
               <button style={cornerButtonStyle('top-right')} onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
-                {mapMode === 'focused' ? '總覽地圖' : '目前房間'}
+                {wrapLabel(mapMode === 'focused' ? '總覽地圖' : '目前房間', 2)}
               </button>
               <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
-                襲擊
+                {wrapLabel('襲擊目標', 2)}
               </button>
               <button style={cornerButtonStyle('bottom-right')} onClick={handleEndTurn}>
-                回合結束
+                {wrapLabel('回合結束', 2)}
               </button>
             </div>
           </div>
-          <div className="playing-layout__panel" style={{ border: '2px dashed blue', boxSizing: 'border-box' }}>
+          <div className="playing-layout__panel">
             <CharacterPanel
               player={me}
               messages={messages}
               cardContent={cardContent}
+              characterContent={characterContent}
               onSelectAction={handleSelectAction}
               roommates={roommates}
             />
