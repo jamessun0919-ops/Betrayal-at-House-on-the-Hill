@@ -72,36 +72,51 @@ const BADGE_STAGGER_PERCENT = 8;
 // north means you walked in through the room's south wall). null means
 // spawned here or arrived via stairs, so the badge sits centered. Percentage
 // + transform based so it works at any tile size.
+// Diameter's radius (half of the 75%-of-door-frame diameter below) -- the
+// edge-anchored positions below add this on top of BADGE_EDGE_MARGIN, so the
+// badge sits one radius further into the room from where it used to touch
+// the edge (per the developer's visual adjustment).
+const BADGE_RADIUS = 'calc(var(--peek-size) * 0.375)';
+const BADGE_INSET = `calc(${BADGE_EDGE_MARGIN}px + ${BADGE_RADIUS})`;
+
 function badgeStyle(enteredFromSide, index, total) {
   const stagger = (index - (total - 1) / 2) * BADGE_STAGGER_PERCENT;
+  // Diameter is 75% of the door frame's width, i.e. the neighbor-peek band
+  // thickness (--peek-size) -- the same strip the room art's door opening
+  // renders into, scaled down per the developer's visual adjustment.
+  const size = { width: 'calc(var(--peek-size) * 0.75)', height: 'calc(var(--peek-size) * 0.75)' };
   switch (enteredFromSide) {
     case 'north':
       return {
         position: 'absolute',
-        top: BADGE_EDGE_MARGIN,
+        top: BADGE_INSET,
         left: `calc(50% + ${stagger}%)`,
         transform: 'translateX(-50%)',
+        ...size,
       };
     case 'south':
       return {
         position: 'absolute',
-        bottom: BADGE_EDGE_MARGIN,
+        bottom: BADGE_INSET,
         left: `calc(50% + ${stagger}%)`,
         transform: 'translateX(-50%)',
+        ...size,
       };
     case 'east':
       return {
         position: 'absolute',
-        right: BADGE_EDGE_MARGIN,
+        right: BADGE_INSET,
         top: `calc(50% + ${stagger}%)`,
         transform: 'translateY(-50%)',
+        ...size,
       };
     case 'west':
       return {
         position: 'absolute',
-        left: BADGE_EDGE_MARGIN,
+        left: BADGE_INSET,
         top: `calc(50% + ${stagger}%)`,
         transform: 'translateY(-50%)',
+        ...size,
       };
     default:
       return {
@@ -109,6 +124,7 @@ function badgeStyle(enteredFromSide, index, total) {
         top: '50%',
         left: `calc(50% + ${stagger}%)`,
         transform: 'translate(-50%, -50%)',
+        ...size,
       };
   }
 }
