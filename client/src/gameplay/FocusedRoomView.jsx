@@ -265,6 +265,7 @@ export default function FocusedRoomView({
         <RoomTile
           filename={currentInfo?.filename}
           name={currentInfo?.name}
+          rotation={currentRoom.rotation || 0}
           style={{
             position: 'relative',
             width: '100%',
