@@ -965,3 +965,27 @@
 - 擲骰異常、開門行動力改扣2、物品攜帶上限、角色icon六格定位、遊戲訊息彈窗流程、事件卡/道具卡品項與描述補充，皆為既有/新增待辦，尚未處理
 - 本階段沒有啟動任何本機測試伺服器，收工前確認系統無殘留 node 行程
 
+
+## 2026-08-20 第 2 次工作階段
+
+**當日工作內容**：
+- 開場即進行「開門/進新房間行動力扣除規則調整」的 `brainstorming`：查證現有程式碼（`turnFlow.js` 的 `getAvailableDirections`/`moveToRoom`、`selectAction` 的 `freeRoomAction`），確認開門扣點與樓梯免費行動、`leaveCheck`、崩塌房間檢定是完全獨立的程式路徑
+- 依開發者選擇定案設計：開門固定扣 2 點（取代歸零）；行動力 <2 時「開門」直接不列為可用選項（不是允許嘗試再報錯）；開門後有剩餘行動力不強制結束回合
+- 寫入設計文件並提交（`2026-08-20-open-door-ap-cost-design.md`），開發者確認後轉 `writing-plans`
+- 產出 3 個任務的實作計畫（`2026-08-20-open-door-ap-cost.md`），逐一比對現有測試檔案找出所有會受影響的既有斷言（`turnFlow.test.js` 4 處、`socketHandlers.test.js` 4 處），寫進計畫裡明確標註哪些測試預期會失敗、哪些不會
+- 開發者選擇 `subagent-driven-development` 執行：開獨立 worktree，依序派遣 3 個 implementer subagent（Task 1 伺服器規則本體、Task 2 socket 整合測試更新、Task 3 前端鏡像同步），每個任務都經過獨立審查，全數一次通過（Task 1 僅 1 項延後的 Minor 建議）
+- 全分支最終審查（Opus 模型）：Ready to merge: Yes，零 Critical/Important 程式碼問題；審查額外指出 `Handover.md` 有 3 處文字仍描述舊規則，需要在收工時一併修正
+- 收工前實際玩一局雙人瀏覽器測試：開門後行動力 4→2（非歸零）、行動力剩 2 點時「解鎖」按鈕仍顯示、扣到 0 點後選項正確消失，過程無錯誤
+- 依開發者選擇合併回 `main`（fast-forward），合併後再跑一次完整測試確認
+
+**完成項目**：
+- 開門/進新房間行動力扣除規則調整——設計文件、實作計畫、3 個任務實作與審查、全分支審查、實機驗證、合併進 `main`，全部完成（496/496 測試全綠）
+- Handover.md 修正 3 處描述舊規則的文字，待辦清單移除已完成項目並重新編號
+
+**遇到瓶頸**：
+- 派遣 Task 1 implementer 時誤傳了 `isolation:"worktree"` 參數，導致該任務的 commit 落在一個全新、跟 controller 自己的 worktree 無關的分支上——後來用 `cherry-pick` 把 commit 搬回正確分支修正，後續任務改成不傳這個參數
+- 收工整理 worktree 時，`TaskStop` 回報「成功停止」的幾個背景 `npm start`/`npm run dev`/`npx jest` 行程，在 Windows 上底層 `node.exe` 子行程並沒有真的被殺掉，導致 worktree 目錄一度因為檔案佔用刪不掉——改用 PowerShell 依命令列比對出確切殘留 PID 才清乾淨
+
+**開發者交代備忘事項**：
+- 擲骰異常、房間圖片旋轉機制（等 `canonicalDoors` 資料填完）、物品攜帶上限、角色icon六格定位、遊戲訊息彈窗流程、事件卡/道具卡品項與描述補充，皆為既有待辦，本階段未處理
+- 收工前確認系統無殘留 node 行程（本階段有 1 次殘留，已排查並清除，詳見上方「遇到瓶頸」）
