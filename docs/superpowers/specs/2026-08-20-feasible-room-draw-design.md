@@ -1,6 +1,6 @@
 # 先判斷合理房型再抽房間卡 設計文件
 
-> **狀態：設計已核准，尚未實作。**
+> **狀態：已實作並合併進 `main`。** 全分支審查抓到 1 個 Critical（舞廳/包廂重抽迴圈的無限迴圈風險），已修復並複審通過——詳見下方「串接進 `moveToRoom`」與「已知限制」的終止性論證。
 
 ## 背景與目標
 
@@ -57,22 +57,33 @@ function drawFeasibleRoom(deck, floor, isFeasible) {
 
 ### 串接進 `moveToRoom`（`server/src/game/turnFlow.js`）
 
-把現有的兩處 `drawRoom(gameState.roomDeck, player.floor)` 都換成 `drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible)`，`isFeasible` 是一個小閉包，把這次開門的座標／方向代入 `isDoorLayoutFeasible`：
+把現有的兩處 `drawRoom(gameState.roomDeck, player.floor)` 都換成 `drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible)`，`isFeasible` 是一個小閉包，把這次開門的座標／方向代入 `isDoorLayoutFeasible`。
+
+**⚠️ 全分支審查後修正（見下方「已知限制」的終止性論證）**：舞廳/包廂配對的既有重抽迴圈原本規劃「不需要改動任何判斷邏輯」，但全分支審查抓到一個 Critical——`drawFeasibleRoom` 的可行性篩選會打破 `drawRoom` 原本隱含的「重抽一定會換到別張牌」保證，在特定盤面下會讓這個迴圈永久卡死（server 掛起）。修正後的實際程式碼會在迴圈外宣告一個 `rejectedIds` 集合，每次拒絕重抽時把被拒絕的房間 id 記進去，重抽時額外排除已經被拒絕過的 id：
 
 ```js
 const isFeasible = (room) => isDoorLayoutFeasible(gameState.board, player.floor, { x: player.x, y: player.y }, direction, room.doors, room.doorPattern);
 let roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
+const rejectedIds = new Set();
 while (isBallroomOrGallery(roomDefinition.id)) {
   // ...既有的配對座標衝突檢查邏輯不變...
-  roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
+  rejectedIds.add(roomDefinition.id);
+  gameState.roomDeck.cards.push(roomDefinition);
+  roomDefinition = drawFeasibleRoom(
+    gameState.roomDeck,
+    player.floor,
+    (room) => !rejectedIds.has(room.id) && isFeasible(room)
+  );
 }
 ```
 
-**舞廳/包廂配對的既有重抽迴圈不需要改動任何判斷邏輯**：配對座標是否被佔用是另一個獨立條件（檢查的是另一個樓層的座標），跟這次新增的門型可行性檢查完全無關，只是重抽時一樣呼叫新的 `drawFeasibleRoom`，兩個機制自然疊加。`hasRoomForFloor`（判斷「牌庫是否還有這個樓層的卡」，決定要不要允許最後一張卡強制通過配對衝突檢查的既有例外）維持只看牌堆卡片數量，不牽扯門型可行性判斷，避免混淆兩個獨立的既有規則。
+配對座標是否被佔用（`hasRoomForFloor`／`pairedOccupied` 的判斷邏輯）本身維持不變，只有重抽時多套用一層「排除已拒絕過的 id」。
 
 ## 已知限制
 
-即使做了這個機制，`drawFeasibleRoom` 找不到任何符合門型的卡時，仍然會退回原本的 `drawRoom` 行為、之後可能被 `computeDoorLayout` 退化成單門房——這個極端情況（牌庫剩下的卡全部門型都跟目前位置衝突）沒辦法完全消除，只是發生機率大幅降低。這個殘留情況已經由「房間圖片旋轉機制」功能的 `computeRotation`（遇到門數不合時回退角度 0，不拋錯）當作安全網處理過，兩個機制不互斥、也不需要互相依賴。
+- **即使做了這個機制，仍然無法完全消除退化成單門房的情況**：`drawFeasibleRoom` 找不到任何符合門型的卡時，會退回原本的 `drawRoom` 行為、之後可能被 `computeDoorLayout` 退化成單門房——這個極端情況（牌庫剩下的卡全部門型都跟目前位置衝突）沒辦法完全消除，只是發生機率大幅降低。這個殘留情況已經由「房間圖片旋轉機制」功能的 `computeRotation`（遇到門數不合時回退角度 0，不拋錯）當作安全網處理過，兩個機制不互斥、也不需要互相依賴。
+- **舞廳/包廂重抽迴圈的終止性論證**：`rejectedIds` 保證同一張房間卡在同一次 `moveToRoom` 呼叫裡不會被重複判定為「可行」而重抽到；一旦排除掉所有已拒絕的房間，`drawFeasibleRoom` 找不到符合條件的卡時會退回 `drawRoom(deck, floor)`——因為 `drawFeasibleRoom` 失敗的搜尋一輪保證會把牌堆順序完整還原（見上方「篩選抽卡」段落），剛被拒絕、推到牌堆尾端的那張房間卡在這次 `drawRoom` 呼叫時仍然在尾端，而 `hasRoomForFloor` 已經保證牌堆裡還有其他同樓層的卡排在它前面，所以 `drawRoom` 一定會抽到別張——恢復了這個迴圈在這次改動之前就有的「重抽一定會前進」保證。
+- **牌堆順序的長期偏移**：`drawFeasibleRoom` 除了樓層不符的牌，也會把「符合樓層但暫時不可行」的牌轉到牌堆尾端。長期下來，門位限制較嚴的房型（4 門房、2 門 opposite）會系統性地更容易沉到牌堆後段，使抽牌分布不再是單純的洗牌均勻分布。這是這個機制刻意的設計結果（優先抽可行的房型），不是缺陷，記錄供之後留意。
 
 ## 範圍排除
 
