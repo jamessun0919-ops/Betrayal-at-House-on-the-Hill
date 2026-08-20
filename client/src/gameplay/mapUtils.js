@@ -13,6 +13,8 @@ const OPPOSITE_SIDE = { north: 'south', south: 'north', east: 'west', west: 'eas
 // sync if the server logic ever changes -- the server remains authoritative
 // (game:move still validates for real), this is only for deciding which
 // buttons to show.
+const OPEN_DOOR_AP_COST = 2;
+
 function hasBlocksOpenDoorModifier(player) {
   return (player.modifiers || []).some((m) =>
     (m.effects || []).some((e) => e.hookType === 'blocksOpenDoor')
@@ -21,6 +23,7 @@ function hasBlocksOpenDoorModifier(player) {
 
 function getAvailableDirections(player, currentRoom, boardRooms) {
   const blockedFromOpeningDoors = hasBlocksOpenDoorModifier(player);
+  const canAffordOpenDoor = player.actionPoints >= OPEN_DOOR_AP_COST;
   const doorSides = Array.isArray(currentRoom.doorSides) ? currentRoom.doorSides : [];
   const results = [];
   for (const direction of Object.keys(DIRECTION_DELTA)) {
@@ -34,7 +37,7 @@ function getAvailableDirections(player, currentRoom, boardRooms) {
       if (Array.isArray(neighborRoom.doorSides) && neighborRoom.doorSides.includes(facingSide)) {
         results.push({ direction, kind: 'move', neighborRoom });
       }
-    } else if (!blockedFromOpeningDoors) {
+    } else if (!blockedFromOpeningDoors && canAffordOpenDoor) {
       results.push({ direction, kind: 'open_door' });
     }
   }
