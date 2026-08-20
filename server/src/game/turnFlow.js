@@ -1,6 +1,6 @@
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
-const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA } = require('./boardGenerator');
-const { drawRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
+const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA, isDoorLayoutFeasible } = require('./boardGenerator');
+const { drawRoom, drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
 const { movePlayerTo, resetActionPoints, getStatValue, changeStat } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
@@ -141,14 +141,16 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   // available for this floor, in which case the draw is allowed through and
   // the pair falls back to a random open door on its own floor instead of
   // insisting on the same coordinate (handled in placeBallroomGalleryPair).
-  let roomDefinition = drawRoom(gameState.roomDeck, player.floor);
+  const isFeasible = (room) =>
+    isDoorLayoutFeasible(gameState.board, player.floor, { x: player.x, y: player.y }, direction, room.doors, room.doorPattern);
+  let roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
   while (isBallroomOrGallery(roomDefinition.id)) {
     const pairedFloor = pairedFloorFor(roomDefinition.id);
     const pairedOccupied = gameState.board[pairedFloor].has(coordKey(targetCoord.x, targetCoord.y));
     if (!pairedOccupied) break;
     if (!hasRoomForFloor(gameState.roomDeck, player.floor)) break; // last card for this floor -- let it through anyway
     gameState.roomDeck.cards.push(roomDefinition); // rejected -- back to the bottom, draw again
-    roomDefinition = drawRoom(gameState.roomDeck, player.floor);
+    roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
   }
 
   const placedRoom = placeNewRoom(

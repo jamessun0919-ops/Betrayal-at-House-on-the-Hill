@@ -971,3 +971,26 @@ test('room_ballroom placement is let through as the last ground-floor card even 
   expect(galleryEntries).toHaveLength(1);
   expect(coordKey(galleryEntries[0].x, galleryEntries[0].y)).not.toBe(coordKey(1, 1));
 });
+
+test('moveToRoom opens a door: prefers a room type that avoids computeDoorLayout degrading to entry-only, when a feasible alternative exists in the deck', () => {
+  jest.spyOn(Math, 'random').mockReturnValue(0); // deterministic shuffle throughout this test
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_good', doors: 3, floor: 'ground' },
+    { id: 'room_bad', doors: 2, doorPattern: 'opposite', floor: 'ground' },
+  ]);
+  // A pre-placed neighbor south of the target coordinate (1,1) requires a
+  // door on that side (its own north side has a door facing back). room_bad's
+  // doorPattern:'opposite' can only ever put its extra door on the east side
+  // (opposite of the west entry from moving 'east'), so it can never satisfy
+  // this and would degrade to entry-only if it were drawn and placed.
+  // room_good (doors:3, no doorPattern restriction) can satisfy it. With
+  // Math.random mocked to 0, the deck's shuffle deterministically puts
+  // room_bad first -- proving drawFeasibleRoom actually skips it rather than
+  // just happening to draw room_good anyway.
+  gameState.board.ground.set(coordKey(1, 2), { roomId: 'room_neighbor', x: 1, y: 2, doorSides: ['north'] });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_good');
+  expect(player.actionPoints).toBe(2); // startingAP 4 - OPEN_DOOR_AP_COST 2
+  const placedRoom = gameState.board.ground.get(coordKey(1, 1));
+  expect(placedRoom.doorSides).toHaveLength(3); // did not degrade to entry-only
+});
