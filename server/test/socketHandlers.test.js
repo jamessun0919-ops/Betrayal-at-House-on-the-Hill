@@ -710,8 +710,10 @@ test('a repeated game:startCharacterSelect is rejected with GAME_ALREADY_STARTED
   httpServer.close();
 });
 
-test('game:move to open a door places a room, zeroes AP, and broadcasts game:stateUpdate', async () => {
-  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+test('game:move to open a door places a room, deducts a flat 2 AP, and broadcasts game:stateUpdate', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  const startingAP = getPlayer(gameState, currentPlayerId).actionPoints;
 
   const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
   const result = await new Promise((resolve) => {
@@ -723,7 +725,7 @@ test('game:move to open a door places a room, zeroes AP, and broadcasts game:sta
   const update = await updatePromise;
   const movedPlayer = update.players.find((p) => p.x === 1 && p.y === 1);
   expect(movedPlayer).toBeTruthy();
-  expect(movedPlayer.actionPoints).toBe(0);
+  expect(movedPlayer.actionPoints).toBe(startingAP - 2);
 
   clientA.close();
   clientB.close();
@@ -1267,6 +1269,7 @@ test('game:diceChoiceRespond with an item optionId resolves a pending leaveCheck
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.inventory.push({ id: 'item_006' });
+  const startingAP = player.actionPoints;
 
   const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
@@ -1285,7 +1288,7 @@ test('game:diceChoiceRespond with an item optionId resolves a pending leaveCheck
   expect(player.diceInterjectionUsedThisTurn).toEqual(['item_006']);
   // might(3) + bonusDice(2) = 5 dice, each face 2 -> sum 10, passes min 3 -> opens the door east
   expect(player.x).toBe(1);
-  expect(player.actionPoints).toBe(0); // open_door zeroes AP, same as a normal door-open
+  expect(player.actionPoints).toBe(startingAP - 2); // open_door deducts a flat 2 AP, same as a normal door-open
 
   clientA.close();
   clientB.close();
@@ -1298,6 +1301,7 @@ test('game:diceChoiceRespond with optionId:"__skip__" resolves a pending leaveCh
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.inventory.push({ id: 'item_006' });
+  const startingAP = player.actionPoints;
 
   const pendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
@@ -1314,7 +1318,7 @@ test('game:diceChoiceRespond with optionId:"__skip__" resolves a pending leaveCh
   expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex); // no cost -- item never used
   expect(player.diceInterjectionUsedThisTurn || []).toEqual([]);
   expect(player.x).toBe(1);
-  expect(player.actionPoints).toBe(0);
+  expect(player.actionPoints).toBe(startingAP - 2);
 
   clientA.close();
   clientB.close();
@@ -1532,10 +1536,12 @@ test('game:endTurn does not re-apply a room\'s onceOnlyPerPlayer bonus once the 
 });
 
 test('when a move exhausts action points, the turn does not auto-advance -- game:endTurn is required', async () => {
-  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGame();
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).actionPoints = 2; // exactly enough to open one door, exhausting AP afterward
 
   const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
-  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // zeroes AP
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // costs the flat 2 AP for opening a door
   const update = await updatePromise;
 
   // AP is zero, but the turn must stay with the same player until they
