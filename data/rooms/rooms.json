@@ -8,7 +8,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_chapel.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":["south", "west"],
     "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級意志。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -31,12 +31,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_research_lab.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south", "east"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_library",
@@ -47,7 +47,7 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_library.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east", "west"],
     "drawType": "omen",
     "text": "若在此房結束回合，可獲得1級知識。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -59,7 +59,7 @@
       }
     ],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_master_bedroom",
@@ -70,7 +70,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_master_bedroom.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south", "east"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -91,7 +91,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_conservatory.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["north", "south", "east", "west"],
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -106,7 +106,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_gamble.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["north", "south", "east", "west"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -127,7 +127,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_gardens.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["north", "south", "east", "west"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -142,12 +142,12 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_patio.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":["north", "south", "east", "west"],
     "drawType": "omen",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item":  "random_one"
   },
   {
     "id": "room_balcony",
@@ -157,7 +157,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_balcony.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south", "east", "west"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -173,12 +173,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_statuary_corridor.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south", "east"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_bridge",
@@ -189,7 +189,7 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_bridge.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west", "east"],
     "drawType": "omen",
     "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
     "effects": [],
@@ -208,7 +208,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_kitchen.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west", "east", "south"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -223,7 +223,7 @@
         "kind": "craft"
       }
     ],
-    "item": "random_one",
+    "item": "item_018",
     "craftRecipes": [
       {
         "id": "recipe_cooked_food",
@@ -243,7 +243,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_abandoned.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west", "east","south"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -259,7 +259,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_larder.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","south"],
     "drawType": null,
     "text": "若在此房結束回合，可獲得1級力量。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -277,7 +277,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": ["item_017","item_016"]
   },
   {
     "id": "room_maid",
@@ -287,12 +287,12 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_maid.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","south","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_guest_1",
@@ -303,7 +303,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_guest_1.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","north"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -314,7 +314,7 @@
         "kind": "search"
       }
     ],
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_charred",
@@ -325,7 +325,7 @@
     "doors": 3,
     "drawType": "omen",
     "filename": "room_charred.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","north","south"],
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -339,7 +339,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_bloody.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","north","south"],
     "drawType": "omen",
     "text": "",
     "effects": [],
@@ -354,7 +354,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_gymnasium.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","north","south"],
     "drawType": null,
     "text": "若在此房結束回合，可獲得1級速度。每位探險者在遊戲中只能受益於此房一次。",
     "effects": [
@@ -372,7 +372,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": null
   },
   {
     "id": "room_vault",
@@ -382,10 +382,10 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_vault.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":  ["south"],
     "drawType": null,
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
-    "item": "random_one",
+    "item": null,
     "actions": [
       {
         "label": "搜索",
@@ -431,7 +431,7 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_weapon.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":  ["east","west"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -442,7 +442,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": ["item_008","item_020"]
   },
   {
     "id": "room_specimen",
@@ -453,12 +453,12 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_specimen.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":  ["east","west"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_ballroom",
@@ -468,12 +468,12 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_ballroom.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":  ["east","west","north","south"],
     "drawType": "omen",
     "text": "與二樓的包廂房形成綁定房間：生成舞廳時，需在二樓對應座標同步生成包廂房；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。",
     "effects": [],
     "needsCustomLogic": true,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_piano",
@@ -484,7 +484,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_piano.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -500,7 +500,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_messy.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south"],
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於3才能離開",
     "effects": [],
@@ -519,7 +519,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_atrium.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north","west"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -535,12 +535,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_murder.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":["west","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_018"
   },
   {
     "id": "room_vine_entangled",
@@ -550,7 +550,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_vine_entangled.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north","west"],
     "drawType": "omen",
     "text": "要離開房間時，必須通過速度考驗，擲骰點數大於4才能離開",
     "effects": [],
@@ -569,7 +569,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_baby.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","west"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -590,7 +590,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_bathroom_ground.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -611,7 +611,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_bathroom_upper.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":["south"],
     "drawType": null,
     "text": "",
     "effects": [],
@@ -633,7 +633,7 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_beast.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["west","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -648,12 +648,12 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_dining.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": ["item_016","item_017"]
   },
   {
     "id": "room_operating_lab",
@@ -664,12 +664,12 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_operating_lab.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_013"
   },
   {
     "id": "room_attic",
@@ -679,7 +679,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_attic.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south"],
     "drawType": "event",
     "text": "離開時，地板突然不穩！需進行速度檢定達3+，否則失去1級力量",
     "effects": [],
@@ -702,7 +702,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_pentagram.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south"],
     "drawType": "event",
     "text": "離開時，被儀式嚇到！需進行知識檢定達4+，否則失去1級神志",
     "effects": [],
@@ -715,7 +715,7 @@
       }
     },
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_012"
   },
   {
     "id": "room_graveyard",
@@ -723,11 +723,11 @@
     "description": "傾斜墓碑散落在荒草與枯樹之間，部分墳墓早已塌陷，鏽蝕鐵欄被藤蔓纏繞。薄霧貼著地面緩緩流動，遠處偶爾傳來烏鴉低沉的鳴叫聲。",
     "floor": "ground",
     "size": "1x1",
-    "doors": 3,
+    "doors": 4,
     "filename": "room_graveyard.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north","west"],
     "drawType": "event",
-    "text": "氣氛陰沈⋯⋯離開時，需進行神志檢定達4+，否則失去1級知識",
+    "text": "氣氛陰沈⋯⋯離開時，需進行意志檢定達4+，否則失去1級知識",
     "effects": [],
     "leaveCheck": {
       "stat": "sanity",
@@ -748,7 +748,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_catacombs.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north","west"],
     "drawType": "event",
     "text": "這恐怖的地方像迷宮一樣走不出去⋯⋯請進行神志檢定，6+得以離開。",
     "effects": [],
@@ -764,7 +764,7 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_chasm.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south","north"],
     "drawType": "event",
     "text": "進行速度檢定，3+得以通向另一側。若失敗則此回合的移動階段立刻結束，下回可選擇折回原方向，或於下回合再次挑戰通過。",
     "effects": [],
@@ -779,7 +779,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_furnace.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","west"],
     "drawType": "event",
     "text": "若你在此房結束你的回合，則受到1級物理傷害。",
     "effects": [],
@@ -794,7 +794,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_crypt.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","north"],
     "drawType": "event",
     "text": "若你在此房結束你的回合，則受到1級神志傷害。",
     "effects": [],
@@ -810,12 +810,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_wine_cellar.webp",
-    "canonicalDoors": null,
-    "drawType": "event",
+    "canonicalDoors": ["east","north"],
+    "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_022"
   },
   {
     "id": "room_storeroom",
@@ -826,12 +826,12 @@
     "doors": 2,
     "doorPattern": "opposite",
     "filename": "room_storeroom.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south","north"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": ["item_022","item_023","item_016"]
   },
   {
     "id": "room_junk",
@@ -841,7 +841,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_junk.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","west"],
     "drawType": "event",
     "text": "離開時，被垃圾絆住了！需進行力量檢定達3+，否則失去1級速度",
     "effects": [],
@@ -864,7 +864,7 @@
     "size": "1x1",
     "doors": 3,
     "filename": "room_organ.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south","west"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -879,7 +879,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_underground_lake.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -892,9 +892,10 @@
     "description": "舞池上方的私人包廂，褪色天鵝絨座椅沿著欄杆排列，桌面散落酒杯與泛黃節目單。從此處可俯瞰整座舞池，陰影中的空座位顯得格外寂寥。",
     "floor": "upper",
     "size": "1x1",
-    "doors": 3,
+    "doors": 2,
+    "doorPattern": "opposite",
     "filename": "room_gallery.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east", "west"],
     "drawType": "event",
     "text": "與一樓的舞廳形成綁定房間：生成包廂房時，需在一樓對應座標同步生成舞廳；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。在舞廳被探索出來之後，玩家可選擇從包廂房躍下，進入舞廳中，並受到1顆骰的物理傷害。此跳躍無需耗移動點數。",
     "effects": [],
@@ -920,12 +921,12 @@
     "doors": 2,
     "doorPattern": "adjacent",
     "filename": "room_bedroom.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","south"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_collapsed_room",
@@ -935,7 +936,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_collapsed.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","north","west","south"],
     "drawType": "event",
     "text": "首位進入者，接受速度檢定，5+得以閃過地板大洞！若檢定失敗，探險者掉進地下室，在正下方座標（同一水平位置，地下室樓層）生成一張新地下室房間卡，並受到1顆骰子的物理傷害。之後進來的玩家可自由選擇是否跳入地板大洞抵達同一間地下室房間，無需耗移動點數，同樣受到1顆骰子的物理傷害。",
     "effects": [],
@@ -950,7 +951,7 @@
         "kind": "teleport"
       }
     ],
-    "item": "random_one"
+    "item": null
   },
   {
     "id": "room_maze",
@@ -960,12 +961,12 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_maze.webp",
-    "canonicalDoors": null,
+    "canonicalDoors":["east","north","west","south"],
     "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_deephole",
@@ -975,7 +976,7 @@
     "size": "1x1",
     "doors": 1,
     "filename": "room_deephole.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["south"],
     "drawType": "event",
     "text": "",
     "effects": [],
@@ -990,7 +991,7 @@
     "size": "1x1",
     "doors": 4,
     "filename": "room_EtiquetteSavior.webp",
-    "canonicalDoors": null,
+    "canonicalDoors": ["east","north","west","south"],
     "drawType": null,
     "text": "",
     "effects": [],
