@@ -44,6 +44,10 @@ function makeGameStateWithPlayer(drawableRooms) {
   return { gameState, player };
 }
 
+afterEach(() => {
+  jest.restoreAllMocks();
+});
+
 test('getAvailableDirections lists an unexplored door as open_door when the deck has cards', () => {
   const { gameState } = makeGameStateWithPlayer();
   // Entrance hall (0,0) is a fixed starting room with doors on all 4 sides.
@@ -994,3 +998,27 @@ test('moveToRoom opens a door: prefers a room type that avoids computeDoorLayout
   const placedRoom = gameState.board.ground.get(coordKey(1, 1));
   expect(placedRoom.doorSides).toHaveLength(3); // did not degrade to entry-only
 });
+
+test('moveToRoom does not infinite-loop when the ballroom/gallery pairing conflict recurs and every other same-floor card is infeasible at this position', () => {
+  jest.spyOn(Math, 'random').mockReturnValue(0);
+  const { gameState, player } = makeGameStateWithPlayer([
+    { id: 'room_ballroom', doors: 4, floor: 'ground' },
+    { id: 'room_other', doors: 2, doorPattern: 'opposite', floor: 'ground' },
+  ]);
+  // Surround the target coordinate (1,1) with neighbors requiring doors on
+  // all three non-entry sides, so only a doors:4 room (room_ballroom) is
+  // feasible there -- room_other (doors:2 opposite) can never satisfy 3
+  // simultaneous door requirements with only 2 total doors.
+  gameState.board.ground.set(coordKey(1, 0), { roomId: 'room_neighbor_n', x: 1, y: 0, doorSides: ['south'] });
+  gameState.board.ground.set(coordKey(2, 1), { roomId: 'room_neighbor_e', x: 2, y: 1, doorSides: ['west'] });
+  gameState.board.ground.set(coordKey(1, 2), { roomId: 'room_neighbor_s', x: 1, y: 2, doorSides: ['north'] });
+  // The ballroom's paired coordinate on the upper floor is already occupied,
+  // so drawing room_ballroom always gets rejected and retried -- with
+  // room_other being the only other same-floor card and it being infeasible,
+  // this reproduces the exact scenario that hung the server before the fix
+  // (drawFeasibleRoom kept re-surfacing the rejected, but still-feasible,
+  // room_ballroom forever).
+  gameState.board.upper.set(coordKey(1, 1), { roomId: 'room_upper_occupant', x: 1, y: 1, doorSides: [] });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.roomId).toBe('room_other');
+}, 5000);

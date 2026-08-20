@@ -144,13 +144,27 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   const isFeasible = (room) =>
     isDoorLayoutFeasible(gameState.board, player.floor, { x: player.x, y: player.y }, direction, room.doors, room.doorPattern);
   let roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
+  // A room rejected below for a paired-coordinate conflict must never be
+  // offered again within this same retry loop -- drawFeasibleRoom has no
+  // memory of what it already handed back, so if every OTHER same-floor
+  // card is infeasible at this position while the rejected room itself
+  // remains feasible, it would keep re-surfacing forever (the
+  // paired-coordinate conflict never resolves just by re-drawing the same
+  // card). Excluding already-rejected ids restores the same
+  // guaranteed-progress property the old plain drawRoom had.
+  const rejectedIds = new Set();
   while (isBallroomOrGallery(roomDefinition.id)) {
     const pairedFloor = pairedFloorFor(roomDefinition.id);
     const pairedOccupied = gameState.board[pairedFloor].has(coordKey(targetCoord.x, targetCoord.y));
     if (!pairedOccupied) break;
     if (!hasRoomForFloor(gameState.roomDeck, player.floor)) break; // last card for this floor -- let it through anyway
+    rejectedIds.add(roomDefinition.id);
     gameState.roomDeck.cards.push(roomDefinition); // rejected -- back to the bottom, draw again
-    roomDefinition = drawFeasibleRoom(gameState.roomDeck, player.floor, isFeasible);
+    roomDefinition = drawFeasibleRoom(
+      gameState.roomDeck,
+      player.floor,
+      (room) => !rejectedIds.has(room.id) && isFeasible(room)
+    );
   }
 
   const placedRoom = placeNewRoom(
