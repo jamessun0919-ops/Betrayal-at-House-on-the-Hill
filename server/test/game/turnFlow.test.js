@@ -83,6 +83,15 @@ test('getAvailableDirections omits open_door for a player with a blocksOpenDoor 
   expect(available.find((a) => a.direction === 'west')).toEqual({ direction: 'west', kind: 'move' });
 });
 
+test('getAvailableDirections omits open_door when the player has only 1 action point, but still lists moves to already-explored neighbors', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  player.actionPoints = 1;
+  const available = getAvailableDirections(gameState, 'p1');
+  expect(available.filter((a) => a.kind === 'open_door')).toEqual([]);
+  expect(available.find((a) => a.direction === 'west')).toEqual({ direction: 'west', kind: 'move' });
+});
+
 test('getAvailableDirections throws PLAYER_NOT_FOUND for an unknown player', () => {
   const { gameState } = makeGameStateWithPlayer();
   expect(() => getAvailableDirections(gameState, 'unknown')).toThrow('PLAYER_NOT_FOUND');
@@ -99,15 +108,30 @@ test('moveToRoom moves the player to an already-explored neighbor and deducts 1 
   expect(player.actionPoints).toBe(startingAP - 1);
 });
 
-test('moveToRoom opens a door: draws a room, places it, moves the player, and zeroes action points', () => {
+test('moveToRoom opens a door: draws a room, places it, moves the player, and deducts a flat 2 action points', () => {
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, drawType: 'item', floor: 'ground' }]);
+  const startingAP = player.actionPoints; // 4, from the default makeStats() speed value
   const result = moveToRoom(gameState, 'p1', 'east');
   expect(result.kind).toBe('open_door');
   expect(result.roomId).toBe('room_new');
   expect(result.pendingCardDraw).toEqual({ deck: 'item' });
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
+  expect(player.actionPoints).toBe(startingAP - 2);
+});
+
+test('moveToRoom allows opening a door with exactly 2 action points, leaving 0 afterward', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, floor: 'ground' }]);
+  player.actionPoints = 2;
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.kind).toBe('open_door');
   expect(player.actionPoints).toBe(0);
+});
+
+test('moveToRoom throws INVALID_MOVE_DIRECTION when attempting to open a door with only 1 action point', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, floor: 'ground' }]);
+  player.actionPoints = 1;
+  expect(() => moveToRoom(gameState, 'p1', 'east')).toThrow('INVALID_MOVE_DIRECTION');
 });
 
 test('moveToRoom sets pendingCardDraw to null when the room has no draw type', () => {
@@ -121,7 +145,7 @@ test('moveToRoom throws INVALID_MOVE_DIRECTION for a direction not currently ava
   const player2 = addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
   gameState2.turnOrder = ['p1'];
   gameState2.currentPlayerIndex = 0;
-  moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,1), AP=0
+  moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,1), AP=2 (4 - the flat door-open cost of 2)
   resetActionPoints(player2); // simulate starting a new turn
   // North of (1,1) is unexplored and the deck is empty, so it's neither a
   // valid move (no room there) nor a valid door-open (no cards left).
@@ -137,9 +161,9 @@ test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS when the player has 0 action po
 
 test('moveToRoom throws NOT_ENOUGH_ACTION_POINTS before checking direction validity', () => {
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_only', doors: 4, floor: 'ground' }]);
-  // Move east to exhaust the deck and set AP to 0
-  moveToRoom(gameState, 'p1', 'east');
-  // AP is now 0, and we're at (1,1). North is unexplored and deck is empty (invalid direction).
+  moveToRoom(gameState, 'p1', 'east'); // exhausts the deck, player now at (1,1)
+  player.actionPoints = 0; // simulate a fully spent turn regardless of the door-open cost
+  // North is unexplored and the deck is empty (invalid direction).
   // The check for NOT_ENOUGH_ACTION_POINTS should fire before INVALID_MOVE_DIRECTION.
   expect(() => moveToRoom(gameState, 'p1', 'north')).toThrow('NOT_ENOUGH_ACTION_POINTS');
 });
@@ -218,7 +242,7 @@ test('moveToRoom with a leaveCheck.failPenalty: the resolvedRoll bypass path (di
   expect(player.stats.might.currentIndex).toBe(startingMightIndex - 1);
 });
 
-test('moveToRoom with a leaveCheck also gates opening a new door: failure does not draw or zero action points beyond the normal 1', () => {
+test('moveToRoom with a leaveCheck also gates opening a new door: failure does not draw or deduct action points beyond the normal 1', () => {
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, drawType: 'item', floor: 'ground' }]);
   const startingAP = player.actionPoints;
   const failRng = () => 0;
@@ -231,13 +255,13 @@ test('moveToRoom with a leaveCheck also gates opening a new door: failure does n
   });
   expect(player.x).toBe(0); // unmoved -- no room was drawn or placed
   expect(player.y).toBe(1);
-  expect(player.actionPoints).toBe(startingAP - 1); // not zeroed -- opening never happened
+  expect(player.actionPoints).toBe(startingAP - 1); // not deducted further -- opening never happened
 
   const passRng = () => 0.99;
   const passResult = moveToRoom(gameState, 'p1', 'east', { stat: 'might', min: 3 }, { rng: passRng });
   expect(passResult.kind).toBe('open_door');
   expect(player.x).toBe(1);
-  expect(player.actionPoints).toBe(0); // successful door-open still zeroes AP as normal
+  expect(player.actionPoints).toBe(startingAP - 3); // successful door-open deducts a flat 2 on top of the earlier 1
 });
 
 test('moveToRoom with a leaveCheck: an eligible interjection item pauses without rolling, moving, or spending action points', () => {

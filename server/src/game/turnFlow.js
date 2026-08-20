@@ -12,6 +12,8 @@ const COLLAPSED_ROOM_ID = 'room_collapsed_room';
 const COLLAPSE_CHECK_STAT = 'speed';
 const COLLAPSE_CHECK_MIN = 5;
 
+const OPEN_DOOR_AP_COST = 2;
+
 const BALLROOM_ID = 'room_ballroom';
 const GALLERY_ID = 'room_gallery';
 
@@ -44,6 +46,7 @@ function getAvailableDirections(gameState, playerId) {
   const results = [];
   const doorSides = Array.isArray(room.doorSides) ? room.doorSides : [];
   const blockedFromOpeningDoors = hasModifierEffect(player, 'blocksOpenDoor');
+  const canAffordOpenDoor = player.actionPoints >= OPEN_DOOR_AP_COST;
   for (const direction of SIDES) {
     if (!doorSides.includes(direction)) continue;
     const delta = DIRECTION_DELTA[direction];
@@ -53,7 +56,7 @@ function getAvailableDirections(gameState, playerId) {
       if (canMoveBetween(gameState.board, player.floor, { x: player.x, y: player.y }, direction)) {
         results.push({ direction, kind: 'move' });
       }
-    } else if (!blockedFromOpeningDoors && hasRoomForFloor(gameState.roomDeck, player.floor)) {
+    } else if (!blockedFromOpeningDoors && canAffordOpenDoor && hasRoomForFloor(gameState.roomDeck, player.floor)) {
       results.push({ direction, kind: 'open_door' });
     }
   }
@@ -156,7 +159,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     roomDefinition
   );
   movePlayerTo(player, player.floor, placedRoom.x, placedRoom.y, OPPOSITE_SIDE[direction]);
-  player.actionPoints = 0;
+  player.actionPoints -= OPEN_DOOR_AP_COST;
   const pendingCardDraw =
     roomDefinition.drawType && roomDefinition.drawType !== 'none'
       ? { deck: roomDefinition.drawType }
