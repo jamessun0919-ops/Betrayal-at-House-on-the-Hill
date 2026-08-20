@@ -1,4 +1,4 @@
-const { createRoomDeck, drawRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor, removeRoomById } = require('../../src/game/roomDeck');
+const { createRoomDeck, drawRoom, drawFeasibleRoom, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor, removeRoomById } = require('../../src/game/roomDeck');
 
 function makeRooms(count, floor = 'ground') {
   const rooms = [];
@@ -141,4 +141,36 @@ test('removeRoomById returns null and does not mutate the deck when the id is no
   const removed = removeRoomById(deck, 'not_in_deck');
   expect(removed).toBeNull();
   expect(getRemainingCount(deck)).toBe(2);
+});
+
+test('drawFeasibleRoom returns the first room matching both floor and the isFeasible predicate, cycling non-matches to the back', () => {
+  const rooms = [
+    { id: 'g_bad', doors: 4, floor: 'ground' },
+    { id: 'u_ok', doors: 4, floor: 'upper' },
+    { id: 'g_ok', doors: 2, floor: 'ground' },
+  ];
+  const deck = createRoomDeck(rooms);
+  const isFeasible = (room) => room.id === 'g_ok';
+  const drawn = drawFeasibleRoom(deck, 'ground', isFeasible);
+  expect(drawn.id).toBe('g_ok');
+  expect(getRemainingCount(deck)).toBe(2);
+  expect(deck.cards.some((r) => r.id === 'g_bad')).toBe(true);
+  expect(deck.cards.some((r) => r.id === 'u_ok')).toBe(true);
+});
+
+test('drawFeasibleRoom falls back to a plain floor-matching draw when no remaining card satisfies isFeasible', () => {
+  const rooms = [
+    { id: 'g1', doors: 2, floor: 'ground' },
+    { id: 'g2', doors: 3, floor: 'ground' },
+  ];
+  const deck = createRoomDeck(rooms);
+  const isFeasible = () => false; // nothing is ever feasible
+  const drawn = drawFeasibleRoom(deck, 'ground', isFeasible);
+  expect(['g1', 'g2']).toContain(drawn.id);
+  expect(getRemainingCount(deck)).toBe(1);
+});
+
+test('drawFeasibleRoom throws ROOM_DECK_EMPTY when no card matches the floor at all, delegating to drawRoom', () => {
+  const deck = createRoomDeck(makeRooms(2, 'upper'));
+  expect(() => drawFeasibleRoom(deck, 'ground', () => true)).toThrow('ROOM_DECK_EMPTY');
 });
