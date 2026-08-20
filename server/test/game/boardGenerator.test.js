@@ -1,4 +1,4 @@
-const { createBoard, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, canMoveBetween } = require('../../src/game/boardGenerator');
+const { createBoard, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, canMoveBetween, isDoorLayoutFeasible } = require('../../src/game/boardGenerator');
 
 const STARTING_ROOMS = [
   { id: 'room_lobby_a', name: '大門廳', floor: 'ground', filename: 'LobbyA.webp' },
@@ -379,4 +379,26 @@ test('placeFixedRoom-placed starting rooms do not have a rotation field', () => 
   const board = createBoard(STARTING_ROOMS);
   const lobbyA = board.ground.get(coordKey(0, 1));
   expect(lobbyA.rotation).toBeUndefined();
+});
+
+test('isDoorLayoutFeasible returns true when the room type can be placed without degrading', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // (5,5) -> east -> target (6,5), entrySide 'west'. No neighbors placed
+  // anywhere near (6,5) on a fresh board, so doorPattern:'opposite' can
+  // freely put its extra door on 'east' (the only candidate) with no conflict.
+  const feasible = isDoorLayoutFeasible(board, 'ground', { x: 5, y: 5 }, 'east', 2, 'opposite');
+  expect(feasible).toBe(true);
+});
+
+test('isDoorLayoutFeasible returns false when computeDoorLayout would have to degrade to entry-only', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Target coord (6,5) via 'east' from (5,5): entrySide is 'west'. A neighbor
+  // placed south of the target, with a door facing back north, forces a
+  // 'door' requirement on the target's south side. doorPattern:'opposite'
+  // only ever offers 'east' as the extra door (opposite of the west entry) --
+  // an irreconcilable conflict, so computeDoorLayout falls back to
+  // entry-only (real doorSides = {west}, size 1, not 2).
+  board.ground.set(coordKey(6, 6), { roomId: 'room_neighbor', x: 6, y: 6, doorSides: ['north'] });
+  const feasible = isDoorLayoutFeasible(board, 'ground', { x: 5, y: 5 }, 'east', 2, 'opposite');
+  expect(feasible).toBe(false);
 });

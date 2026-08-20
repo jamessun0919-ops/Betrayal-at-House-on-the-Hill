@@ -167,6 +167,20 @@ function placeRoomAt(board, floor, x, y, roomDefinition, guaranteedSide) {
   return placedRoom;
 }
 
+// 檢查「如果把一個 doors/doorPattern 這樣的房型放在 fromCoord+direction 這個位置，
+// computeDoorLayout 會不會需要退化成只剩入口一扇門」。直接重用 computeDoorLayout
+// 本身當可行性檢查器（跟 placeNewRoom/placeRoomAt 用的是同一套引擎），不是另外實作
+// 一套判斷邏輯，這樣可行性判斷永遠跟實際放置時的引擎結果一致。
+function isDoorLayoutFeasible(board, floor, fromCoord, direction, doors, doorPattern) {
+  const grid = board[floor];
+  const delta = DIRECTION_DELTA[direction];
+  const targetCoord = { x: fromCoord.x + delta.dx, y: fromCoord.y + delta.dy };
+  const entrySide = OPPOSITE_SIDE[direction];
+  const getNeighborRequirement = makeNeighborRequirementReader(grid, targetCoord);
+  const doorSides = computeDoorLayout(doors, entrySide, getNeighborRequirement, doorPattern || null);
+  return doorSides.size === doors;
+}
+
 function shuffle(array) {
   const result = array.slice();
   for (let i = result.length - 1; i > 0; i--) {
@@ -239,6 +253,7 @@ module.exports = {
   placeAtRandomOpenDoor,
   coordKey,
   canMoveBetween,
+  isDoorLayoutFeasible,
   DIRECTION_DELTA,
   FLOORS,
 };
