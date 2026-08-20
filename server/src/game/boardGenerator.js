@@ -1,4 +1,4 @@
-const { SIDES, OPPOSITE_SIDE, computeDoorLayout } = require('./doorLayout');
+const { SIDES, OPPOSITE_SIDE, computeDoorLayout, computeRotation } = require('./doorLayout');
 
 const FLOORS = ['ground', 'upper', 'basement'];
 
@@ -101,12 +101,14 @@ function placeNewRoom(board, floor, fromCoord, direction, roomDefinition) {
     getNeighborRequirement,
     roomDefinition.doorPattern || null
   );
+  const rotation = computeRotation(roomDefinition.canonicalDoors, doorSides);
 
   const placedRoom = {
     roomId: roomDefinition.id,
     x: newCoord.x,
     y: newCoord.y,
     doorSides: Array.from(doorSides),
+    rotation,
     droppedItems: [],
     item: cloneRoomItem(roomDefinition.item),
   };
@@ -150,12 +152,14 @@ function placeRoomAt(board, floor, x, y, roomDefinition, guaranteedSide) {
     getNeighborRequirement,
     roomDefinition.doorPattern || null
   );
+  const rotation = computeRotation(roomDefinition.canonicalDoors, doorSides);
 
   const placedRoom = {
     roomId: roomDefinition.id,
     x,
     y,
     doorSides: Array.from(doorSides),
+    rotation,
     droppedItems: [],
     item: cloneRoomItem(roomDefinition.item),
   };

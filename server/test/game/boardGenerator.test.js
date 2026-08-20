@@ -298,3 +298,55 @@ test('createBoard sets item to null on the five starting rooms', () => {
   expect(board.upper.get(coordKey(0, 0)).item).toBeNull(); // room_upper_landing
   expect(board.basement.get(coordKey(0, 0)).item).toBeNull(); // room_basement_landing
 });
+
+test('placeNewRoom computes rotation from canonicalDoors and stores it on the placed room', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // 從 (5,5) 往 east 移動，新房間的入口方向（entrySide）是 west。
+  // 畫死的門在 south，south 轉 90 度（1 步）會落在 west，預期 rotation 是 90。
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'east', {
+    id: 'room_a',
+    doors: 1,
+    canonicalDoors: ['south'],
+  });
+  expect(placed.doorSides).toEqual(['west']);
+  expect(placed.rotation).toBe(90);
+});
+
+test('placeNewRoom defaults rotation to 0 when the room definition has no canonicalDoors', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const placed = placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'east', { id: 'room_a', doors: 4 });
+  expect(placed.rotation).toBe(0);
+});
+
+test('placeNewRoom throws ROTATION_NOT_FOUND when canonicalDoors cannot be reconciled with the real doorSides', () => {
+  const board = createBoard(STARTING_ROOMS);
+  expect(() =>
+    placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'east', {
+      id: 'room_a',
+      doors: 1,
+      canonicalDoors: ['north', 'south'], // 2 個方向，跟 doors:1 的真實 doorSides（1 個方向）數量不合
+    })
+  ).toThrow('ROTATION_NOT_FOUND');
+});
+
+test('placeRoomAt computes rotation from canonicalDoors and stores it on the placed room', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // guaranteedSide 直接指定 west，doors:1 -> 真實 doorSides 只有 west。
+  // 畫死的門在 south，south 轉 90 度會落在 west，預期 rotation 是 90。
+  const placed = placeRoomAt(
+    board,
+    'basement',
+    5,
+    5,
+    { id: 'room_fallen', doors: 1, canonicalDoors: ['south'] },
+    'west'
+  );
+  expect(placed.doorSides).toEqual(['west']);
+  expect(placed.rotation).toBe(90);
+});
+
+test('placeFixedRoom-placed starting rooms do not have a rotation field', () => {
+  const board = createBoard(STARTING_ROOMS);
+  const lobbyA = board.ground.get(coordKey(0, 1));
+  expect(lobbyA.rotation).toBeUndefined();
+});
