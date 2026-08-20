@@ -90,4 +90,27 @@ function computeDoorLayout(doorCount, entrySide, getNeighborRequirement, doorPat
   return new Set([entrySide]);
 }
 
-module.exports = { SIDES, OPPOSITE_SIDE, computeDoorLayout };
+// 把單一方向依順時針旋轉 steps 個 90 度（steps 0~3）。SIDES 本身就是順時針順序。
+function rotateSide(side, steps) {
+  return SIDES[(SIDES.indexOf(side) + steps) % 4];
+}
+
+// 找出讓 canonicalDoors（房間圖片畫死的門位置）旋轉幾次 90 度後，會等於這個房間實例
+// 真實的 doorSides。canonicalDoors 缺席時代表沒有旋轉資料，回傳 0（不旋轉）。四個角度
+// 都對不出來時代表資料填錯（例如數量不合、或跟 doorPattern 對不起來），直接拋錯，讓填錯
+// 的資料在測試/實際遊玩時就爆出來，不要悄悄用錯的角度顯示。
+function computeRotation(canonicalDoors, doorSides) {
+  if (!Array.isArray(canonicalDoors) || canonicalDoors.length === 0) {
+    return 0;
+  }
+  const target = new Set(doorSides);
+  for (let steps = 0; steps < 4; steps++) {
+    const rotated = new Set(canonicalDoors.map((side) => rotateSide(side, steps)));
+    if (rotated.size === target.size && [...rotated].every((side) => target.has(side))) {
+      return steps * 90;
+    }
+  }
+  throw new Error('ROTATION_NOT_FOUND');
+}
+
+module.exports = { SIDES, OPPOSITE_SIDE, computeDoorLayout, computeRotation };

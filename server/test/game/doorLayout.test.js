@@ -1,4 +1,4 @@
-const { SIDES, OPPOSITE_SIDE, computeDoorLayout } = require('../../src/game/doorLayout');
+const { SIDES, OPPOSITE_SIDE, computeDoorLayout, computeRotation } = require('../../src/game/doorLayout');
 
 function noNeighbors() {
   return () => null;
@@ -157,4 +157,32 @@ test('regression: exhaustively finds the single satisfiable layout every time (n
     const layout = computeDoorLayout(2, 'north', getNeighborRequirement);
     expect(layout).toEqual(new Set(['north', 'south']));
   }
+});
+
+test('computeRotation returns 0 for a doors:4 room (all four sides are doors either way)', () => {
+  const canonical = ['north', 'east', 'south', 'west'];
+  expect(computeRotation(canonical, new Set(['north', 'east', 'south', 'west']))).toBe(0);
+});
+
+test('computeRotation finds the rotation that aligns a single canonical door (doors:1)', () => {
+  // 畫死的門在 south；真實 doorSides 只有 east 有門。
+  // south 順時針轉 270 度（3 步）會落在 east，所以預期是 270。
+  expect(computeRotation(['south'], new Set(['east']))).toBe(270);
+});
+
+test('computeRotation finds the rotation for a doors:3 room (single wall side)', () => {
+  // 畫死的門在 north/south/east（牆在 west）；真實牆在 north（門在 east/south/west）。
+  const canonical = ['north', 'south', 'east'];
+  const real = new Set(['east', 'south', 'west']);
+  expect(computeRotation(canonical, real)).toBe(90);
+});
+
+test('computeRotation returns 0 when canonicalDoors is missing (test fixtures without the field)', () => {
+  expect(computeRotation(undefined, new Set(['north']))).toBe(0);
+  expect(computeRotation(null, new Set(['north']))).toBe(0);
+});
+
+test('computeRotation throws ROTATION_NOT_FOUND when no rotation can reconcile canonicalDoors with doorSides', () => {
+  // canonicalDoors 只有 1 個方向，doorSides 有 2 個——數量不合，永遠對不出來。
+  expect(() => computeRotation(['south'], new Set(['north', 'east']))).toThrow('ROTATION_NOT_FOUND');
 });
