@@ -318,13 +318,20 @@ test('placeNewRoom defaults rotation to 0 when the room definition has no canoni
   expect(placed.rotation).toBe(0);
 });
 
-test('placeNewRoom throws ROTATION_NOT_FOUND when canonicalDoors cannot be reconciled with the real doorSides', () => {
+test('placeNewRoom throws ROTATION_NOT_FOUND when canonicalDoors and doorSides have the same door count but no rotation reconciles their shapes', () => {
   const board = createBoard(STARTING_ROOMS);
+  // Entry side into the new room is west (opposite of 'east', the direction walked).
+  // doorPattern:'opposite' forces the only other door onto the side opposite west,
+  // i.e. east -- so the real doorSides is the opposite pair {west, east}. canonicalDoors
+  // is the adjacent pair ['north', 'east']: rotating an adjacent pair only ever produces
+  // another adjacent pair, never an opposite one, so no rotation can reconcile them --
+  // same door count (2) on both sides, genuinely unreconcilable shapes.
   expect(() =>
     placeNewRoom(board, 'ground', { x: 5, y: 5 }, 'east', {
       id: 'room_a',
-      doors: 1,
-      canonicalDoors: ['north', 'south'], // 2 個方向，跟 doors:1 的真實 doorSides（1 個方向）數量不合
+      doors: 2,
+      doorPattern: 'opposite',
+      canonicalDoors: ['north', 'east'],
     })
   ).toThrow('ROTATION_NOT_FOUND');
 });
@@ -343,6 +350,29 @@ test('placeRoomAt computes rotation from canonicalDoors and stores it on the pla
   );
   expect(placed.doorSides).toEqual(['west']);
   expect(placed.rotation).toBe(90);
+});
+
+test('placeRoomAt returns rotation 0 instead of throwing when computeDoorLayout\'s entry-only fallback shrinks the real door count below canonicalDoors', () => {
+  const board = createBoard(STARTING_ROOMS);
+  // Same conflict setup as "placeRoomAt respects existing neighbor door/wall
+  // requirements like placeNewRoom does" above: a single neighbor at (6,5) with
+  // no door facing back forces computeDoorLayout's doors:4 candidate combo (all
+  // three non-entry sides at once) to conflict, so it falls all the way back to
+  // entry-only -- real doorSides ends up as just ['south'] (guaranteedSide),
+  // even though the room definition declares doors:4 and canonicalDoors has 2
+  // entries. This is computeDoorLayout's own fallback, not a canonicalDoors data
+  // error, so computeRotation must return 0, not throw ROTATION_NOT_FOUND.
+  board.basement.set(coordKey(6, 5), { roomId: 'room_neighbor', x: 6, y: 5, doorSides: ['north'] });
+  const placed = placeRoomAt(
+    board,
+    'basement',
+    5,
+    5,
+    { id: 'room_fallen', doors: 4, canonicalDoors: ['north', 'east'] },
+    'south'
+  );
+  expect(placed.doorSides).toEqual(['south']);
+  expect(placed.rotation).toBe(0);
 });
 
 test('placeFixedRoom-placed starting rooms do not have a rotation field', () => {

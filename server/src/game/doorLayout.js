@@ -96,14 +96,26 @@ function rotateSide(side, steps) {
 }
 
 // 找出讓 canonicalDoors（房間圖片畫死的門位置）旋轉幾次 90 度後，會等於這個房間實例
-// 真實的 doorSides。canonicalDoors 缺席時代表沒有旋轉資料，回傳 0（不旋轉）。四個角度
-// 都對不出來時代表資料填錯（例如數量不合、或跟 doorPattern 對不起來），直接拋錯，讓填錯
-// 的資料在測試/實際遊玩時就爆出來，不要悄悄用錯的角度顯示。
+// 真實的 doorSides。canonicalDoors 缺席時代表沒有旋轉資料，回傳 0（不旋轉）。
+//
+// computeDoorLayout 有一條既有的、刻意設計的 fallback（見其函式內註解）：當所有候選門
+// 位置組合都跟已放置的鄰房衝突時，會放棄湊出宣告的門數，把房間強制退化成只剩入口那一
+// 扇門——這是引擎既有的合法行為，不是 canonicalDoors 資料填錯，此時 doorSides 的數量
+// 會比 canonicalDoors 少，直接回傳 0（不旋轉），不拋錯。已知限制（開發者已確認接受）：
+// 這種情況下房間美術圖仍會畫出原本宣告的門數，但只有入口方向的行動按鈕真的可以互動；
+// 玩家主要依賴方向按鈕辨認可走方向，不是靠美術圖數門，不需要額外處理。
+//
+// 門數相同、但四個角度都對不出真實 doorSides 的情況，才是真的資料填錯（例如
+// doors:2 opposite 的房間，canonicalDoors 卻填成相鄰的兩側），維持拋錯，讓填錯的資料
+// 在測試/實際遊玩時就爆出來，不要悄悄用錯的角度顯示。
 function computeRotation(canonicalDoors, doorSides) {
   if (!Array.isArray(canonicalDoors) || canonicalDoors.length === 0) {
     return 0;
   }
   const target = new Set(doorSides);
+  if (target.size !== canonicalDoors.length) {
+    return 0;
+  }
   for (let steps = 0; steps < 4; steps++) {
     const rotated = new Set(canonicalDoors.map((side) => rotateSide(side, steps)));
     if (rotated.size === target.size && [...rotated].every((side) => target.has(side))) {

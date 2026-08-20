@@ -1,4 +1,5 @@
 const { SIDES, OPPOSITE_SIDE, computeDoorLayout, computeRotation } = require('../../src/game/doorLayout');
+const { loadRooms } = require('../../src/game/contentLoader');
 
 function noNeighbors() {
   return () => null;
@@ -182,7 +183,34 @@ test('computeRotation returns 0 when canonicalDoors is missing (test fixtures wi
   expect(computeRotation(null, new Set(['north']))).toBe(0);
 });
 
-test('computeRotation throws ROTATION_NOT_FOUND when no rotation can reconcile canonicalDoors with doorSides', () => {
-  // canonicalDoors 只有 1 個方向，doorSides 有 2 個——數量不合，永遠對不出來。
-  expect(() => computeRotation(['south'], new Set(['north', 'east']))).toThrow('ROTATION_NOT_FOUND');
+test('computeRotation throws ROTATION_NOT_FOUND when canonicalDoors and doorSides have the same door count but no rotation reconciles their shapes', () => {
+  // Same door count (2) on both sides, but canonicalDoors is an "opposite" pair
+  // (north+south) and doorSides is an "adjacent" pair (north+east) -- rotating an
+  // opposite pair only ever produces another opposite pair (north+south or
+  // east+west), never an adjacent one, so no rotation can reconcile them. This is
+  // a genuine data error (e.g. a doors:2 "opposite" room whose canonicalDoors was
+  // mistakenly entered as two adjacent sides instead of two opposite sides).
+  expect(() => computeRotation(['north', 'south'], new Set(['north', 'east']))).toThrow('ROTATION_NOT_FOUND');
+});
+
+test('computeRotation returns 0 (not a throw) when canonicalDoors and doorSides differ in count -- this is computeDoorLayout\'s own entry-only fallback, not a canonicalDoors data error', () => {
+  expect(computeRotation(['north', 'east'], new Set(['north']))).toBe(0);
+  expect(computeRotation(['north', 'east', 'south'], new Set(['north']))).toBe(0);
+});
+
+test('regression: computeRotation never throws ROTATION_NOT_FOUND for any real room in data/rooms/rooms.json, from any entry side, when the door count is not shrunk by a neighbor-conflict fallback', () => {
+  // Exercises every room definition's actual canonicalDoors/doorPattern against
+  // computeDoorLayout's real (no-neighbor-conflict) output for every possible
+  // entry side, so a mis-authored canonicalDoors shape (e.g. a doors:2
+  // "opposite" room whose canonicalDoors was entered as two adjacent sides)
+  // would surface here instead of only at runtime.
+  const rooms = loadRooms();
+  const noNeighbors = () => null;
+  for (const room of rooms) {
+    if (!room.canonicalDoors) continue;
+    for (const entrySide of SIDES) {
+      const doorSides = computeDoorLayout(room.doors, entrySide, noNeighbors, room.doorPattern || null);
+      expect(() => computeRotation(room.canonicalDoors, doorSides)).not.toThrow();
+    }
+  }
 });
