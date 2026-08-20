@@ -1,6 +1,6 @@
 # 房間圖片旋轉機制 設計文件
 
-> **狀態：設計已核准，尚未實作。**
+> **狀態：已實作並合併進 `main`。**
 
 ## 背景與目標
 
@@ -36,7 +36,9 @@
 
 **`doors:4` 不需要特殊判斷**：`canonicalDoors` 是全部 4 側時，任何旋轉角度算出來的集合都相同，演算法在第一次嘗試（0°）就會吻合，自然得到 `rotation:0`，不需要另外寫 `if (doors === 4)` 的特殊分支。
 
-**找不到吻合角度時拋錯**：如果四個角度都比對不出來（`canonicalDoors` 資料填錯，例如跟 `doorPattern` 對不起來），拋出 `ROTATION_NOT_FOUND`，跟這個檔案既有的 `INVALID_DOOR_COUNT` 等錯誤風格一致。這樣資料填錯會在測試/實際遊玩時立刻爆出來，不會讓房間悄悄用錯的角度顯示卻沒人發現。
+**找不到吻合角度時，先分辨兩種情況（全分支審查後修正，見下方「已知限制」）**：`computeDoorLayout` 有一條既有的、刻意設計的 fallback——當所有候選門位置組合都跟已放置的鄰房衝突時，會放棄湊出宣告的門數，把房間強制退化成只剩入口那一扇門，不管這間房原本宣告幾扇門。這種情況下真實 `doorSides` 的數量會比 `canonicalDoors` 少，這是引擎既有的合法行為，不是資料填錯，`computeRotation` 回傳 `0`（不旋轉），不拋錯。只有**門數相同、但四個角度都對不出真實 `doorSides` 形狀**時，才是真的資料填錯（例如 `doors:2 opposite` 的房間，`canonicalDoors` 卻填成相鄰的兩側），這時才拋出 `ROTATION_NOT_FOUND`，跟這個檔案既有的 `INVALID_DOOR_COUNT` 等錯誤風格一致，讓真正填錯的資料在測試/實際遊玩時立刻爆出來。
+
+**已知限制（開發者已確認接受）**：房間因為上述 fallback 被退化成只剩入口一扇門時，房間美術圖仍會畫出原本宣告的門數（例如仍畫出 4 個門框），但只有入口方向的行動按鈕真的可以互動。玩家主要依賴方向按鈕辨認可走方向，不是靠美術圖數門，暫不處理這個視覺落差。「先判斷合理房型再抽房間卡」（讓抽卡結果從一開始就符合鄰房限制，減少甚至消除退化情況）列為新待辦，另外討論。
 
 **呼叫點**：`server/src/game/boardGenerator.js` 的 `placeNewRoom`／`placeRoomAt`（兩個用 `roomDefinition` 建立新房間實例的地方），算完 `doorSides` 後立刻呼叫 `computeRotation(roomDefinition.canonicalDoors, doorSides)`，結果存進 `placedRoom.rotation`，跟 `doorSides` 一樣是房間實例資料的一部分。`placeFixedRoom`（大門廳三格／二樓平台／地下平台，`doorSides` 是寫死的固定房間）維持不變，不產生 `rotation` 欄位，繼續固定角度顯示。
 
@@ -68,7 +70,7 @@ transform: translate(${pan.x}px, ${pan.y}px) scale(${zoom}) rotate(${rotation}de
 
 ## 目前進度
 - ✅ `canonicalDoors` 欄位格式定案並填完全部 52 間房間（含填值過程中修正的 `room_kitchen`／`room_gallery` 2 項資料缺口）
-- ✅ 旋轉角度計算演算法、伺服器端呼叫點、資料傳輸方式已定案
-- ✅ 前端 `RoomTile` 套用旋轉的做法（含跟縮放/拖動的疊加順序）已定案
+- ✅ 旋轉角度計算演算法、伺服器端呼叫點、資料傳輸方式已定案並實作完成
+- ✅ 前端 `RoomTile` 套用旋轉的做法（含跟縮放/拖動的疊加順序）已定案並實作完成，瀏覽器實測通過
 - ✅ 鄰房預覽帶範圍已確定排除，不套用旋轉
-- ⏳ 待轉入 `writing-plans`
+- ✅ **已完成並合併進 `main`**：走完整 `brainstorming`→`writing-plans`→`subagent-driven-development` 流程（3 任務＋全分支審查）。全分支審查抓到 1 個 Critical（`computeRotation` 跟 `computeDoorLayout` 既有的「退化成單門」fallback 衝突，會讓多數遊戲局中途拋錯），已修復並複審通過，見上方「已知限制」。509/509 測試全綠。
