@@ -73,6 +73,14 @@ test('resolveEffects grant_item adds the item to the player inventory', () => {
   expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_001' }]);
 });
 
+test('grant_item effect reports the granted item id in drawnCards', () => {
+  const gameState = makeGameStateWithPlayer();
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'grant_item', itemId: 'item_042' },
+  ]);
+  expect(result.drawnCards).toEqual([{ id: 'item_042' }]);
+});
+
 test('resolveEffects lose_item removes the item from the player inventory', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');

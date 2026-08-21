@@ -39,7 +39,7 @@ function handleStatChange(gameState, playerId, effect) {
 function handleGrantItem(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   addItem(player, { id: effect.itemId });
-  return { pending: false };
+  return { pending: false, drawnCards: [{ id: effect.itemId }] };
 }
 
 function handleLoseItem(gameState, playerId, effect) {

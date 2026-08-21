@@ -8,7 +8,13 @@ function startResolver(manager, roomCode) {
   if (manager.resolvers.has(roomCode)) {
     throw new Error('RESOLVER_ALREADY_STARTED');
   }
-  const entry = { promptState: createPromptState(), pendingChoice: null, pendingRollChoice: null };
+  const entry = {
+    promptState: createPromptState(),
+    pendingChoice: null,
+    pendingRollChoice: null,
+    pendingInventoryChoice: null,
+    inventoryChoiceTimeoutHandle: null,
+  };
   manager.resolvers.set(roomCode, entry);
   return entry;
 }
