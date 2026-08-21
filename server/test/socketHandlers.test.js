@@ -3823,3 +3823,40 @@ test('game:inventoryChoiceRespond opens a second round when still over the cap a
   clientB.close();
   httpServer.close();
 });
+
+test('a timed-out inventory choice auto-leaves the triggering item and does not affect the player\'s other items', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        { id: 'item_104', name: '道具四' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content, { inventoryChoiceTimeoutMs: 50 });
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' });
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  room.droppedItems.push({ id: 'item_104' });
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104', mode: 'pickup' }, resolve)
+  );
+  const resolved = await resolvedPromise;
+  expect(resolved.wasTimeout).toBe(true);
+  expect(resolved.chosenOptionId).toBe('item_104');
+
+  expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_101', 'item_102', 'item_103'].sort());
+  expect(room.droppedItems).toEqual([{ id: 'item_104' }]);
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+}, 5000);
