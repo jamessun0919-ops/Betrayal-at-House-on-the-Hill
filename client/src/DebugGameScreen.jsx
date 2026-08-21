@@ -502,12 +502,12 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               )}
               {pendingInventoryChoice && (
                 <div>
-                  <p>攜帶的道具已經超過上限（力量值），請選擇要遷留哪一件：</p>
+                  <p>攜帶的道具已經超過上限（力量值），請選擇要遺留哪一件：</p>
                   <ul>
                     {pendingInventoryChoice.itemIds.map((itemId) => (
                       <li key={itemId}>
                         {findCardName(itemId, cardContent)}
-                        <button onClick={() => handleInventoryChoiceRespond(itemId)}>遷留這件</button>
+                        <button onClick={() => handleInventoryChoiceRespond(itemId)}>遺留這件</button>
                       </li>
                     ))}
                   </ul>

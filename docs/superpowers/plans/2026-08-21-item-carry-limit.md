@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 玩家能攜帶的道具卡數量上限＝目前力量值；取得道具（不論透過哪一種路徑）後若超過上限，開啟一個「選擇遷留哪件道具」的暫停狀態，直到回到上限內為止。
+**Goal:** 玩家能攜帶的道具卡數量上限＝目前力量值；取得道具（不論透過哪一種路徑）後若超過上限，開啟一個「選擇遺留哪件道具」的暫停狀態，直到回到上限內為止。
 
 **Architecture:** 統一所有「道具進背包」路徑經過 `playerEntity.js` 的 `addItem()`；新增一個共用檢查函式 `openInventoryChoiceIfNeeded`，在每個取得道具的入口點之後呼叫；沿用既有的 `promptState.js` 通用暫停/回應/逾時機制（`createPrompt`/`respondToPrompt`/`resolvePromptTimeout`），新增一個平行的 `resolverEntry.pendingInventoryChoice` 欄位（不重用 `pendingChoice` 的資料結構），比照 `pendingChoice`/`pendingRollChoice` 現有的「room 進行中動作要被擋下」約定。
 
@@ -10,7 +10,7 @@
 
 **Design doc:** `docs/superpowers/specs/2026-08-21-item-carry-limit-design.md`（已核准）。本計畫在其基礎上加入兩項實作細節上的釐清（皆與開發者確認過，不牴觸已核准的設計）：
 
-1. **逾時預設目標的精確定義**：設計文件的 `triggeredByItemId` 在「一次取得多件道具、超過上限需連續詢問多輪」時，`triggeredByItemId` 每一輪都**重新計算**——固定從「這次操作新取得的道具 id 清單」（`newlyAcquiredItemIds`，依取得順序）由後往前找「目前仍持有」的第一件；如果這批新道具全部都已在前面幾輪被玩家手動選走，才 fallback 成「目前持有清單的第一件」。範例：一次抽到 item_A、item_B 兩張且都超過上限 → 第 1 輪逾時預設遷留 item_B（最後抽到的）→ 若還超過上限開第 2 輪 → 逾時預設遷留 item_A。
+1. **逾時預設目標的精確定義**：設計文件的 `triggeredByItemId` 在「一次取得多件道具、超過上限需連續詢問多輪」時，`triggeredByItemId` 每一輪都**重新計算**——固定從「這次操作新取得的道具 id 清單」（`newlyAcquiredItemIds`，依取得順序）由後往前找「目前仍持有」的第一件；如果這批新道具全部都已在前面幾輪被玩家手動選走，才 fallback 成「目前持有清單的第一件」。範例：一次抽到 item_A、item_B 兩張且都超過上限 → 第 1 輪逾時預設遺留 item_B（最後抽到的）→ 若還超過上限開第 2 輪 → 逾時預設遺留 item_A。
 2. **`pendingInventoryChoice` 資料結構補一個欄位** `newlyAcquiredItemIds`（設計文件原始草稿沒有寫出這個欄位，但要支援上一點的邏輯就需要它）：
 
 ```js
@@ -19,7 +19,7 @@
   playerId,
   itemIds: [...],              // 玩家目前持有的道具卡 id 清單（動態產生，不含預兆卡）
   newlyAcquiredItemIds: [...], // 這次操作新取得的道具 id 清單（依取得順序），逾時預設從這裡挑選，跨輪次不變
-  triggeredByItemId,           // 本輪逾時預設遷留的道具 id（每輪重新計算，見上）
+  triggeredByItemId,           // 本輪逾時預設遺留的道具 id（每輪重新計算，見上）
   deadline
 }
 ```
@@ -30,8 +30,8 @@
 
 - 上限計算：`getStatValue(player, 'might')`（`server/src/game/playerEntity.js` 既有函式，含 overflow）。
 - 只計算道具卡：`countHeldItems`／`openInventoryChoiceIfNeeded` 判斷「是否為道具卡」一律用 `cardContent.items.some((i) => i.id === held.id)`（`cardContent` 即伺服器端的 `content.cards`，形狀為 `{ items, events, omens }`），預兆卡（`cardContent.omens`）不計入。
-- 遷留道具**不扣行動力**：直接把道具從 `player.inventory` 移到當前房間的 `room.droppedItems`，不呼叫任何會扣 `actionPoints` 的既有函式。
-- 力量值下降**不**回溯觸發遷留選擇：`openInventoryChoiceIfNeeded` 只在明確呼叫時才檢查一次，沒有任何監聽力量值變動的程式碼。
+- 遺留道具**不扣行動力**：直接把道具從 `player.inventory` 移到當前房間的 `room.droppedItems`，不呼叫任何會扣 `actionPoints` 的既有函式。
+- 力量值下降**不**回溯觸發遺留選擇：`openInventoryChoiceIfNeeded` 只在明確呼叫時才檢查一次，沒有任何監聽力量值變動的程式碼。
 - 召喚物攜帶的道具（`player.summons.carryingItemId`）不受影響：`selectSummonAction` 完全不改動，本來就不經過 `player.inventory`／`addItem`。
 - 逾時預設時間沿用既有慣例：新增 `options.inventoryChoiceTimeoutMs`，預設 `20000`（比照 `rollChoiceTimeoutMs` 在 `registerSocketHandlers` 開頭的寫法）。
 - 未解決的 `pendingInventoryChoice` 要擋下 `game:move`／`game:selectAction`／`game:useStairs`／`game:endTurn` 這 4 個既有守衛點，回傳 `INVENTORY_CHOICE_IN_PROGRESS`，插入順序在既有的 `EFFECT_CHOICE_IN_PROGRESS`／`ROLL_CHOICE_IN_PROGRESS` 檢查之後。
@@ -402,7 +402,7 @@ function openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomC
   const prompt = createPrompt(resolverEntry.promptState, {
     type: 'inventory_choice',
     targetPlayerId: playerId,
-    description: '選擇要遷留哪一件道具',
+    description: '選擇要遺留哪一件道具',
     options: heldItemIds,
     timeoutMs: inventoryChoiceTimeoutMs,
     now: Date.now(),
@@ -516,7 +516,7 @@ git commit -m "feat: open pendingInventoryChoice when an effect-resolution path 
 
 **Interfaces:**
 - Consumes: Task 2 的 `openInventoryChoiceIfNeeded`／`applyInventoryLeave`／`hasPendingInventoryChoice`。
-- Produces: 完整可用的 `game:inventoryChoiceRespond` socket 事件（payload: `{ promptId, optionId }`，回應「要遷留哪一件道具」，`optionId` 是道具 id）。
+- Produces: 完整可用的 `game:inventoryChoiceRespond` socket 事件（payload: `{ promptId, optionId }`，回應「要遺留哪一件道具」，`optionId` 是道具 id）。
 
 - [ ] **Step 1: 寫「撿取道具超過上限」的失敗測試**
 
@@ -863,13 +863,13 @@ git commit -m "test: cover inventory choice timeout auto-leave"
 
 ---
 
-### Task 4: 前端「選擇遷留道具」彈窗（`DebugGameScreen.jsx`）
+### Task 4: 前端「選擇遺留道具」彈窗（`DebugGameScreen.jsx`）
 
 **Files:**
 - Modify: `client/src/DebugGameScreen.jsx`
 
 **Interfaces:**
-- Consumes: 新 socket 事件 `game:inventoryChoicePending`（payload: `{ playerId, promptId, itemIds }`）、`game:promptResolved`（既有事件，遷留動作完成或逾時都會收到）；既有的 `findCardName(id, cardContent)` 函式（檔案第 72 行）。
+- Consumes: 新 socket 事件 `game:inventoryChoicePending`（payload: `{ playerId, promptId, itemIds }`）、`game:promptResolved`（既有事件，遺留動作完成或逾時都會收到）；既有的 `findCardName(id, cardContent)` 函式（檔案第 72 行）。
 - Produces: 新 socket 事件送出 `game:inventoryChoiceRespond`（payload: `{ promptId, optionId }`）。
 
 - [ ] **Step 1: 加入 state 與事件監聽**
@@ -891,7 +891,7 @@ git commit -m "test: cover inventory choice timeout auto-leave"
     }
 ```
 
-改成（讓遷留選擇解決後，彈窗也會關閉——收到 `game:inventoryChoicePending` 才會重新開下一輪）：
+改成（讓遺留選擇解決後，彈窗也會關閉——收到 `game:inventoryChoicePending` 才會重新開下一輪）：
 
 ```js
     function onPromptResolved(data) {
@@ -952,12 +952,12 @@ git commit -m "test: cover inventory choice timeout auto-leave"
 ```jsx
               {pendingInventoryChoice && (
                 <div>
-                  <p>攜帶的道具已經超過上限（力量值），請選擇要遷留哪一件：</p>
+                  <p>攜帶的道具已經超過上限（力量值），請選擇要遺留哪一件：</p>
                   <ul>
                     {pendingInventoryChoice.itemIds.map((itemId) => (
                       <li key={itemId}>
                         {findCardName(itemId, cardContent)}
-                        <button onClick={() => handleInventoryChoiceRespond(itemId)}>遷留這件</button>
+                        <button onClick={() => handleInventoryChoiceRespond(itemId)}>遺留這件</button>
                       </li>
                     ))}
                   </ul>
@@ -1002,8 +1002,8 @@ git commit -m "feat: add inventory-choice modal to DebugGameScreen"
 - `pendingInventoryChoice` 新暫停狀態、逾時、四個守衛點 → Task 2。
 - 串接每個取得道具的入口點（`resolveEffects` 路徑 + 撿取/給予/搜索） → Task 2 Step 10、Task 3。
 - 一次取得多件依序詢問直到回到上限內 → Task 3（`openInventoryChoiceIfNeeded` 在 respond/timeout handler 內遞迴呼叫自己，Step 7 的第二個測試驗證）。
-- 逾時自動遷留剛取得的那一件（含多輪的精確定義，已與開發者確認） → Task 2 Step 8（`pickInventoryChoiceDefault`）、Task 3 Step 12。
-- 遷留不扣行動力 → Task 2/3 的 `applyInventoryLeave` 直接操作 inventory/droppedItems，不碰 `actionPoints`。
+- 逾時自動遺留剛取得的那一件（含多輪的精確定義，已與開發者確認） → Task 2 Step 8（`pickInventoryChoiceDefault`）、Task 3 Step 12。
+- 遺留不扣行動力 → Task 2/3 的 `applyInventoryLeave` 直接操作 inventory/droppedItems，不碰 `actionPoints`。
 - 力量值下降不回溯檢查 → 沒有新增任何監聽力量值變動的程式碼，Global Constraints 已明列。
 - 召喚物排除 → `selectSummonAction` 完全未改動。
 - 前端彈窗 → Task 4。

@@ -666,7 +666,7 @@ function openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomC
   const prompt = createPrompt(resolverEntry.promptState, {
     type: 'inventory_choice',
     targetPlayerId: playerId,
-    description: '選擇要遷留哪一件道具',
+    description: '選擇要遺留哪一件道具',
     options: heldItemIds,
     timeoutMs: inventoryChoiceTimeoutMs,
     now: Date.now(),
