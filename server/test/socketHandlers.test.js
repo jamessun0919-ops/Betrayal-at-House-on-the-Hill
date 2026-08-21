@@ -3684,3 +3684,39 @@ test('a roll choice that times out resolves with no item used (default skip)', a
   clientB.close();
   httpServer.close();
 }, 2000);
+
+test('picking up a dropped item that pushes the player over the cap opens a pendingInventoryChoice', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        { id: 'item_104', name: '道具四' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' });
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  room.droppedItems.push({ id: 'item_104' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104', mode: 'pickup' }, resolve)
+  );
+  expect(ack.error).toBeUndefined();
+  const pending = await pendingPromise;
+  expect(pending.playerId).toBe(currentPlayerId);
+
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_104');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

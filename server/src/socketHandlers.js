@@ -318,6 +318,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             if (searchOutcome.found) {
               addItem(currentPlayer, { id: searchOutcome.card.id });
               io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: searchOutcome.card.id, cardName: searchOutcome.card.name, hasCheck: false });
+              openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, [searchOutcome.card.id], inventoryChoiceTimeoutMs);
             } else {
               io.to(roomCode).emit('game:searchEmpty', { playerId, roomId: placedRoom.roomId });
             }
@@ -328,6 +329,14 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 
         const result = selectAction(gameState, playerId, actionType, selectOptions);
         ack(result);
+
+        if (result.kind === 'item' && result.mode === 'give') {
+          openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, result.targetPlayerId, content.cards, [result.itemId], inventoryChoiceTimeoutMs);
+          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+        } else if (result.kind === 'item' && result.mode === 'pickup') {
+          openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, [result.itemId], inventoryChoiceTimeoutMs);
+          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+        }
 
         if (sourceEffects) {
           try {
