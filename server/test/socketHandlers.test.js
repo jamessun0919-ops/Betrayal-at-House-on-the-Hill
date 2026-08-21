@@ -3537,6 +3537,89 @@ test('game:diceChoiceRespond rejects when there is no active roll choice', async
   httpServer.close();
 });
 
+test('a grant_item effect that pushes the player over the item cap opens a pendingInventoryChoice and blocks game:endTurn', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        {
+          id: 'item_104',
+          name: '會送人道具的卡',
+          category: 'consumable',
+          effects: [{ type: 'grant_item', itemId: 'item_999' }],
+        },
+        { id: 'item_999', name: '第四件道具' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' }, { id: 'item_104' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104' }, resolve)
+  );
+  expect(ack.error).toBeUndefined();
+  const pending = await pendingPromise;
+  expect(pending.playerId).toBe(currentPlayerId);
+  expect(pending.itemIds.sort()).toEqual(['item_101', 'item_102', 'item_103', 'item_999'].sort());
+
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingInventoryChoice).not.toBeNull();
+  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_999');
+
+  const blocked = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(blocked.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('holding exactly the cap does not open a pendingInventoryChoice', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        {
+          id: 'item_104',
+          name: '會送人道具的卡',
+          category: 'consumable',
+          effects: [{ type: 'grant_item', itemId: 'item_999' }],
+        },
+        { id: 'item_999', name: '第三件道具' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_104' });
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104' }, resolve)
+  );
+  expect(ack.error).toBeUndefined();
+  await resolvedPromise;
+
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingInventoryChoice).toBeNull(); // 剛好等於上限（might=3），不觸發
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('a pending roll choice blocks game:move/game:selectAction/game:endTurn/game:useStairs with ROLL_CHOICE_IN_PROGRESS', async () => {
   const content = makeDiceInterjectionContent();
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
