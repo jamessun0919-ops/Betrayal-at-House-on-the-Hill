@@ -3720,3 +3720,106 @@ test('picking up a dropped item that pushes the player over the cap opens a pend
   clientB.close();
   httpServer.close();
 });
+
+test('game:inventoryChoiceRespond leaves the chosen item in the room and clears the pending state', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        { id: 'item_104', name: '道具四' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' });
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  room.droppedItems.push({ id: 'item_104' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104', mode: 'pickup' }, resolve)
+  );
+  const pending = await pendingPromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  const respondAck = await new Promise((resolve) =>
+    currentClient.emit('game:inventoryChoiceRespond', { promptId: pending.promptId, optionId: 'item_101' }, resolve)
+  );
+  expect(respondAck.error).toBeUndefined();
+  await resolvedPromise;
+
+  expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_102', 'item_103', 'item_104'].sort());
+  expect(room.droppedItems).toEqual([{ id: 'item_101' }]);
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+
+  // 已經解決，接下來的動作不應該再被擋
+  const endTurnAck = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endTurnAck.error).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:inventoryChoiceRespond opens a second round when still over the cap after leaving one item', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        {
+          id: 'item_201',
+          name: '一次抽兩張的卡',
+          effects: [{ type: 'draw_card', deck: 'item', count: 2 }],
+          category: 'consumable',
+        },
+        { id: 'item_301', name: '被抽到的道具A' },
+        { id: 'item_302', name: '被抽到的道具B' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' }, { id: 'item_201' });
+  gameState.itemDeck.cards = [{ id: 'item_301', name: '被抽到的道具A' }, { id: 'item_302', name: '被抽到的道具B' }];
+
+  const firstPendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_201' }, resolve)
+  );
+  const firstPending = await firstPendingPromise;
+  // might 上限 3、目前持有 5 件（101/102/103/301/302）-> 觸發，逾時預設會是 item_302（最後抽到的）
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.triggeredByItemId).toBe('item_302');
+
+  const secondPendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:inventoryChoiceRespond', { promptId: firstPending.promptId, optionId: 'item_101' }, resolve)
+  );
+  const secondPending = await secondPendingPromise;
+  // 還是超過上限(4件) -> 開第二輪，這次逾時預設沿用 newlyAcquiredItemIds 找仍持有的最後一件 -> 還是 item_302（還沒被選走）
+  expect(secondPending.itemIds.sort()).toEqual(['item_102', 'item_103', 'item_301', 'item_302'].sort());
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.triggeredByItemId).toBe('item_302');
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:inventoryChoiceRespond', { promptId: secondPending.promptId, optionId: 'item_302' }, resolve)
+  );
+  await resolvedPromise;
+
+  expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_102', 'item_103', 'item_301'].sort());
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

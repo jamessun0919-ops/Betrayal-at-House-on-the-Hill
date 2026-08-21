@@ -520,6 +520,40 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
+    socket.on('game:inventoryChoiceRespond', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        const resolverEntry = getResolver(effectResolverManager, roomCode);
+        if (!resolverEntry || !resolverEntry.pendingInventoryChoice) {
+          return ack({ error: 'NO_ACTIVE_INVENTORY_CHOICE' });
+        }
+        const { promptId, optionId } = payload || {};
+        const { playerId: choicePlayerId, newlyAcquiredItemIds } = resolverEntry.pendingInventoryChoice;
+        const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
+        if (resolverEntry.inventoryChoiceTimeoutHandle) {
+          clearTimeout(resolverEntry.inventoryChoiceTimeoutHandle);
+          resolverEntry.inventoryChoiceTimeoutHandle = null;
+        }
+        resolverEntry.pendingInventoryChoice = null;
+        applyInventoryLeave(gameState, choicePlayerId, result.chosenOptionId);
+        io.to(roomCode).emit('game:promptResolved', result);
+        openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, choicePlayerId, content.cards, newlyAcquiredItemIds, inventoryChoiceTimeoutMs);
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+        ack({});
+      } catch (err) {
+        console.error('game:inventoryChoiceRespond error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
     socket.on('lobby:leave', async (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};
       const { roomCode, playerId } = socket.data;
