@@ -2,7 +2,7 @@ const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA, isDoorLayoutFeasible } = require('./boardGenerator');
 const { drawRoom, drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
-const { movePlayerTo, resetActionPoints, getStatValue, changeStat } = require('./playerEntity');
+const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
 
@@ -435,7 +435,7 @@ function giveItemAction(gameState, player, itemId, targetPlayerId) {
     throw new Error('TARGET_NOT_IN_ROOM');
   }
   const [item] = player.inventory.splice(index, 1);
-  targetPlayer.inventory.push(item);
+  addItem(targetPlayer, item);
   player.actionPoints -= 1;
   return { kind: 'item', mode: 'give', itemId, targetPlayerId };
 }
@@ -459,7 +459,7 @@ function pickupItemAction(gameState, player, itemId) {
     throw new Error('ITEM_NOT_IN_ROOM');
   }
   const [item] = room.droppedItems.splice(index, 1);
-  player.inventory.push(item);
+  addItem(player, item);
   player.actionPoints -= 1;
   return { kind: 'item', mode: 'pickup', itemId };
 }
