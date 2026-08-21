@@ -1,4 +1,4 @@
-const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem } = require('../../src/game/playerEntity');
+const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem, countHeldItems } = require('../../src/game/playerEntity');
 
 function makeStats() {
   return {
@@ -287,4 +287,22 @@ test('removeItem removes and returns the matching item', () => {
 test('removeItem throws ITEM_NOT_FOUND when no inventory item matches', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   expect(() => removeItem(player, 'not_held')).toThrow('ITEM_NOT_FOUND');
+});
+
+test('countHeldItems counts only ids that appear in cardContent.items, not omens', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_001' });
+  addItem(player, { id: 'omen_003' });
+  addItem(player, { id: 'item_007' });
+  const cardContent = {
+    items: [{ id: 'item_001' }, { id: 'item_007' }, { id: 'item_099' }],
+    omens: [{ id: 'omen_003' }],
+  };
+  expect(countHeldItems(player, cardContent)).toBe(2);
+});
+
+test('countHeldItems returns 0 for an empty inventory', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  const cardContent = { items: [{ id: 'item_001' }], omens: [] };
+  expect(countHeldItems(player, cardContent)).toBe(0);
 });
