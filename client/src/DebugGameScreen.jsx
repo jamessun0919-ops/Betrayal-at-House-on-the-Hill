@@ -3,7 +3,7 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import CheckModal from './gameplay/CheckModal';
-import { getAvailableDirections, findRoomInfo, findCardInfo, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
+import { getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
 function findPlayerName(playerId, players) {
@@ -82,6 +82,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   const [overviewFloor, setOverviewFloor] = useState('ground');
   const [pendingEffectChoice, setPendingEffectChoice] = useState(null);
   const [pendingRollChoice, setPendingRollChoice] = useState(null);
+  const [pendingInventoryChoice, setPendingInventoryChoice] = useState(null);
   const [showRoomActionMenu, setShowRoomActionMenu] = useState(false);
   const [pendingCheckQueue, setPendingCheckQueue] = useState([]);
   // Monotonic id generator for pendingCheckQueue items -- CheckModal keys off
@@ -100,6 +101,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setMessages((prev) => [...prev, `提問結果：${JSON.stringify(data)}`]);
       setPrompt(null);
       setPendingRollChoice(null);
+      setPendingInventoryChoice(null);
     }
     function onCharacterSelectUpdate(data) {
       setCharacterSelectState(data);
@@ -160,6 +162,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     function onDiceChoicePending(data) {
       setPendingRollChoice(data);
     }
+    function onInventoryChoicePending(data) {
+      setPendingInventoryChoice(data);
+    }
 
     socket.on('game:prompt', onPrompt);
     socket.on('game:promptResolved', onPromptResolved);
@@ -171,6 +176,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.on('game:effectPendingChoice', onEffectPendingChoice);
     socket.on('game:effectResolved', onEffectResolved);
     socket.on('game:diceChoicePending', onDiceChoicePending);
+    socket.on('game:inventoryChoicePending', onInventoryChoicePending);
     socket.on('game:checkResolved', onCheckResolved);
     socket.on('game:roomEntered', onRoomEntered);
     socket.on('game:searchEmpty', onSearchEmpty);
@@ -186,6 +192,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       socket.off('game:effectPendingChoice', onEffectPendingChoice);
       socket.off('game:effectResolved', onEffectResolved);
       socket.off('game:diceChoicePending', onDiceChoicePending);
+      socket.off('game:inventoryChoicePending', onInventoryChoicePending);
       socket.off('game:checkResolved', onCheckResolved);
       socket.off('game:roomEntered', onRoomEntered);
       socket.off('game:searchEmpty', onSearchEmpty);
@@ -252,6 +259,16 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.emit('game:diceChoiceRespond', { promptId: pendingRollChoice.promptId, optionId, overrideValue }, (res) => {
       if (res && res.error) {
         console.error('[game:diceChoiceRespond]', res.error);
+        setActionError(res.error);
+      }
+    });
+  }
+
+  function handleInventoryChoiceRespond(itemId) {
+    if (!pendingInventoryChoice) return;
+    socket.emit('game:inventoryChoiceRespond', { promptId: pendingInventoryChoice.promptId, optionId: itemId }, (res) => {
+      if (res && res.error) {
+        console.error('[game:inventoryChoiceRespond]', res.error);
         setActionError(res.error);
       }
     });
@@ -424,7 +441,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               </div>
             </div>
           )}
-          {(pendingEffectChoice || pendingRollChoice) && (
+          {(pendingEffectChoice || pendingRollChoice || pendingInventoryChoice) && (
             <div
               style={{
                 position: 'fixed',
@@ -480,6 +497,19 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                     ))}
                   </ul>
                   <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
+                </div>
+              )}
+              {pendingInventoryChoice && (
+                <div>
+                  <p>攜帶的道具已經超過上限（力量值），請選擇要遷留哪一件：</p>
+                  <ul>
+                    {pendingInventoryChoice.itemIds.map((itemId) => (
+                      <li key={itemId}>
+                        {findCardName(itemId, cardContent)}
+                        <button onClick={() => handleInventoryChoiceRespond(itemId)}>遷留這件</button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               )}
               </div>

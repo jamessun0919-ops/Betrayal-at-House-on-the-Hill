@@ -63,6 +63,11 @@ function findCardInfo(cardId, cardContent) {
   );
 }
 
+function findCardName(cardId, cardContent) {
+  const card = findCardInfo(cardId, cardContent);
+  return card ? card.name : cardId;
+}
+
 // 跟伺服器 socketHandlers.js 的 getRoomActions 同一套邏輯，前端自己重算一份
 // （不新增 socket 事件）。roomDefinition 來自 roomContent（一次性靜態資料），
 // placedRoom 是 gameState.board[floor] 裡目前房間的實體（含 collapseLink）。
@@ -78,4 +83,4 @@ function getRoomActions(roomDefinition, placedRoom) {
   });
 }
 
-export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo, getRoomActions };
+export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions };
