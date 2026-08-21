@@ -163,6 +163,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setPendingRollChoice(data);
     }
     function onInventoryChoicePending(data) {
+      if (data.playerId !== playerId) return;
       setPendingInventoryChoice(data);
     }
 

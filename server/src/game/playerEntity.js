@@ -140,10 +140,6 @@ function removeItem(player, itemId) {
   return player.inventory.splice(index, 1)[0];
 }
 
-function countHeldItems(player, cardContent) {
-  return player.inventory.filter((held) => cardContent.items.some((i) => i.id === held.id)).length;
-}
-
 module.exports = {
   STATS,
   createPlayer,
@@ -154,5 +150,4 @@ module.exports = {
   isBelowBase,
   addItem,
   removeItem,
-  countHeldItems,
 };

@@ -3644,6 +3644,51 @@ test('a pending roll choice blocks game:move/game:selectAction/game:endTurn/game
   httpServer.close();
 }, 3000);
 
+test('a pending inventory choice blocks game:move/game:selectAction/game:endTurn/game:useStairs with INVENTORY_CHOICE_IN_PROGRESS', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        {
+          id: 'item_104',
+          name: '會送人道具的卡',
+          category: 'consumable',
+          effects: [{ type: 'grant_item', itemId: 'item_999' }],
+        },
+        { id: 'item_999', name: '第四件道具' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' }, { id: 'item_104' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104' }, resolve)
+  );
+  expect(ack.error).toBeUndefined();
+  await pendingPromise;
+
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(moveResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+  const selectActionResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'attack' }, resolve));
+  expect(selectActionResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+  const useStairsResult = await new Promise((resolve) => currentClient.emit('game:useStairs', {}, resolve));
+  expect(useStairsResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+  const endTurnResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  expect(endTurnResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('a roll choice that times out resolves with no item used (default skip)', async () => {
   const content = makeContent({
     cards: {

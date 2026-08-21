@@ -20,7 +20,7 @@ const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
-const { addItem, removeItem, getStatValue, countHeldItems } = require('./game/playerEntity');
+const { addItem, removeItem, getStatValue } = require('./game/playerEntity');
 const { checkRemoveConditions } = require('./game/modifiers');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
@@ -332,10 +332,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 
         if (result.kind === 'item' && result.mode === 'give') {
           openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, result.targetPlayerId, content.cards, [result.itemId], inventoryChoiceTimeoutMs);
-          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
         } else if (result.kind === 'item' && result.mode === 'pickup') {
           openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, [result.itemId], inventoryChoiceTimeoutMs);
-          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
         }
 
         if (sourceEffects) {
@@ -941,6 +939,9 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     // room entry today, but the function stays correct for any future/other
     // caller that draws from the item deck this way.
     addItem(getPlayer(gameState, playerId), { id: card.id });
+    if (deckType === 'item') {
+      openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, [card.id], inventoryChoiceTimeoutMs);
+    }
   }
 
   if (deckType === 'omen' && !gameState.hauntStarted) {
