@@ -1,7 +1,21 @@
 [
-  { "id": "omen_001", "name": "噬咬", "text": "這是一個針對玩家的4點力量襲擊，由前一位玩家代擲四粒骰子。若玩家勝出這比拚，此卡無效果。否則玩家如常受到肉體損傷。此卡牌非物品，無法被偷竊或轉交、丟棄。保留此卡以便計算已翻開的邪祟牌數目", "effects": [], "category": "general", "needsCustomLogic": true },
-  { "id": "omen_002", "name": "書", "text": "玩家的知識上升兩個級別，如果玩家失去書本，知識下降兩個級別", "effects": [{ "type": "stat_change", "stat": "knowledge", "delta": 2 }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_003", "name": "水晶球", "text": "當玩家使用水晶球時以知識進行考驗，骰數大於等於四，玩家可以從三張隨機事件卡中選擇一張，重新洗牌後將選擇的牌放置於牌堆頂端。骰數１至３：玩家頭昏眼花，意志下降一個級別；骰數０：玩家見到了地獄般的景象，意志下降２級別", "effects": [{
+  { "id": "omen_001", "name": "利爪", 
+    "description":"一進房間，你就見到一頭披著細密羽毛、長尾如鞭的遠古獵食者突然從陰影中竄出。牠壓低身軀，以後肢迅速逼近，彎曲利爪在地板上刮出刺耳聲響。就在血盆大口撲向你的剎那，牠卻化作一縷黑霧消散無蹤。在幻象消失的地方，你撿到了「利爪」",
+    "text": "這是一個針對玩家的4點力量襲擊。若玩家通過考驗，則不受到傷害，否則玩家依照襲擊規則受到肉體損傷。持有「利爪」時，玩家的速度和力量上升一個級別．失去「利爪」，速度和力量下降一個級別。可被偷竊、給予，不可遺留", 
+    "effects": [], 
+    "category": "general", 
+    "needsCustomLogic": true 
+},
+  { "id": "omen_002", "name": "古書",
+    "description":"踏入房間後，一名白髮蒼蒼的巫師悄然浮現在眼前，肩頭停著一隻沉靜的貓頭鷹。他舉起法杖低聲吟誦，點點光芒隨即在空中盤旋，凝聚成神祕符文。貓頭鷹忽然轉頭凝視著你，巫師也停下咒語，彷彿早已察覺你的存在。在幻象消失的地方，你撿到了「古書」",
+    "text": "持有「古書」時，玩家的知識上升兩個級別，如果玩家失去「古書」，知識下降兩個級別，可被偷竊、給予，不可遺留", 
+    "effects": [{ "type": "stat_change", "stat": "knowledge", "delta": 2 }], 
+    "category": "general", 
+    "needsCustomLogic": false 
+},
+  { "id": "omen_003", "name": "塔羅牌", 
+    "description":"占卜師翻開數張塔羅牌，牌面依序映出烈火、墜落與死亡。下一刻，牌中的景象竟在她身後逐一發生，而最後一張尚未翻開的牌，正緩緩自行轉向正面。在幻象消失的地方，你撿到了「塔羅牌」",
+    "text": "當玩家使用「塔羅牌」時以知識進行考驗，骰數大於等於四，玩家可以從三張隨機事件卡中選擇一張，重新洗牌後將選擇的牌放置於牌堆頂端。骰數１至３：玩家頭昏眼花，意志下降一個級別；骰數０：玩家見到了地獄般的景象，意志下降２級別，可被偷竊、給予，不可遺留", "effects": [{
     "type": "dice_check",
     "stat": "knowledge",
     "tiers": [
@@ -9,12 +23,42 @@
       { "min": 1, "max": 3, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] },
       { "min": 0, "max": 0, "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -2 }] }
     ]
-  }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
-  { "id": "omen_004", "name": "犬靈", "text": "玩家的力量及意志上升一個級別，如果失去犬靈的追隨，玩家的意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取物品，犬靈不可被丟棄、竊盜或轉交", "effects": [{ "type": "switch_control", "summonType": "spiritDog", "actionPoints": 6 }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
-  { "id": "omen_005", "name": "女孩", "text": "玩家的意志和知識上升一個級別．如果失去女孩的追隨，知識和意志下降一個級別。不可被偷竊、丟棄和轉交", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_006", "name": "聖符", "text": "玩家的意志上升兩個級別，若玩家失去聖符，玩家的意志下降兩個級別", "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 2 }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_007", "name": "瘋漢", "text": "瘋漢跟隨著玩家，力量上升兩個級別，意志下降兩個級別。若失去瘋漢追隨，力量下降兩個級別，意志上升兩個級別。不可被偷竊、丟棄及轉交", "effects": [{ "type": "stat_change", "stat": "might", "delta": 2 }, { "type": "stat_change", "stat": "sanity", "delta": -2 }], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_008", "name": "面具", "text": "當玩家使用面具時以意志進行考驗，骰數大於等於四：可以啟動面具效果。生效狀態：知識上升兩個級別，意志下降兩個級別。骰數０～３：狀態不改變", "effects": [{
+  }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false 
+},
+  { "id": "omen_004", "name": "木雕",
+    "description":"踏入房間後，眼前忽然浮現昔日的溫馨景象。一名孩童笑著將木棍拋向遠處，獵犬興奮地追趕，叼回後又繞著主人不停搖尾。清脆笑聲迴盪在房間裡；然而木棍再次落地時，孩童與獵犬卻一同消失，只剩一個獵犬木雕靜靜躺在地上。在幻象消失的地方，你撿到了「木雕」",
+    "text": "持有「木雕」時，玩家的力量及意志上升一個級別，如果失去「木雕」，意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取或遺留物品，可被偷竊、給予，不可遺留", 
+    "effects": [{ "type": "switch_control", 
+    "summonType": "spiritDog", "actionPoints": 6 }], 
+    "activatedOnUse": true, 
+    "category": "general", 
+    "needsCustomLogic": false 
+  },
+  { "id": "omen_005", "name": "鬼牌", 
+    "description":"踏入房間後，一幅景象逐漸浮現。魔術師彈射出撲克牌，飛舞的紙牌在半空中忽而化作白鴿振翅而過，忽而變成兔子躍入另一人手中。時而從指尖高速彈出，時而在手背與桌緣間靈巧彈跳，又旋轉著飛向下一人。撲克牌始終不曾落地，在半空劃出一道道令人眼花撩亂的軌跡。在幻象消失的地方，你撿到了「鬼牌」",
+    "text": "持有「鬼牌」時，玩家的速度和知識上升一個級別．如果失去「鬼牌」，速度和知識下降一個級別。可被偷竊、給予，不可遺留", 
+    "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }], 
+    "category": "general", 
+    "needsCustomLogic": false 
+  },
+  { "id": "omen_006", "name": "陀螺",
+    "description":"踏入房間後，幻象如夢境般接連變換：旅館走廊突然失去重力，人影在牆壁與天花板翻滾打鬥；繁華街道上，一列火車毫無預兆地疾馳而過；轉眼又化為雪地中的激烈槍戰。所有景象驟然消失，最後只剩一枚陀螺，在桌面上不停旋轉。在幻象消失的地方，你撿到了「陀螺」",
+    "text": "持有「陀螺」時，玩家的意志上升兩個級別，若玩家失去「聖符」，玩家的意志下降兩個級別，可被偷竊、給予，不可遺留", 
+    "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 2 }], 
+    "category": "general", 
+    "needsCustomLogic": false 
+  },
+  { "id": "omen_007", "name": "藥劑",
+    "description":"踏入房間後，一幅景象逐漸浮現。一名男子在極度憤怒中逐漸失去理智，肌肉異常膨脹，身軀暴增成巨大的綠色怪物。他發出震耳欲聾的咆哮，憑藉暴增的蠻力砸碎牆壁與地面，將周遭一切障礙摧毀殆盡。",
+    "text": "持有「藥劑」時，玩家力量上升兩個級別，意志下降兩個級別。若失去「藥劑」，力量下降兩個級別，意志上升兩個級別。可被偷竊、給予，不可遺留", 
+    "effects": [{ "type": "stat_change", "stat": "might", "delta": 2 }, { "type": "stat_change", "stat": "sanity", "delta": -2 }], 
+    "category": "general", 
+    "needsCustomLogic": false 
+  },
+  { "id": "omen_008", "name": "面具", 
+    "description":"踏入房間後，一幅景象逐漸浮現。一名平凡男子拾起古老的木製面具，好奇地將它覆上臉龐。面具瞬間緊貼皮膚，整個人瘋狂旋轉變形；再次現身時，他已化為綠色面孔的怪人，舉手投足都能扭曲現實。在幻象消失的地方，你撿到了「面具」",
+    "text": "持有「面具」時，玩家速度上升兩個級別，知識下降兩個級別。若失去「面具」，速度下降兩個級別，知識上升兩個級別。可被偷竊、給予，不可遺留", 
+    "effects": [{
     "type": "dice_check",
     "stat": "sanity",
     "tiers": [
@@ -26,10 +70,44 @@
       }] },
       { "min": 0, "max": 3, "effects": [] }
     ]
-  }], "activatedOnUse": true, "category": "general", "needsCustomLogic": false },
-  { "id": "omen_009", "name": "徽章", "text": "玩家不受五芒星堂、地窖及墓園的影響，通過上述三個房間時不需要進行考驗", "effects": [], "category": "general", "needsCustomLogic": false },
-  { "id": "omen_010", "name": "戒指", "text": "玩家在自身的回合可以選擇以意志進行襲擊，如果襲擊成功，敵方受到精神損傷而非肉體損傷，對於無意志的目標無法使用", "effects": [], "category": "weapon", "needsCustomLogic": true },
-  { "id": "omen_011", "name": "頭骨", "text": "當玩家受到精神損傷時，可以選擇改受肉體損傷", "effects": [], "category": "general", "needsCustomLogic": true },
-  { "id": "omen_012", "name": "長矛", "text": "玩家的回合中選擇以力量進行襲擊時，可多骰兩顆骰子，最多不超過八顆", "effects": [], "category": "weapon", "needsCustomLogic": true },
-  { "id": "omen_013", "name": "通靈板", "text": "在玩家移動前，可以檢視房間牌堆最頂上一塊，看過後可以選擇放回頂端或底部。如果遊戲已經進入邪祟階段，在玩家使用此物品後，叛徒可以控制任意數量怪物朝玩家前進一步，如無叛徒，所以怪物必須朝玩家移動一步", "effects": [], "category": "general", "needsCustomLogic": true }
+  }], 
+    "activatedOnUse": true, 
+    "category": "general", 
+    "needsCustomLogic": false 
+},
+  { "id": "omen_009", "name": "香菸", 
+    "description":"手持散彈槍的獵人穿行於烈焰翻騰的煉獄，四周惡魔環伺。一頭惡魔猛然伸手貫入他的胸膛，扯出被肺癌侵蝕的漆黑肺臟；瀕死的獵人倒下後竟重新站起，彷彿獲得了第二次生命。在幻象消失的地方，你撿到了「香菸」",
+    "text": "玩家不受五芒星堂、地窖及墓園的影響，通過上述三個房間時不需要進行考驗，可被偷竊、給予，不可遺留", 
+    "effects": [], "category": 
+    "general", 
+    "needsCustomLogic": false 
+  },
+  { "id": "omen_010", "name": "戒指", 
+    "description":"踏入房間後，幻象化作一片陰沉荒原。遠方漆黑尖塔頂端，一隻燃燒般的巨大獨眼俯瞰大地；近處，一名骨瘦如柴的矮小怪人緊握著戒指，興奮地蹦跳歡呼。當巨眼猛然轉向你時，怪人也瞬間安靜，將戒指死死藏進懷中。在幻象消失的地方，你撿到了「戒指」",
+    "text": "玩家在自身的回合可以選擇以意志進行襲擊，如果襲擊成功，目標受到精神損傷而非肉體損傷，對於無意志的目標無法使用，可被偷竊、給予，不可遺留", 
+    "effects": [], 
+    "category": "weapon", 
+    "needsCustomLogic": true 
+  },
+  { "id": "omen_011", "name": "頭骨",  
+    "description":"踏入房間後，四周忽然化作幽暗潮濕的洞穴。一名風塵僕僕的冒險家撥開碎石，在古老石臺上發現一顆晶瑩剔透的水晶頭骨。他驚喜地伸手將它捧起，幽光隨即照亮洞壁；下一瞬間，頭骨空洞的眼窩竟自行亮起詭異光芒。在幻象消失的地方，你撿到了「頭骨」",
+    "text": "當玩家受到肉體損傷時，可以選擇改受精神損傷，可被偷竊、給予，不可遺留",
+    "effects": [], 
+    "category": "gear", 
+    "needsCustomLogic": true 
+  },
+  { "id": "omen_012", "name": "長矛", 
+    "description":"踏入房間後，眼前浮現一片陰沉荒涼的刑場。一名傷痕累累的男子被釘在高聳的十字架上，四周人群沉默注視。一名士兵走上前，以長矛刺向他的身側確認生死。天空彷彿隨之黯淡，幻象也在死寂中逐漸消散。在幻象消失的地方，你撿到了「長矛」",
+    "text": "玩家的回合中選擇以力量進行襲擊時，可多骰兩顆骰子，最多不超過八顆，可被偷竊、給予，不可遺留", 
+    "effects": [], 
+    "category": "weapon", 
+    "needsCustomLogic": true 
+  },
+  { "id": "omen_013", "name": "金幣", 
+    "description":"踏入房間後，眼前浮現一艘航行於月夜下的古老海盜船。皎潔月光灑過甲板，船員被照亮的身軀竟化作森森白骨，藏在陰影中的肢體卻仍維持血肉之軀。他們若無其事地繼續工作，隨著船身搖晃，在人形與骷髏之間詭異交錯。在幻象消失的地方，你撿到了「金幣」",
+    "text": "玩家在自身的回合可以選擇以意志進行襲擊，如果襲擊成功，目標受到精神損傷而非肉體損傷，對於無意志的目標無法使用，可被偷竊、給予，不可遺留", 
+    "effects": [], 
+    "category": "general", 
+    "needsCustomLogic": true
+  }
 ]

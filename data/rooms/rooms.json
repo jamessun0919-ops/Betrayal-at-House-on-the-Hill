@@ -33,10 +33,10 @@
     "filename": "room_research_lab.webp",
     "canonicalDoors": ["south", "east"],
     "drawType": "event",
-    "text": "",
+    "text": "可在此房間進行調配藥劑行動，玩家身上持有木炭item_029與不明粉末item_030時，可以合成黑色火藥item_002",
     "effects": [],
     "needsCustomLogic": false,
-    "item": "random_one"
+    "item": null
   },
   {
     "id": "room_library",
@@ -59,7 +59,7 @@
       }
     ],
     "needsCustomLogic": false,
-    "item": "random_one"
+    "item": "item_027"
   },
   {
     "id": "room_master_bedroom",
@@ -71,7 +71,7 @@
     "doorPattern": "adjacent",
     "filename": "room_master_bedroom.webp",
     "canonicalDoors": ["south", "east"],
-    "drawType": null,
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -81,7 +81,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": ["item_028","item_034","item_022"]
   },
   {
     "id": "room_conservatory",
@@ -107,7 +107,7 @@
     "doors": 4,
     "filename": "room_gamble.webp",
     "canonicalDoors": ["north", "south", "east", "west"],
-    "drawType": null,
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -117,7 +117,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": ["item_048","item_049","item_040"]
   },
   {
     "id": "room_gardens",
@@ -128,11 +128,11 @@
     "doors": 4,
     "filename": "room_gardens.webp",
     "canonicalDoors": ["north", "south", "east", "west"],
-    "drawType": "event",
+    "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_043"
   },
   {
     "id": "room_patio",
@@ -147,7 +147,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item":  "random_one"
+    "item":  null
   },
   {
     "id": "room_balcony",
@@ -158,8 +158,8 @@
     "doors": 3,
     "filename": "room_balcony.webp",
     "canonicalDoors": ["south", "east", "west"],
-    "drawType": "event",
-    "text": "",
+    "drawType": null,
+    "text": "可以從此房間跳下，進入一樓相對應座標的房間",
     "effects": [],
     "needsCustomLogic": false,
     "item": null
@@ -178,7 +178,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": "random_one"
+    "item": "item_020"
   },
   {
     "id": "room_bridge",
@@ -192,7 +192,7 @@
     "canonicalDoors": ["west", "east"],
     "drawType": "omen",
     "text": "牆圍崩塌、大風呼呼吹嘯，這房間被分成兩側，請進行力量考驗，3+得以通向另一側。若失敗則此回合的移動階段立刻結束。",
-    "effects": [],
+    "effects": "可以從此房間跳下，進入一樓相對應座標的房間",
     "leaveCheck": {
       "stat": "might",
       "min": 3
@@ -210,7 +210,7 @@
     "filename": "room_kitchen.webp",
     "canonicalDoors": ["west", "east", "south"],
     "drawType": "event",
-    "text": "",
+    "text": "可在此房間進行烹飪行動，玩家身上持有item_016與item_017時，可以合成item_021",
     "effects": [],
     "needsCustomLogic": false,
     "actions": [
@@ -248,7 +248,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "random_one"
   },
   {
     "id": "room_larder",
@@ -277,7 +277,7 @@
         "kind": "search"
       }
     ],
-    "item": ["item_017","item_016"]
+    "item": ["item_017","item_016","item_022"]
   },
   {
     "id": "room_maid",
@@ -329,7 +329,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_029"
   },
   {
     "id": "room_bloody",
@@ -344,7 +344,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_011"
   },
   {
     "id": "room_gymnasium",
@@ -385,7 +385,7 @@
     "canonicalDoors":  ["south"],
     "drawType": null,
     "text": "以知識能力進行考驗，若骰子點數大於等於六，視為成功開啟保險箱，可以抽取兩張物品牌，之後放置空蕩蕩標記",
-    "item": null,
+    "item": "random_one",
     "actions": [
       {
         "label": "搜索",
@@ -442,7 +442,7 @@
         "kind": "search"
       }
     ],
-    "item": ["item_008","item_020"]
+    "item": ["item_008","item_020","item_041"]
   },
   {
     "id": "room_specimen",
@@ -458,7 +458,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": "random_one"
+    "item": "item_036"
   },
   {
     "id": "room_ballroom",
@@ -473,7 +473,7 @@
     "text": "與二樓的包廂房形成綁定房間：生成舞廳時，需在二樓對應座標同步生成包廂房；若對應位置已被佔用，需重新抽取房間卡。例外：若舞廳／包廂房是該樓層牌堆僅存的最後一張，改為在該樓層隨機位置生成另一間。",
     "effects": [],
     "needsCustomLogic": true,
-    "item": "random_one"
+    "item": "item_042"
   },
   {
     "id": "room_piano",
@@ -486,7 +486,7 @@
     "filename": "room_piano.webp",
     "canonicalDoors": ["east","south"],
     "drawType": "event",
-    "text": "",
+    "text": "玩家攜帶有完整樂譜item_027，在此房間執行行動(演奏)，通過知識考驗（＞５），提升速度一個節別。通過考驗後，物品完整樂譜消失。",
     "effects": [],
     "needsCustomLogic": false,
     "item": null
@@ -509,7 +509,7 @@
       "min": 4
     },
     "needsCustomLogic": false,
-    "item": null
+    "item": ["item_028","item_019","item_033","item_035","item_018","item_043"]
   },
   {
     "id": "room_atrium",
@@ -520,7 +520,7 @@
     "doors": 4,
     "filename": "room_atrium.webp",
     "canonicalDoors": ["east","south","north","west"],
-    "drawType": "event",
+    "drawType": "null",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -580,7 +580,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": null
   },
   {
     "id": "room_bathroom_ground",
@@ -591,7 +591,7 @@
     "doors": 1,
     "filename": "room_bathroom_ground.webp",
     "canonicalDoors": ["south"],
-    "drawType": null,
+    "drawType": "event",
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -601,7 +601,7 @@
         "kind": "search"
       }
     ],
-    "item": "random_one"
+    "item": null
   },
   {
     "id": "room_bathroom_upper",
@@ -638,7 +638,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_033"
   },
   {
     "id": "room_dining",
@@ -653,7 +653,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": ["item_016","item_017"]
+    "item": ["item_016","item_017","item_023"]
   },
   {
     "id": "room_operating_lab",
@@ -692,7 +692,7 @@
       }
     },
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_037"
   },
   {
     "id": "room_pentagram",
@@ -738,7 +738,7 @@
       }
     },
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_030"
   },
   {
     "id": "room_catacombs",
@@ -753,7 +753,7 @@
     "text": "這恐怖的地方像迷宮一樣走不出去⋯⋯請進行神志檢定，6+得以離開。",
     "effects": [],
     "needsCustomLogic": true,
-    "item": null
+    "item": "item_030"
   },
   {
     "id": "room_chasm",
@@ -784,7 +784,7 @@
     "text": "若你在此房結束你的回合，則受到1級物理傷害。",
     "effects": [],
     "needsCustomLogic": true,
-    "item": null
+    "item": "item_029"
   },
   {
     "id": "room_crypt",
@@ -799,7 +799,7 @@
     "text": "若你在此房結束你的回合，則受到1級神志傷害。",
     "effects": [],
     "needsCustomLogic": true,
-    "item": null
+    "item": ["item_033","item_038","item_039"]
   },
   {
     "id": "room_wine_cellar",
@@ -812,7 +812,7 @@
     "filename": "room_wine_cellar.webp",
     "canonicalDoors": ["east","north"],
     "drawType": null,
-    "text": "",
+    "text": "可在此房間進行調酒行動，玩家身上持有item_022與item_023時，可以合成item_032",
     "effects": [],
     "needsCustomLogic": false,
     "item": "item_022"
@@ -831,7 +831,7 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": ["item_022","item_023","item_016"]
+    "item": ["item_022","item_023","item_016","item_039","item_040"]
   },
   {
     "id": "room_junk",
@@ -854,7 +854,7 @@
       }
     },
     "needsCustomLogic": false,
-    "item": null
+    "item": ["item_038","item_039","item_034","item_028","item_026","item_044"]
   },
   {
     "id": "room_organ",
@@ -865,11 +865,11 @@
     "doors": 3,
     "filename": "room_organ.webp",
     "canonicalDoors": ["east","south","west"],
-    "drawType": "event",
-    "text": "",
+    "drawType": null,
+    "text": "玩家攜帶有完整樂譜item_027，在此房間執行行動(演奏)，通過知識考驗（＞５），提升速度一個節別。通過考驗後，物品完整樂譜消失。",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_026"
   },
   {
     "id": "room_underground_lake",
@@ -910,7 +910,7 @@
         "kind": "teleport"
       }
     ],
-    "item": "random_one"
+    "item": ["item_022","item_023","item_042"]
   },
   {
     "id": "room_bedroom",
@@ -977,7 +977,7 @@
     "doors": 1,
     "filename": "room_deephole.webp",
     "canonicalDoors": ["south"],
-    "drawType": "event",
+    "drawType": null,
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
@@ -996,6 +996,6 @@
     "text": "",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": ["item_032","item_021","item_028","item_013"]
   }
 ]

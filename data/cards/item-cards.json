@@ -2,31 +2,42 @@
   {
     "id": "item_001",
     "name": "左輪手槍",
-    "description": "一把警用手槍，手槍裡只有一顆子彈",
-    "text": "玩家回合中進行襲擊時可改以速度進行考驗，並多擲一顆骰子。可對相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。本道具使用次數於取得時隨機決定１～６次。",
+    "description": "警用手槍，但只有一顆子彈，不知道能否得到補給，應該要謹慎使用",
+    "text": "此物品卡被抽出時，附帶抽出指定物品item_046。消耗item_046，進行襲擊時可改以速度進行考驗，並多擲一顆骰子。可對本房間或相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。本道具使用次數於取得時隨機決定１～６次。",
     "effects": [],
-    "category": "weapon,consumable",
+    "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_002",
-    "name": "炸藥",
-    "description": "",
-    "text": "使用炸藥時視為一次襲擊，可對本房間與相鄰房間使用炸藥，該房間的所有人物／怪物以速度進行考驗，骰數總和大於五：不受傷害；骰數０到４：人物受到四點肉體傷害／怪物陷入昏迷。炸藥效果對於沒有速度屬性或靈體怪物無效。本道具使用一次後消失。",
+    "name": "黑色火藥",
+    "description": "古代東方帝國的發明，用木炭、硝石、硫磺，依比例混合成的爆炸性粉末，不穩定且危險",
+    "text": "使用黑色火藥時視為一次襲擊，可對本房間或相鄰房間使用炸藥，該房間的所有人物／怪物以速度進行考驗，骰數總和大於五：不受傷害；骰數０到４：人物受到四點肉體傷害／怪物陷入昏迷。炸藥效果對於沒有速度屬性或靈體怪物無效。本道具使用一次後消失。",
     "effects": [],
-    "category": "weapon",
+    "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_003",
-    "name": "治療藥膏",
-    "description": "",
+    "name": "急救箱",
+    "description": "裝有繃帶、藥膏等簡易急救藥物的急救箱，但是藥物的數量與種類不多，只能應急使用",
     "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的力量、速度或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
+    "feedbacktextOccur": "你使用了急救箱，傷勢開始好轉了",
     "effects": [
-      { "type": "stat_change", "stat": "might", "restoreToBase": true },
-      { "type": "stat_change", "stat": "speed", "restoreToBase": true }
+      {
+        "type": "stat_change",
+        "stat": "might",
+        "restoreToBase": true
+      },
+      {
+        "type": "stat_change",
+        "stat": "speed",
+        "restoreToBase": true
+      }
     ],
     "category": "consumable",
     "canTargetOthers": true,
@@ -35,11 +46,20 @@
   {
     "id": "item_004",
     "name": "嗅鹽",
-    "description": "",
+    "description": "由碳酸銨與水、酒精混合而成的化學化合物，強烈刺鼻的味道，讓人瞬間清醒",
     "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的知識、意志或兩者皆低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
+    "feedbacktextOccur": "你使用了嗅鹽，刺鼻的味道讓人精神一振",
     "effects": [
-      { "type": "stat_change", "stat": "knowledge", "restoreToBase": true },
-      { "type": "stat_change", "stat": "sanity", "restoreToBase": true }
+      {
+        "type": "stat_change",
+        "stat": "knowledge",
+        "restoreToBase": true
+      },
+      {
+        "type": "stat_change",
+        "stat": "sanity",
+        "restoreToBase": true
+      }
     ],
     "category": "consumable",
     "canTargetOthers": true,
@@ -48,10 +68,14 @@
   {
     "id": "item_005",
     "name": "天使羽毛",
-    "description": "",
-    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後玩家選擇０～８範圍內數字，取代該次擲骰的結果。本道具使用一次後消失。",
+    "description": "據說為某間教堂擁有的神聖物品，由位高權重的神職人員保管，謠傳具有改變現實的力量",
+    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使該次考驗結果必定通過。本道具使用一次後消失。",
     "effects": [],
-    "diceInterjection": { "scope": "any", "override": true, "consumesItem": true },
+    "diceInterjection": {
+      "scope": "any",
+      "override": true,
+      "consumesItem": true
+    },
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -59,87 +83,135 @@
   {
     "id": "item_006",
     "name": "詭異人偶",
-    "description": "",
+    "description": "面容精緻生動，服裝華美乾淨的洋娃娃，放在髒亂的櫃子裡特別顯得格格不入。",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後可以多投擲兩顆骰子（最多八顆），使用後意志降低一個級別，每回合限用一次，本道具使用後不會消失",
     "effects": [],
     "diceInterjection": {
       "scope": "any",
       "bonusDice": 2,
-      "cost": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }],
+      "cost": [
+        {
+          "type": "stat_change",
+          "stat": "sanity",
+          "delta": -1
+        }
+      ],
       "consumesItem": false
     },
-    "category": "general",
+    "category": "reusable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
     "id": "item_008",
-    "name": "中世紀鎧甲",
-    "description": "",
-    "text": "每當受到肉體損傷時，損傷減少一點。本物品不可被偷竊。",
+    "name": "護心鏡",
+    "description": "一件古代的鎧甲的一部分，穿上護心鏡可以起到保護身體部位的作用",
+    "text": "每當受到肉體傷害時，傷害減少一點。本物品不可被偷竊。",
     "effects": [],
-    "category": "general",
+    "category": "gear",
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_009",
-    "name": "魔術方塊",
-    "description": "",
-    "text": "玩家在其回合內可以進行知識考驗，骰數大於等於五：抽取兩張物品牌，魔術方塊消失。骰數０至五：沒有事情發生",
-    "effects": [{
-      "type": "dice_check",
-      "stat": "knowledge",
-      "tiers": [
-        { "min": 5, "max": 8, "effects": [{ "type": "draw_card", "deck": "item", "count": 2 }] },
-        { "min": 0, "max": 4, "effects": [] }
-      ]
-    }],
+    "name": "魯班盒",
+    "description": "東方古國著名巧匠流傳下來的物品，如果能解開，或許裡面藏著甚麼",
+    "text": "進行知識考驗，骰數大於等於５：抽取兩張物品牌，魯班盒消失，。骰數０至４：",
+    "feedbacktextDice": {"5+":"你絞盡腦汁，終於打開了盒子，裡面掉出了...","0-4":"你費盡心思，還是只能對著盒子一籌莫展"},
+    "effects": [
+      {
+        "type": "dice_check",
+        "stat": "knowledge",
+        "tiers": [
+          {
+            "min": 5,
+            "max": 8,
+            "effects": [
+              {
+                "type": "draw_card",
+                "deck": "item",
+                "count": 2
+              }
+            ]
+          },
+          {
+            "min": 0,
+            "max": 4,
+            "effects": []
+          }
+        ]
+      }
+    ],
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
     "id": "item_010",
-    "name": "蠟燭",
-    "description": "",
+    "name": "油燈",
+    "description": "油燈散發出的微光驅散了部分黑暗，使你在遇到突發情況時能有更好的應對",
     "text": "當玩家因事件卡需要進行考驗時，可以多投擲一顆骰子（最多八顆）",
     "effects": [],
-    "diceInterjection": { "scope": "eventTriggered", "bonusDice": 1, "consumesItem": false },
-    "category": "general",
+    "diceInterjection": {
+      "scope": "eventTriggered",
+      "bonusDice": 1,
+      "consumesItem": false
+    },
+    "category": "gear",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
     "id": "item_011",
-    "name": "斧頭",
-    "description": "沉重的斧頭，需要足夠力量才能舞動",
-    "text": "玩家需要力量大於六才可使用，以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
+    "name": "手斧",
+    "description": "用於野外求生，輕便攜帶的小型斧頭",
+    "text": "以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
     "effects": [],
     "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_012",
     "name": "獻祭之劍",
-    "description": "劍身隱隱冒出黑氣，劍刃透出鋒利的亮光，一接觸到這把劍，你腦海裡就出現一道聽不清楚的聲音",
-    "text": "玩家以力量進行襲擊時，可以多投擲三顆骰子（最多八顆），同時進行知識考驗，大於等於六：無副作用；骰數３到５：受到一點精神損傷；骰數０到２：投擲兩顆骰子，點數總和為玩家受到的肉體損傷，且本次襲擊視為無效且不能再次發動襲擊",
+    "description": "劍身隱隱冒出黑氣，劍刃透出鋒利的亮光。一接觸到這把劍，你腦海中就不斷出現各種呢喃聲",
+    "text": "玩家以力量進行襲擊時，可以多投擲兩顆骰子（最多八顆），同時進行知識考驗，大於等於六：無副作用；骰數３到５：受到一點精神損傷；骰數０到２：投擲兩顆骰子，點數總和為玩家受到的肉體損傷，且本次襲擊視為無效且不能再次發動襲擊",
     "effects": [],
     "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_013",
-    "name": "腎上腺素藥劑",
-    "description": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的任一項或多項能力低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
-    "text": "",
+    "name": "腎上腺素",
+    "description": "促使心跳加快、血壓升高、支氣管擴張及肝醣分解，讓身體短時間內充滿能量的針劑，用急救使用",
+    "text": "玩家回合可選擇使用在自己或同房間玩家，若目標對象的任一項或多項能力低於該角色基本數值，則將該能力回復至基本值。本道具使用一次後消失。",
+    "feedbacktextOccur": "你咬著牙，注射了腎上腺素針劑",
     "effects": [
-      { "type": "stat_change", "stat": "might", "restoreToBase": true },
-      { "type": "stat_change", "stat": "speed", "restoreToBase": true },
-      { "type": "stat_change", "stat": "knowledge", "restoreToBase": true },
-      { "type": "stat_change", "stat": "sanity", "restoreToBase": true }
+      {
+        "type": "stat_change",
+        "stat": "might",
+        "restoreToBase": true
+      },
+      {
+        "type": "stat_change",
+        "stat": "speed",
+        "restoreToBase": true
+      },
+      {
+        "type": "stat_change",
+        "stat": "knowledge",
+        "restoreToBase": true
+      },
+      {
+        "type": "stat_change",
+        "stat": "sanity",
+        "restoreToBase": true
+      }
     ],
     "category": "consumable",
     "canTargetOthers": true,
@@ -147,21 +219,21 @@
   },
   {
     "id": "item_014",
-    "name": "維修工具組",
+    "name": "維修工具",
     "description": "包含了螺絲起子、老虎鉗等簡易維修工具，也許在某些房間中會使用到",
     "text": "",
     "effects": [],
-    "category": "general",
+    "category": "decoration",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
     "id": "item_015",
-    "name": "古老的金幣",
-    "description": "看上去是一件歷史悠久的古物，如果能順利逃生的話，也許可以變賣不少錢。",
+    "name": "珍珠項鍊",
+    "description": "看上去是一件歷史悠久的古物，在許多故事中都會導致戴上它的主人遭遇不幸。但是如果能順利逃生的話，也許可以變賣不少錢。",
     "text": "",
     "effects": [],
-    "category": "general",
+    "category": "decoration",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
@@ -169,7 +241,8 @@
     "id": "item_016",
     "name": "礦泉水",
     "description": "可以用來解渴的一罐礦泉水，除了解渴可能還有其他用處",
-    "text": "",
+    "text": "單獨使用沒有任何效果，單獨使用後回到公用道具牌堆中。",
+    "feedbacktextOccur": "你一口喝光了瓶中的水，不再口渴了",
     "effects": [],
     "category": "consumable",
     "canTargetOthers": false,
@@ -178,9 +251,9 @@
   },
   {
     "id": "item_017",
-    "name": "沾滿灰塵的包裝泡麵",
-    "description": "可以用來充飢的一包泡麵，看上去不太美味",
-    "text": "",
+    "name": "一包泡麵",
+    "description": "可以用來充飢的一包泡麵，看上去不太美味。「你拆開包裝吃了幾口，不那麼餓了」",
+    "text": "單獨使用沒有任何效果，單獨使用後回到公用道具牌堆中",
     "effects": [],
     "category": "consumable",
     "canTargetOthers": false,
@@ -189,103 +262,348 @@
   },
   {
     "id": "item_018",
-    "name": "生鏽的菜刀",
-    "description": "玩家以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
-    "text": "",
+    "name": "生鏽菜刀",
+    "description": "這把菜刀雖然生鏽了但是依然鋒利，足以作為武器使用",
+    "text": "以力量進行襲擊時，可以多投擲一顆骰子（最多八顆）",
     "effects": [],
     "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_019",
-    "name": "銀製的拆信刀",
+    "name": "銀拆信刀",
     "description": "銀製的精緻文具，勉強可以可以當作武器使用，可能對某些情況下會有意想不到的效果",
-    "text": "玩家回合中進行襲擊時可改以速度進行考驗。",
+    "text": "襲擊時可改以速度進行考驗。",
     "effects": [],
     "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_020",
-    "name": "精緻的十字弩",
-    "description": "保養良好還可以使用的十字弩，弩身側只有一支弩箭",
-    "text": "玩家回合中進行襲擊時可改以速度進行考驗。可對相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。",
+    "name": "十字弩",
+    "description": "保養良好還可以使用的十字弩，但是只有一支弩箭，射擊之後得想辦法撿回來",
+    "text": "此物品卡被抽出時，附帶抽出指定物品item_047。消耗item_047，襲擊時可改以速度進行考驗。可對本房間或相鄰房間的目標進行襲擊，若襲擊成功，目標受到肉體損傷。若襲擊失敗，發動襲擊的玩家不受肉體損傷。完成襲擊後，item_047物品自人物背包遺留至房間（不額外消耗行動力）",
     "effects": [],
-    "category": "weapon,consumable",
+    "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
     "canTargetOthers": false,
     "needsCustomLogic": true
   },
   {
     "id": "item_021",
-    "name": "烹飪過的食物",
+    "name": "簡易餐食",
     "description": "在廚房使用泡麵跟礦泉水加工出的食物，稱不上美味，但總能恢復一些體力",
-    "text": "對自己或對同房間玩家使用，力量增加一個級別",
+    "text": "對自己或對同房間玩家使用，速度增加一個級別。",
+    "feedbacktextOccur": "比起直接乾吃泡麵好多了，感覺體能變強了（速度上升一個級別）",
     "effects": [],
     "category": "consumable",
     "canTargetOthers": true,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_022",
+    "name": "威士忌",
+    "description": "古堡主人珍藏的烈酒，飲用之後會讓人昏昏欲睡",
+    "text": "使用沒有任何效果，使用後回到公用道具牌堆中。",
+    "feedbacktextOccur": "這酒對你來說太烈了",
     "effects": [],
-    "category": "general",
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false,
+    "isMaterial": true
+  },
+  {
+    "id": "item_023",
+    "name": "葡萄汁？",
+    "description": "裝在一個高腳杯中的紫紅色飲料，聞起來有葡萄甜香，隱隱有淡淡血腥味",
+    "text": "使用沒有任何效果，使用後回到公用道具牌堆中。",
+    "feedbacktextOccur": "你喝光了杯中的液體，不那麼口渴，也覺得飽了些",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false,
+    "isMaterial": true
+  },
+  {
+    "id": "item_024",
+    "name": "運動鞋",
+    "description": "跑酷玩家必備一雙好鞋，可以增加跳躍時的彈性，也可以做為落地時的緩衝",
+    "text": "裝備時，減免跳下／崩塌的傷害",
+    "effects": [],
+    "category": "gear",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_025",
+    "name": "心願羅盤",
+    "description": "羅盤的指針不總是指向北方，甚至在靜置的時候也會偶爾亂動起來",
+    "text": "使用後不觸發任何效果。",
+    "feedbacktextOccur": "指針晃動了一陣後，指向古堡大門的方向。",
     "effects": [],
-    "category": "general",
+    "category": "reusable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_026",
+    "name": "殘缺樂譜",
+    "description": "不完整的樂譜，看起來像是鋼琴，也可能是管風琴的樂譜",
+    "text": "使用後不觸發任何效果。",
     "effects": [],
-    "category": "general",
+    "category": "decoration",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_027",
+    "name": "魔力樂譜",
+    "description": "一份完整的樂譜，在月光下散發出微微的光芒，似乎有某種魔力，也許應該找個地方試著彈奏",
+    "text": "於特定房間行動需要的道具。",
     "effects": [],
-    "category": "general",
+    "category": "decoration",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_028",
+    "name": "萬能鑰匙",
+    "description": "古堡管家持有的鑰匙串，數十把鑰匙對應著古堡中的各個房間",
+    "text": "持有萬能鑰匙可以將解鎖房間的行動力由２點降為１點",
     "effects": [],
-    "category": "general",
+    "category": "reusable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
   {
-    "id": "",
-    "name": "",
-    "description": "",
-    "text": "",
+    "id": "item_029",
+    "name": "木炭",
+    "description": "鍋爐燃燒的原料之一",
+    "text": "無法使用。",
     "effects": [],
-    "category": "general",
+    "category": "decoration",
+    "canTargetOthers": false,
+    "needsCustomLogic": false,
+    "isMaterial": true
+  },
+  {
+    "id": "item_030",
+    "name": "不明粉末",
+    "description": "白色與黃色粉末的混合物，有著刺鼻的味道",
+    "text": "無法使用。",
+    "effects": [],
+    "category": "decoration",
+    "canTargetOthers": false,
+    "needsCustomLogic": false,
+    "isMaterial": true
+  },
+  {
+    "id": "item_031",
+    "name": "安全帽",
+    "description": "出入工地一定要戴安全帽，安全第一，可以有效保護頭部。",
+    "text": "每當受到精神傷害時，傷害減少一點。本物品不可被偷竊。",
+    "effects": [],
+    "category": "gear",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_032",
+    "name": "提神飲料",
+    "description": "酒精加果汁調製而成的飲品，喝下後精神亢奮，肌肉彷彿充滿了力量",
+    "text": "對自己或對同房間玩家使用，力量增加一個級別。",
+    "feedbacktextOccur": "酒精與果汁依適當比例混合的飲料，讓人感到亢奮（力量增加一個級別）",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_033",
+    "name": "沉重鐵鍊",
+    "description": "似乎是用來限制某些動物行動的鍊銬，相當沉重",
+    "text": "無法使用。",
+    "effects": [],
+    "category": "decoration",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_034",
+    "name": "叫人鈴",
+    "description": "應該是古堡主人用來呼喚佣人前來服侍的鈴鐺",
+    "text": "使用後不觸發任何效果。",
+    "feedbacktextOccur": "鈴鐺發出清脆響亮的聲音，但是沒有佣人前來服侍。",
+    "effects": [],
+    "category": "reusable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_035",
+    "name": "皮手套",
+    "description": "單隻的黑色皮質露指手套，戴上後掌心感到微微的清涼，感覺靈活了不少",
+    "text": "進行襲擊時以速度進行考驗，並多擲一顆骰子。考驗成功不造成傷害，改為偷竊目標身上隨機一件物品",
+    "effects": [],
+    "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_036",
+    "name": "老鷹木雕",
+    "description": "古樸風格的老鷹木雕，雙眼是兩顆深邃的黑色寶石，寄宿著老鷹的靈魂供你驅使",
+    "text": "使用後可以得知其他玩家/怪物/惡人位在哪個房間內。",
+    "feedbacktextOccur": "xxx在xxx間內；ooo在ooo房間內",
+    "effects": [],
+    "category": "reusable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_037",
+    "name": "陰陽玉珮",
+    "description": "外觀為圓形陰陽魚形狀的玉珮，戴上之後一股暖意流淌全身，似乎有庇佑不受邪祟侵害的效果",
+    "text": "裝備後，抵擋一次大於三點（包含三點）的肉體傷害，抵擋後物品消失",
+    "effects": [],
+    "category": "gear",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_038",
+    "name": "可疑藥丸",
+    "description": "藥丸上的編號隱約寫著APTX4869",
+    "text": "使用後，力量降到最低級別(不致死的級別１)，速度提升到最高級別，到下一個回合開始時恢復。",
+    "feedbacktextOccur": "你感覺身體發出高熱，視線漸漸模糊，身上的衣物變得寬鬆",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_039",
+    "name": "一節竹筒",
+    "description": "揮夜姬?迷豆子?",
+    "text": "無法使用。",
+    "effects": [],
+    "category": "decoration",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_040",
+    "name": "一疊紙牌",
+    "description": "如果你有某個漫畫角色的超能力，應該可以把紙牌當成武器。如果沒有，或者可以試著拿來搭訕",
+    "text": "使用後不觸發任何效果，彈窗文字隨機顯示以下撲克牌花色：紅心七、黑桃二、梅花三、鬼牌、黑桃Ａ、黑桃Ｊ。",
+    "feedbacktextOccur": "抽到了ｏｏｏ",
+    "effects": [],
+    "category": "reusable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_041",
+    "name": "華麗匕首",
+    "description": "這把匕首的柄上鑲嵌著一顆亮眼的紅寶石，上好的皮革縫製成匕首鞘",
+    "text": "裝備後無任何效果",
+    "effects": [],
+    "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_042",
+    "name": "半臉面具",
+    "description": "化裝舞會常用的華麗面具，以金粉描邊並有鮮艷羽毛作為裝飾，戴上之後就不會別人認出身分",
+    "text": "裝備後無任何效果",
+    "effects": [],
+    "category": "gear",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_043",
+    "name": "硬木棍",
+    "description": "一根被用來搭建花藝建築的硬木棍，一米三四的長度，當成武器揮動的時候會讓人難以近身",
+    "text": "玩家以力量進行襲擊時，襲擊失敗時不受到傷害",
+    "effects": [],
+    "category": "weapon",
+    "attackStat": null,
+    "attackDice": null,
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_044",
+    "name": "有限手套",
+    "description": "一隻厚重的金屬右手手套，手背與五指節鑲嵌著六顆不同顏色的寶石",
+    "text": "使用後隨機出現以下一個效果：1.移動到隨機一個鄰房2.意志降低一個級別3.知識降低一個級別4.力量降低一個級別5.速度降低一個級別6.行動力歸零7.消滅房間內其他所有角色",
+    "feedbacktextDice": {"1":"藍色寶石閃了一下，你被移動到了隔壁房間","2":"橙色寶石閃了一下，你心中充滿了惡念","3":"黃色寶石閃了一下，你感覺遺忘了很多事情","4":"紫色寶石閃了一下，你感覺手套吸走了你的力量","5":"綠色寶石閃了一下，你感覺自己變遲鈍了","6":"紅色寶石閃了一下，你無法動彈了","7":"六顆寶石一起亮起，你不自覺彈了一下手指"},
+    "effects": [],
+    "category": "reusable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_999",
+    "name": "黑色筆記",
+    "description": "附帶有一枝鉛筆的黑色封皮筆記，封面文字已經磨損看不清。第一頁寫滿了看不懂的文字，似乎是某些規則。可以拿來記錄訊息與房間位置，但是最好不要寫上名字",
+    "text": "取代原有地圖總覽按鈕的功能，使用後顯示個人已經去過的房間，查詢公開訊息（邪祟陣營／遊戲目標）的地方",
+    "effects": [],
+    "category": "reusable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_046",
+    "name": "左輪子彈",
+    "description": "搭配左輪手槍使用的子彈",
+    "text": "消耗品，被使用後重新回到公用道具牌堆",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_047",
+    "name": "十字弩箭",
+    "description": "搭配十字弩使用的弩箭",
+    "text": "消耗品，被使用後遺留在該房間",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_048",
+    "name": "海盜金幣",
+    "description": "傳說中能夠實現貪婪者願望，但是會讓使用者詛咒纏身的金幣。",
+    "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次考驗減少一顆骰子，如該考驗通過，則額外隨機取得一件物品（原考驗內容與結果不受影響）。",
+    "effects": [],
+    "category": "consumable",
+    "canTargetOthers": false,
+    "needsCustomLogic": false
+  },
+  {
+    "id": "item_049",
+    "name": "賭神骰子",
+    "description": "傳說中的賭神隨身攜帶的骰子，使用前記得驗牌",
+    "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次擲骰的骰子六面點數設定從[0,0,1,1,2,2]改為[1,1,1,2,2,2]，考驗完成後修改回原設定。",
+    "effects": [],
+    "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   }
-        
 ]

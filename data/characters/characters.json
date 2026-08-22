@@ -44,11 +44,11 @@
     "age": 32,
     "tall":180,
     "occupation": "建築工人",
-    "itemID":null,
-    "itemname":null,
+    "itemID":"item_031",
+    "itemname":"安全帽",
     "stats": {
       "might": { "track": [4,4,5,5,6,7,7,8], "baseIndex": 4, "skullIndex": 0 },
-      "speed": { "track": [4,4,4,5,5,5,6,6], "baseIndex": 4, "skullIndex": 0 },
+      "speed": { "track": [4,4,4,5,5,5,6,6], "baseIndex": 3, "skullIndex": 0 },
       "knowledge": { "track": [3,4,4,4,5,5,5,6], "baseIndex": 3, "skullIndex": 0 },
       "sanity": { "track": [3,3,4,4,5,5,5,6], "baseIndex": 3, "skullIndex": 0 }
     }
@@ -74,14 +74,14 @@
   {
     "id": "char_005",
     "codename": "石川大輝",
-    "filename":"male_athlrte.webp",
-    "fileicon":"male_athlrte_icon.webp",
+    "filename":"male_Parkour.webp",
+    "fileicon":"male_Parkour_icon.webp",
     "gender": "male",
     "age": 18,
     "tall":170,
-    "occupation": "運動員",
-    "itemID":null,
-    "itemname":null,
+    "occupation": "跑酷玩家",
+    "itemID":"item_024",
+    "itemname":"運動鞋",
     "stats": {
       "might": { "track": [4,4,4,5,6,6,7,7], "baseIndex": 3, "skullIndex": 0 },
       "speed": { "track": [4,5,5,6,6,7,7,8], "baseIndex": 3, "skullIndex": 0 },
@@ -99,7 +99,7 @@
     "tall":150,
     "occupation": "畫家",
     "itemID":"item_009",
-    "itemname":"魔術方塊",
+    "itemname":"魯班盒",
     "stats": {
       "might": { "track": [3,3,3,3,4,4,4,5], "baseIndex": 3, "skullIndex": 0 },
       "speed": { "track": [4,4,5,5,6,6,7,8], "baseIndex": 3, "skullIndex": 0 },
