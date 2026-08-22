@@ -1068,3 +1068,31 @@
 - 新 10 項待辦（詳見 Handover.md「下一步行動」）：道具卡/事件卡/預兆卡 text 補完、角色icon六格定位機制、遊戲訊息彈窗流程與機制、M2c-3卡片機制留給M3、M2D3細節四項（公開資訊/私人資訊版位/操控實體切換UI/擲骰道具介入畫面）、擲骰機制複查（需開發者提供具體案例）
 - CharacterPanel.jsx 的私有 `findCardName` 與這次新增到 mapUtils.js 的版本邏輯重複，判定不在本次範圍內，之後可另開小任務整併
 - 收工前確認系統無殘留 node 行程，本階段乾淨無殘留
+
+## 2026-08-22 第 1 次工作階段
+
+**當日工作內容**：
+- 開場依開發者指示，檢查其自行補充過的 omen/event/item 三份卡片檔案語法與缺項，確認語法無誤，完整度大幅進步（event 全數補齊、omen description 全數補齊、item 只剩 2 張 decoration 類無 text，開發者確認這是設計本身如此）
+- 開發者提出道具 category 重新分類（weapon/gear/consumable/reusable/decoration，各自對應不同道具選單選項）與武器 attackStat/attackDice 欄位需求、道具選單改依 category 動態決定選項、「」回饋文字要抽取到新欄位（feedbacktextUse/feedbacktextDice，item/event 先做，omen 開發者自己再調整）
+- **嚴重事故**：為了把 category 值 Reusable 改小寫，agent 用 JSON.stringify 整檔重寫 item-cards.json 導致排版打亂；想用 git checkout -- 復原，但該檔案本來就是開發者未提交的進行中編輯（48 張卡新分類系統），checkout 只會退回最後一次 commit，把開發者未提交的工作整個清空，git 無法復原。開發者自行手動復原內容
+- 事故後立即記錄防範規則到 agent 記憶（feedback_json_data_file_edits.md）：JSON 資料檔案一律用精準文字取代不整檔重寫；絕不用 git checkout/reset/clean 復原自己的錯誤；批次腳本編輯前先備份到 scratchpad
+- 建立 attackStat/attackDice 欄位骨架（9 張武器卡，值為 null，開發者後續會分批填寫/討論）
+- 「」回饋文字抽取：多輪來回確認抽取規則（骰數 key 格式、多段回饋的處理、item_044 隨機效果分支特例、event_029 標記名稱誤判特例、item_009 條件與機制文字夾雜的特例），過程中額外掃出並修正 5 處半形引號打字錯誤；動手前先做完整 dry-run 並把結果傳給開發者確認過才實際寫入；寫入改用逐行文字比對取代整檔重寫，並用備份逐行 diff 驗證只有目標行被改動
+- 討論並定案新的檔案協作慣例：developersketch（原 img 資料夾改名）維持不 commit，作為圖片/影片/prompt 筆記暫存區；卡片/角色/房間 JSON 內容檔案改成雙方直接共用 data/ 同一份，不再分開維護兩份副本；developersketch 底下重複的 JSON 副本已刪除；commit 節奏改為小量多次，但每次 commit 前都要提醒開發者確認過才執行
+- 收工前依新慣例小量 commit：item-cards.json/event-cards.json（本階段處理）+ omen-cards.json/characters.json/rooms.json/README 重新命名（開發者自己完成的編輯），524/524 測試全綠
+- 更新 Handover.md：記錄事故與防範規則、category 分類定案、回饋文字抽取結果、新協作慣例、新增 4 項待辦（omen 待續、weapon 欄位值待填、gear 配戴機制待實作、道具選單動態化待實作、scratchpad 額度風險提醒）
+
+**完成項目**：
+- item/event 卡片內容稽核、category 統一小寫、weapon attackStat/attackDice 欄位骨架、「」回饋文字抽取（item 15 張、event 27 張）、5 處引號錯字修正，全部完成並 commit，524/524 測試全綠
+- developersketch 新協作慣例定案並清理重複檔案，.gitignore 更新
+
+**遇到瓶頸**：
+- 本階段最大瓶頸是 agent 自己造成的：JSON.stringify 整檔重寫＋git checkout 誤用，導致開發者未提交的工作被意外清空，所幸開發者自行復原，未造成永久損失，但這是本次協作史上最嚴重的一次操作失誤
+- 「」回饋文字抽取規則比預期複雜，多個特例（item_044/event_029/item_009）都需要跟開發者來回確認才能正確處理，不能單靠正規表達式全自動判斷
+
+**開發者交代備忘事項**：
+- 事故發生後開發者要求「提出後續工作流程避免再次發生相同錯誤」，已提出並存入 agent 記憶，開發者確認接受
+- omen-cards.json 開發者還要繼續調整，尚未套用回饋文字抽取
+- weapon 卡的 attackStat/attackDice 實際數值、gear 配戴/取下機制、道具選單動態化，皆為新待辦，詳見 Handover.md
+- 之後 commit data/ 內容前，agent 一定要先給開發者確認過才執行，不可自主決定 commit 時機
+- 收工前確認系統無殘留 node 行程，本階段乾淨無殘留
