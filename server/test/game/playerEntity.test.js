@@ -1,4 +1,4 @@
-const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem } = require('../../src/game/playerEntity');
+const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem, clearEquipStateIfNeeded } = require('../../src/game/playerEntity');
 
 function makeStats() {
   return {
@@ -35,6 +35,12 @@ test('createPlayer builds a player with the given stat tracks, position, and act
   });
   expect(player.inventory).toEqual([]);
   expect(player.characterId).toBeNull(); // not supplied
+});
+
+test('createPlayer initializes empty equip state (wieldedWeaponId null, wornGearIds empty)', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(player.wieldedWeaponId).toBeNull();
+  expect(player.wornGearIds).toEqual([]);
 });
 
 test('createPlayer stores the given characterId (used by the client to look up portrait/icon assets)', () => {
@@ -287,4 +293,34 @@ test('removeItem removes and returns the matching item', () => {
 test('removeItem throws ITEM_NOT_FOUND when no inventory item matches', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   expect(() => removeItem(player, 'not_held')).toThrow('ITEM_NOT_FOUND');
+});
+
+test('clearEquipStateIfNeeded clears wieldedWeaponId when it matches the given itemId', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  player.wieldedWeaponId = 'item_001';
+  clearEquipStateIfNeeded(player, 'item_001');
+  expect(player.wieldedWeaponId).toBeNull();
+});
+
+test('clearEquipStateIfNeeded leaves wieldedWeaponId untouched when it does not match', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  player.wieldedWeaponId = 'item_001';
+  clearEquipStateIfNeeded(player, 'item_002');
+  expect(player.wieldedWeaponId).toBe('item_001');
+});
+
+test('clearEquipStateIfNeeded removes the itemId from wornGearIds if present', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  player.wornGearIds = ['item_008', 'item_010'];
+  clearEquipStateIfNeeded(player, 'item_008');
+  expect(player.wornGearIds).toEqual(['item_010']);
+});
+
+test('clearEquipStateIfNeeded is a no-op when the itemId is neither wielded nor worn', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  player.wieldedWeaponId = 'item_001';
+  player.wornGearIds = ['item_008'];
+  clearEquipStateIfNeeded(player, 'item_099');
+  expect(player.wieldedWeaponId).toBe('item_001');
+  expect(player.wornGearIds).toEqual(['item_008']);
 });

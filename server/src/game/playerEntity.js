@@ -51,6 +51,8 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     inventory: [],
     visitedRooms: [{ floor, x, y }],
     enteredFromSide: null, // null = arrived by spawn/stairs (badge centered), else the door side entered through
+    wieldedWeaponId: null, // id of the currently wielded weapon-category item, at most one
+    wornGearIds: [], // ids of currently worn gear-category items, no cap
   };
 }
 
@@ -140,6 +142,16 @@ function removeItem(player, itemId) {
   return player.inventory.splice(index, 1)[0];
 }
 
+function clearEquipStateIfNeeded(player, itemId) {
+  if (player.wieldedWeaponId === itemId) {
+    player.wieldedWeaponId = null;
+  }
+  const index = player.wornGearIds.indexOf(itemId);
+  if (index !== -1) {
+    player.wornGearIds.splice(index, 1);
+  }
+}
+
 module.exports = {
   STATS,
   createPlayer,
@@ -150,4 +162,5 @@ module.exports = {
   isBelowBase,
   addItem,
   removeItem,
+  clearEquipStateIfNeeded,
 };
