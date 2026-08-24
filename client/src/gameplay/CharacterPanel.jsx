@@ -74,6 +74,11 @@ function findCardName(id, cardContent) {
   return card ? card.name : id;
 }
 
+function findCardCategory(id, cardContent) {
+  const card = findCardInfo(id, cardContent);
+  return card ? card.category : null;
+}
+
 function isOmenCard(id, cardContent) {
   return Boolean(cardContent?.omens?.some((c) => c.id === id));
 }
@@ -90,7 +95,7 @@ const ITEM_SLOT_GAP = '2%';
 const ITEM_SLOT_WIDTH = '22.5%';
 
 export default function CharacterPanel({ player, cardContent, characterContent, onSelectAction, roommates }) {
-  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial } | null
+  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial, category } | null
   const [showGiveTargets, setShowGiveTargets] = useState(false);
 
   const speed = player.stats.speed;
@@ -111,6 +116,22 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
   }
   function handleGiveItem(targetPlayerId) {
     onSelectAction('item', { itemId: selectedItem.itemId, mode: 'give', targetPlayerId });
+    closeItemMenu();
+  }
+  function handleWieldItem() {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wield', itemCategory: selectedItem.category });
+    closeItemMenu();
+  }
+  function handleUnwieldItem() {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'unwield' });
+    closeItemMenu();
+  }
+  function handleWearItem() {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wear', itemCategory: selectedItem.category });
+    closeItemMenu();
+  }
+  function handleUnwearItem() {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'unwear' });
     closeItemMenu();
   }
 
@@ -177,7 +198,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               item ? (
                 <button
                   key={`${item.id}-${i}`}
-                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial) })}
+                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent) })}
                   style={{
                     width: ITEM_SLOT_WIDTH,
                     flexShrink: 0,
@@ -233,7 +254,23 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
-                {!selectedItem.isMaterial && <button onClick={handleUseItem}>使用</button>}
+                {selectedItem.category === 'weapon' && (
+                  player.wieldedWeaponId === selectedItem.itemId ? (
+                    <button onClick={handleUnwieldItem}>取下</button>
+                  ) : (
+                    <button onClick={handleWieldItem}>手持</button>
+                  )
+                )}
+                {selectedItem.category === 'gear' && (
+                  player.wornGearIds.includes(selectedItem.itemId) ? (
+                    <button onClick={handleUnwearItem}>取下</button>
+                  ) : (
+                    <button onClick={handleWearItem}>配戴</button>
+                  )
+                )}
+                {(selectedItem.category === 'consumable' || selectedItem.category === 'reusable') && !selectedItem.isMaterial && (
+                  <button onClick={handleUseItem}>使用</button>
+                )}
                 {roommates && roommates.length > 0 && (
                   <button onClick={() => setShowGiveTargets(true)}>給予</button>
                 )}
