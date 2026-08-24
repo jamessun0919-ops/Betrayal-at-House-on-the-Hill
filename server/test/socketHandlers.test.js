@@ -3766,6 +3766,54 @@ test('picking up a dropped item that pushes the player over the cap opens a pend
   httpServer.close();
 });
 
+test('game:selectAction item mode:wield resolves itemCategory from content and sets wieldedWeaponId', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [{ id: 'item_101', name: '短劍', category: 'weapon' }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' });
+
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_101', mode: 'wield' }, resolve)
+  );
+  expect(ack.error).toBeUndefined();
+  expect(player.wieldedWeaponId).toBe('item_101');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item mode:wear on a non-gear item is rejected with INVALID_ITEM_CATEGORY', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [{ id: 'item_101', name: '短劍', category: 'weapon' }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' });
+
+  const ack = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_101', mode: 'wear' }, resolve)
+  );
+  expect(ack.error).toBe('INVALID_ITEM_CATEGORY');
+  expect(player.wornGearIds).toEqual([]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:inventoryChoiceRespond leaves the chosen item in the room and clears the pending state', async () => {
   const content = makeContent({
     cards: {

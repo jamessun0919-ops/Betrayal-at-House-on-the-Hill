@@ -244,6 +244,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           consumeItemIfApplied = Boolean(itemContent && itemContent.category === 'consumable');
         }
 
+        if (actionType === 'item' && (mode === 'wield' || mode === 'wear')) {
+          const itemContent = content.cards.items.find((i) => i.id === itemId);
+          selectOptions.itemCategory = itemContent ? itemContent.category : null;
+        }
+
         if (actionType === 'room_action') {
           const currentPlayer = getPlayer(gameState, playerId);
           const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));
