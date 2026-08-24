@@ -95,7 +95,7 @@ const ITEM_SLOT_GAP = '2%';
 const ITEM_SLOT_WIDTH = '22.5%';
 
 export default function CharacterPanel({ player, cardContent, characterContent, onSelectAction, roommates }) {
-  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial, category } | null
+  const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial, category, isOmen } | null
   const [showGiveTargets, setShowGiveTargets] = useState(false);
 
   const speed = player.stats.speed;
@@ -119,7 +119,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
     closeItemMenu();
   }
   function handleWieldItem() {
-    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wield', itemCategory: selectedItem.category });
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wield' });
     closeItemMenu();
   }
   function handleUnwieldItem() {
@@ -127,7 +127,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
     closeItemMenu();
   }
   function handleWearItem() {
-    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wear', itemCategory: selectedItem.category });
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'wear' });
     closeItemMenu();
   }
   function handleUnwearItem() {
@@ -198,7 +198,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               item ? (
                 <button
                   key={`${item.id}-${i}`}
-                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent) })}
+                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent) })}
                   style={{
                     width: ITEM_SLOT_WIDTH,
                     flexShrink: 0,
@@ -254,22 +254,30 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
-                {selectedItem.category === 'weapon' && (
-                  player.wieldedWeaponId === selectedItem.itemId ? (
-                    <button onClick={handleUnwieldItem}>取下</button>
-                  ) : (
-                    <button onClick={handleWieldItem}>手持</button>
+                {selectedItem.isOmen ? (
+                  !selectedItem.isMaterial && (
+                    <button onClick={handleUseItem}>使用</button>
                   )
-                )}
-                {selectedItem.category === 'gear' && (
-                  player.wornGearIds.includes(selectedItem.itemId) ? (
-                    <button onClick={handleUnwearItem}>取下</button>
-                  ) : (
-                    <button onClick={handleWearItem}>配戴</button>
-                  )
-                )}
-                {(selectedItem.category === 'consumable' || selectedItem.category === 'reusable') && !selectedItem.isMaterial && (
-                  <button onClick={handleUseItem}>使用</button>
+                ) : (
+                  <>
+                    {selectedItem.category === 'weapon' && (
+                      player.wieldedWeaponId === selectedItem.itemId ? (
+                        <button onClick={handleUnwieldItem}>取下</button>
+                      ) : (
+                        <button onClick={handleWieldItem}>手持</button>
+                      )
+                    )}
+                    {selectedItem.category === 'gear' && (
+                      player.wornGearIds.includes(selectedItem.itemId) ? (
+                        <button onClick={handleUnwearItem}>取下</button>
+                      ) : (
+                        <button onClick={handleWearItem}>配戴</button>
+                      )
+                    )}
+                    {(selectedItem.category === 'consumable' || selectedItem.category === 'reusable') && !selectedItem.isMaterial && (
+                      <button onClick={handleUseItem}>使用</button>
+                    )}
+                  </>
                 )}
                 {roommates && roommates.length > 0 && (
                   <button onClick={() => setShowGiveTargets(true)}>給予</button>
