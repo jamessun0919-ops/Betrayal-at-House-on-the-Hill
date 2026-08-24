@@ -295,6 +295,22 @@ test('removeItem throws ITEM_NOT_FOUND when no inventory item matches', () => {
   expect(() => removeItem(player, 'not_held')).toThrow('ITEM_NOT_FOUND');
 });
 
+test('removeItem clears wieldedWeaponId when removing the wielded item', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_001' });
+  player.wieldedWeaponId = 'item_001';
+  removeItem(player, 'item_001');
+  expect(player.wieldedWeaponId).toBeNull();
+});
+
+test('removeItem clears the item from wornGearIds when removing a worn item', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  addItem(player, { id: 'item_008' });
+  player.wornGearIds = ['item_008'];
+  removeItem(player, 'item_008');
+  expect(player.wornGearIds).toEqual([]);
+});
+
 test('clearEquipStateIfNeeded clears wieldedWeaponId when it matches the given itemId', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   player.wieldedWeaponId = 'item_001';

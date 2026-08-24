@@ -20,7 +20,7 @@ const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard } = require('./game/cardDeck');
-const { addItem, removeItem, getStatValue, clearEquipStateIfNeeded } = require('./game/playerEntity');
+const { addItem, removeItem, getStatValue } = require('./game/playerEntity');
 const { checkRemoveConditions } = require('./game/modifiers');
 
 const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
@@ -693,7 +693,6 @@ function openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomC
 function applyInventoryLeave(gameState, playerId, itemId) {
   const player = getPlayer(gameState, playerId);
   const item = removeItem(player, itemId);
-  clearEquipStateIfNeeded(player, itemId);
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
   room.droppedItems.push(item);
 }

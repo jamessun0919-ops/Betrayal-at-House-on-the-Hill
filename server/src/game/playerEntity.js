@@ -139,7 +139,9 @@ function removeItem(player, itemId) {
   if (index === -1) {
     throw new Error('ITEM_NOT_FOUND');
   }
-  return player.inventory.splice(index, 1)[0];
+  const [item] = player.inventory.splice(index, 1);
+  clearEquipStateIfNeeded(player, itemId);
+  return item;
 }
 
 function clearEquipStateIfNeeded(player, itemId) {
