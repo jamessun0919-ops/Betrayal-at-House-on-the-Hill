@@ -1118,3 +1118,27 @@
 - 下次開工第一件事：確認執行方式（Subagent-Driven 推薦 / Inline），開始實作 4 個任務
 - Handover.md 待辦清單已更新，原本的「gear 配戴機制」跟「道具選單動態化」兩項待辦已合併標記為「已完成設計+計畫，待執行」
 - 收工前確認系統無殘留 node 行程，本階段本來就沒啟動任何伺服器
+
+## 2026-08-23 第 2 次工作階段
+
+**當日工作內容**：
+- 開場確認執行方式為 Subagent-Driven，開獨立 worktree
+- 依序派工 Task 1~4：資料模型＋三處整合清理裝備狀態、四種道具動作（wield/unwield/wear/unwear）、油燈配戴才觸發＋開場自動裝備、前端選單動態化
+- Task 3 implementer 發現計畫的真實缺口（gameManager.test.js 既有測試的 baseStartArgs() 預設沒有 cards 欄位，計畫程式碼片段沒防呆），沒有自行猜測修改，回報後 controller 查證確認、給出精準修正指示，implementer 套用後繼續完成
+- 4 個任務各自審查一次通過
+- 整分支最終審查（Opus 模型）抓到 1 個 Critical＋1 個 Important，根因相同：計畫誤判預兆卡沒有 category 欄位，實際查證 data/cards/omen-cards.json 發現全部 13 張都有 category（10 general/2 weapon/1 gear），導致 10 張預兆卡失去使用按鈕（違反設計文件明確要求）、3 張多出必定失敗的手持/配戴按鈕
+- 派遣一次性修正（含這個 Critical+Important、3 個 Minor），複審通過
+- 手動開瀏覽器實測：確認 gear 開場自動配戴、配戴/取下切換正常、console 無錯誤；因 RNG 導向明確武器/預兆卡路徑較耗時，未逐一實測，依賴自動化測試+審查佐證，已誠實告知開發者
+- 依開發者選擇合併回本地 main，push 到 origin
+
+**完成項目**：
+- 道具手持/配戴機制——4 個任務實作與審查、全分支審查（含 1 個 Critical+1 個 Important 修復）、合併進 main 並推送 origin，全部完成，554/554 測試全綠
+
+**遇到瓶頸**：
+- 整分支審查抓到的 Critical/Important 根因是計畫本身在 brainstorming 階段對預兆卡資料結構的假設就是錯的（沒有實際查證 omen-cards.json 就寫進設計文件），這類「計畫假設錯誤」比「實作疏漏」更難靠 task 級審查抓到，只有整支放在一起、拿真實卡片資料去查證才浮現
+- Task 3 遇到的 cards-undefined 缺口也是同一類問題（計畫寫程式碼片段時沒對照既有測試的 fixture 預設值）
+
+**開發者交代備忘事項**：
+- 角色icon六格定位、遊戲訊息彈窗流程、擲骰機制複查，仍為既有待辦，本階段未處理
+- CharacterPanel.jsx 的道具選單邏輯現在有明確的優先順序（omen 判斷要在 category 判斷之前），Handover 已記錄，之後再改這個選單要注意維持這個順序
+- 收工前確認系統無殘留 node 行程，本階段乾淨無殘留
