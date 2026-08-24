@@ -3812,6 +3812,46 @@ test('game:inventoryChoiceRespond leaves the chosen item in the room and clears 
   httpServer.close();
 });
 
+test('game:inventoryChoiceRespond clears wieldedWeaponId when the forced-left item was wielded', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_101', name: '道具一' },
+        { id: 'item_102', name: '道具二' },
+        { id: 'item_103', name: '道具三' },
+        { id: 'item_104', name: '道具四' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' });
+  player.wieldedWeaponId = 'item_101';
+  const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+  room.droppedItems.push({ id: 'item_104' });
+
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104', mode: 'pickup' }, resolve)
+  );
+  const pending = await pendingPromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  await new Promise((resolve) =>
+    currentClient.emit('game:inventoryChoiceRespond', { promptId: pending.promptId, optionId: 'item_101' }, resolve)
+  );
+  await resolvedPromise;
+
+  expect(player.wieldedWeaponId).toBeNull();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:inventoryChoiceRespond opens a second round when still over the cap after leaving one item', async () => {
   const content = makeContent({
     cards: {
