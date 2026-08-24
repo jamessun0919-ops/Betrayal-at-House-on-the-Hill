@@ -133,6 +133,28 @@ test('startGame leaves inventory empty when the character has no itemID (null or
   expect(gameState.players.get('p2').inventory).toEqual([]);
 });
 
+test('startGame auto-wields a weapon-category starting item', () => {
+  const manager = createGameManager();
+  const characters = makeCharacters();
+  characters[0].itemID = 'item_101';
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({
+    characters,
+    cards: { items: [{ id: 'item_101', name: '短劍', category: 'weapon' }], events: [], omens: [] },
+  }));
+  expect(gameState.players.get('p1').wieldedWeaponId).toBe('item_101');
+});
+
+test('startGame auto-wears a gear-category starting item', () => {
+  const manager = createGameManager();
+  const characters = makeCharacters();
+  characters[0].itemID = 'item_102';
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({
+    characters,
+    cards: { items: [{ id: 'item_102', name: '護目鏡', category: 'gear' }], events: [], omens: [] },
+  }));
+  expect(gameState.players.get('p1').wornGearIds).toEqual(['item_102']);
+});
+
 test('startGame passes cards through to createGameState so the decks are populated', () => {
   const manager = createGameManager();
   const gameState = startGame(manager, 'ROOM1', baseStartArgs({

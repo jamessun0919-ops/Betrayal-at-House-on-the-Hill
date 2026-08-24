@@ -34,6 +34,12 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
     });
     if (character.itemID) {
       addItem(newPlayer, { id: character.itemID });
+      const itemContent = cards && cards.items.find((i) => i.id === character.itemID);
+      if (itemContent && itemContent.category === 'weapon') {
+        newPlayer.wieldedWeaponId = character.itemID;
+      } else if (itemContent && itemContent.category === 'gear') {
+        newPlayer.wornGearIds.push(character.itemID);
+      }
     }
   }
   // Turn order is independent of character-pick order — a fresh, separate
