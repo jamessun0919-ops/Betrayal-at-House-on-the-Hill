@@ -9,6 +9,7 @@ function findInterjectionOptions(player, itemCatalog, sourceDeckType) {
   for (const invItem of player.inventory || []) {
     const content = itemCatalog.find((c) => c.id === invItem.id);
     if (!content || !content.diceInterjection) continue;
+    if (content.category === 'gear' && !player.wornGearIds.includes(invItem.id)) continue;
     const di = content.diceInterjection;
     if (di.scope === 'eventTriggered' && sourceDeckType !== 'event') continue;
     if (!di.consumesItem && used.includes(invItem.id)) continue;

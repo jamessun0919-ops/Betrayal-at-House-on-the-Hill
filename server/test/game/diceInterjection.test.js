@@ -54,6 +54,33 @@ test('findInterjectionOptions ignores held items with no diceInterjection field'
   expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([]);
 });
 
+test('findInterjectionOptions excludes a gear-category diceInterjection item when it is not worn', () => {
+  const player = { inventory: [{ id: 'item_010' }], wornGearIds: [], diceInterjectionUsedThisTurn: [] };
+  const itemCatalog = [
+    { id: 'item_010', name: '油燈', category: 'gear', diceInterjection: { scope: 'eventTriggered', bonusDice: 1, consumesItem: false } },
+  ];
+  const options = findInterjectionOptions(player, itemCatalog, 'event');
+  expect(options).toEqual([]);
+});
+
+test('findInterjectionOptions includes a gear-category diceInterjection item when it is worn', () => {
+  const player = { inventory: [{ id: 'item_010' }], wornGearIds: ['item_010'], diceInterjectionUsedThisTurn: [] };
+  const itemCatalog = [
+    { id: 'item_010', name: '油燈', category: 'gear', diceInterjection: { scope: 'eventTriggered', bonusDice: 1, consumesItem: false } },
+  ];
+  const options = findInterjectionOptions(player, itemCatalog, 'event');
+  expect(options).toEqual([{ itemId: 'item_010', name: '油燈', diceInterjection: { scope: 'eventTriggered', bonusDice: 1, consumesItem: false } }]);
+});
+
+test('findInterjectionOptions includes a non-gear diceInterjection item regardless of wornGearIds', () => {
+  const player = { inventory: [{ id: 'item_006' }], wornGearIds: [], diceInterjectionUsedThisTurn: [] };
+  const itemCatalog = [
+    { id: 'item_006', name: '詭異人偶', category: 'reusable', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } },
+  ];
+  const options = findInterjectionOptions(player, itemCatalog, 'event');
+  expect(options).toEqual([{ itemId: 'item_006', name: '詭異人偶', diceInterjection: { scope: 'any', bonusDice: 2, consumesItem: false } }]);
+});
+
 test('findInterjectionOptions throws INVALID_ITEM_CATALOG when itemCatalog is not an array', () => {
   const player = { inventory: [] };
   expect(() => findInterjectionOptions(player, null, undefined)).toThrow('INVALID_ITEM_CATALOG');
