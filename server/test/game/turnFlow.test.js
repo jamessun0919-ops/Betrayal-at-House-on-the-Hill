@@ -807,6 +807,103 @@ test('selectAction item mode:pickup throws ITEM_NOT_IN_ROOM when the room has no
   ).toThrow('ITEM_NOT_IN_ROOM');
 });
 
+test('selectAction item mode:wield sets wieldedWeaponId and spends 1 action point', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'wield', itemCategory: 'weapon' });
+  expect(result).toEqual({ kind: 'item', mode: 'wield', itemId: 'item_001' });
+  expect(player.wieldedWeaponId).toBe('item_001');
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction item mode:wield swaps out the previously wielded weapon automatically', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' }, { id: 'item_011' });
+  player.wieldedWeaponId = 'item_001';
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_011', mode: 'wield', itemCategory: 'weapon' });
+  expect(player.wieldedWeaponId).toBe('item_011');
+});
+
+test('selectAction item mode:wield throws ITEM_NOT_HELD when the player does not hold the item', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'wield', itemCategory: 'weapon' })
+  ).toThrow('ITEM_NOT_HELD');
+});
+
+test('selectAction item mode:wield throws INVALID_ITEM_CATEGORY when the item is not a weapon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_003' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'wield', itemCategory: 'consumable' })
+  ).toThrow('INVALID_ITEM_CATEGORY');
+});
+
+test('selectAction item mode:unwield clears wieldedWeaponId and spends 1 action point', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  player.wieldedWeaponId = 'item_001';
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'unwield' });
+  expect(result).toEqual({ kind: 'item', mode: 'unwield', itemId: 'item_001' });
+  expect(player.wieldedWeaponId).toBeNull();
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction item mode:unwield throws ITEM_NOT_WIELDED when that item is not the wielded one', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'unwield' })
+  ).toThrow('ITEM_NOT_WIELDED');
+});
+
+test('selectAction item mode:wear adds to wornGearIds and spends 1 action point', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' });
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'wear', itemCategory: 'gear' });
+  expect(result).toEqual({ kind: 'item', mode: 'wear', itemId: 'item_008' });
+  expect(player.wornGearIds).toEqual(['item_008']);
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction item mode:wear allows multiple gear items to be worn at once', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' }, { id: 'item_010' });
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'wear', itemCategory: 'gear' });
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_010', mode: 'wear', itemCategory: 'gear' });
+  expect(player.wornGearIds).toEqual(['item_008', 'item_010']);
+});
+
+test('selectAction item mode:wear throws INVALID_ITEM_CATEGORY when the item is not gear', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'wear', itemCategory: 'weapon' })
+  ).toThrow('INVALID_ITEM_CATEGORY');
+});
+
+test('selectAction item mode:unwear removes from wornGearIds and spends 1 action point', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' });
+  player.wornGearIds = ['item_008'];
+  const startingAP = player.actionPoints;
+  const result = selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'unwear' });
+  expect(result).toEqual({ kind: 'item', mode: 'unwear', itemId: 'item_008' });
+  expect(player.wornGearIds).toEqual([]);
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('selectAction item mode:unwear throws ITEM_NOT_WORN when that item is not currently worn', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'unwear' })
+  ).toThrow('ITEM_NOT_WORN');
+});
+
 test('selectAction room_action: succeeds when hasRoomAction is true', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   const startingAP = player.actionPoints;

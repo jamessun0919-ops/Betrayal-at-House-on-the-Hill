@@ -466,6 +466,51 @@ function pickupItemAction(gameState, player, itemId) {
   return { kind: 'item', mode: 'pickup', itemId };
 }
 
+function wieldItemAction(gameState, player, itemId, itemCategory) {
+  if (!player.inventory.some((item) => item.id === itemId)) {
+    throw new Error('ITEM_NOT_HELD');
+  }
+  if (itemCategory !== 'weapon') {
+    throw new Error('INVALID_ITEM_CATEGORY');
+  }
+  player.wieldedWeaponId = itemId;
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'wield', itemId };
+}
+
+function unwieldItemAction(gameState, player, itemId) {
+  if (player.wieldedWeaponId !== itemId) {
+    throw new Error('ITEM_NOT_WIELDED');
+  }
+  player.wieldedWeaponId = null;
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'unwield', itemId };
+}
+
+function wearItemAction(gameState, player, itemId, itemCategory) {
+  if (!player.inventory.some((item) => item.id === itemId)) {
+    throw new Error('ITEM_NOT_HELD');
+  }
+  if (itemCategory !== 'gear') {
+    throw new Error('INVALID_ITEM_CATEGORY');
+  }
+  if (!player.wornGearIds.includes(itemId)) {
+    player.wornGearIds.push(itemId);
+  }
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'wear', itemId };
+}
+
+function unwearItemAction(gameState, player, itemId) {
+  const index = player.wornGearIds.indexOf(itemId);
+  if (index === -1) {
+    throw new Error('ITEM_NOT_WORN');
+  }
+  player.wornGearIds.splice(index, 1);
+  player.actionPoints -= 1;
+  return { kind: 'item', mode: 'unwear', itemId };
+}
+
 function selectAction(gameState, playerId, actionType, options = {}) {
   const player = requirePlayer(gameState, playerId);
   if (getCurrentTurnPlayerId(gameState) !== playerId) {
@@ -479,7 +524,7 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   }
 
   if (actionType === 'item') {
-    const { itemId, targetPlayerId, mode } = options;
+    const { itemId, targetPlayerId, mode, itemCategory } = options;
     if (mode === 'give') {
       return giveItemAction(gameState, player, itemId, targetPlayerId);
     }
@@ -488,6 +533,18 @@ function selectAction(gameState, playerId, actionType, options = {}) {
     }
     if (mode === 'pickup') {
       return pickupItemAction(gameState, player, itemId);
+    }
+    if (mode === 'wield') {
+      return wieldItemAction(gameState, player, itemId, itemCategory);
+    }
+    if (mode === 'unwield') {
+      return unwieldItemAction(gameState, player, itemId);
+    }
+    if (mode === 'wear') {
+      return wearItemAction(gameState, player, itemId, itemCategory);
+    }
+    if (mode === 'unwear') {
+      return unwearItemAction(gameState, player, itemId);
     }
     if (!player.inventory.some((item) => item.id === itemId)) {
       throw new Error('ITEM_NOT_HELD');
