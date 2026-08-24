@@ -703,6 +703,30 @@ test('selectAction item mode:give transfers the item to a same-room target playe
   expect(player.actionPoints).toBe(3); // addPlayer resets AP to speed value (4, per makeStats' speed baseIndex) minus the 1 spent here
 });
 
+test('selectAction item mode:give clears the giver\'s wieldedWeaponId when giving away the wielded weapon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  player.wieldedWeaponId = 'item_001';
+  const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  other.floor = player.floor;
+  other.x = player.x;
+  other.y = player.y;
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'give', targetPlayerId: 'p2' });
+  expect(player.wieldedWeaponId).toBeNull();
+});
+
+test('selectAction item mode:give clears the giver\'s wornGearIds when giving away a worn gear item', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' });
+  player.wornGearIds = ['item_008'];
+  const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  other.floor = player.floor;
+  other.x = player.x;
+  other.y = player.y;
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'give', targetPlayerId: 'p2' });
+  expect(player.wornGearIds).toEqual([]);
+});
+
 test('selectAction item mode:give throws TARGET_NOT_IN_ROOM when the target is elsewhere', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   player.inventory.push({ id: 'item_003' });
@@ -723,6 +747,22 @@ test('selectAction item mode:leave removes the item from inventory and adds it t
   expect(player.inventory).toEqual([]);
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
   expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
+});
+
+test('selectAction item mode:leave clears the player\'s wieldedWeaponId when leaving the wielded weapon', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_001' });
+  player.wieldedWeaponId = 'item_001';
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_001', mode: 'leave' });
+  expect(player.wieldedWeaponId).toBeNull();
+});
+
+test('selectAction item mode:leave clears the player\'s wornGearIds when leaving a worn gear item', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'item_008' });
+  player.wornGearIds = ['item_008'];
+  selectAction(gameState, 'p1', 'item', { itemId: 'item_008', mode: 'leave' });
+  expect(player.wornGearIds).toEqual([]);
 });
 
 test('selectAction item mode:leave preserves the item object\'s extra fields (e.g. an activated mask\'s active flag)', () => {

@@ -2,7 +2,7 @@ const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA, isDoorLayoutFeasible } = require('./boardGenerator');
 const { drawRoom, drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
 const { getPlayer } = require('./gameState');
-const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem } = require('./playerEntity');
+const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem, clearEquipStateIfNeeded } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
 
@@ -435,6 +435,7 @@ function giveItemAction(gameState, player, itemId, targetPlayerId) {
     throw new Error('TARGET_NOT_IN_ROOM');
   }
   const [item] = player.inventory.splice(index, 1);
+  clearEquipStateIfNeeded(player, itemId);
   addItem(targetPlayer, item);
   player.actionPoints -= 1;
   return { kind: 'item', mode: 'give', itemId, targetPlayerId };
@@ -446,6 +447,7 @@ function leaveItemAction(gameState, player, itemId) {
     throw new Error('ITEM_NOT_HELD');
   }
   const [item] = player.inventory.splice(index, 1);
+  clearEquipStateIfNeeded(player, itemId);
   const room = getRoomAt(gameState, player.floor, player.x, player.y);
   room.droppedItems.push(item);
   player.actionPoints -= 1;
