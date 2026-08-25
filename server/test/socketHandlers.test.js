@@ -2386,6 +2386,65 @@ test('game:selectAction item: a general-category item is not removed from invent
   httpServer.close();
 });
 
+test('game:selectAction item use with no dice_check broadcasts game:itemUseResolved', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_050', name: '無考驗道具', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }], category: 'general' },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' });
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_050' }, resolve));
+  const resolved = await resolvedPromise;
+
+  expect(resolved.playerId).toBe(currentPlayerId);
+  expect(resolved.itemId).toBe('item_050');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item use with a dice_check does NOT broadcast game:itemUseResolved', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        {
+          id: 'item_051',
+          name: '有考驗道具',
+          effects: [{
+            type: 'dice_check',
+            diceCount: 2,
+            tiers: [{ min: 0, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] }],
+          }],
+          category: 'general',
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_051' });
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve('timeout'), 300));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_051' }, resolve));
+  const outcome = await Promise.race([resolvedPromise, timeoutPromise]);
+
+  expect(outcome).toBe('timeout');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item: a consumable item that fails its check is not removed (matches 魔術方塊 rules)', async () => {
   const content = makeContent({
     cards: {
