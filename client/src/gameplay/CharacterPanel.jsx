@@ -198,7 +198,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               item ? (
                 <button
                   key={`${item.id}-${i}`}
-                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent) })}
+                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), description: findCardInfo(item.id, cardContent)?.description || '', isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent) })}
                   style={{
                     width: ITEM_SLOT_WIDTH,
                     flexShrink: 0,
@@ -242,7 +242,8 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
           onClick={closeItemMenu}
         >
           <div style={{ backgroundColor: '#fff', padding: 16, borderRadius: 8, minWidth: 200 }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ fontWeight: 'bold', marginBottom: 8 }}>{selectedItem.name}</p>
+            <p style={{ fontWeight: 'bold', marginBottom: 4 }}>{selectedItem.name}</p>
+            <p style={{ fontSize: 14, color: '#555', marginBottom: 8 }}>{selectedItem.description}</p>
             {showGiveTargets ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {(roommates || []).map((p) => (
