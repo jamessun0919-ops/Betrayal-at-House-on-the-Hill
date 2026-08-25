@@ -742,6 +742,7 @@ test('game:move into a plain (no leaveCheck) neighbor broadcasts game:roomEntere
   const roomEntered = await roomEnteredPromise;
   expect(roomEntered.playerId).toBe(currentPlayerId);
   expect(roomEntered.roomId).toBe('room_new');
+  expect(roomEntered.enteredNewRoom).toBe(true); // room_new was just placed by the door-open
 
   clientA.close();
   clientB.close();
@@ -1057,6 +1058,7 @@ test('game:selectAction room_action with actionIndex selecting teleport: jumping
 
   expect(roomEntered.playerId).toBe(currentPlayerId);
   expect(roomEntered.roomId).toBe('room_basement_a');
+  expect(roomEntered.enteredNewRoom).toBe(false); // this player already fell into room_basement_a earlier in this test
 
   clientA.close();
   clientB.close();
@@ -1234,6 +1236,7 @@ test('game:selectAction room_action resolving a move_to_room effect (e.g. stairs
 
   expect(roomEntered.playerId).toBe(currentPlayerId);
   expect(roomEntered.roomId).toBe('room_upper_landing');
+  expect(roomEntered.enteredNewRoom).toBe(true); // first time this player reaches room_upper_landing in this test
 
   clientA.close();
   clientB.close();

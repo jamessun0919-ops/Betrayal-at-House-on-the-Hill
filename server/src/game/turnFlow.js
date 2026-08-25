@@ -129,9 +129,9 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
   const targetCoord = { x: player.x + delta.dx, y: player.y + delta.dy };
 
   if (choice.kind === 'move') {
-    movePlayerTo(player, player.floor, targetCoord.x, targetCoord.y, OPPOSITE_SIDE[direction]);
+    const enteredNewRoom = movePlayerTo(player, player.floor, targetCoord.x, targetCoord.y, OPPOSITE_SIDE[direction]);
     player.actionPoints -= 1;
-    return { kind: 'move', x: targetCoord.x, y: targetCoord.y, ...(leaveCheckResult ? { leaveCheckResult } : {}) };
+    return { kind: 'move', x: targetCoord.x, y: targetCoord.y, enteredNewRoom, ...(leaveCheckResult ? { leaveCheckResult } : {}) };
   }
 
   // 舞廳 & 包廂房 -- drawing either one must also place its pair at the same
@@ -213,6 +213,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
       roomId: placedRoom.roomId,
       pendingCardDraw,
       collapseResult,
+      enteredNewRoom: true,
       ...(leaveCheckResult ? { leaveCheckResult } : {}),
     };
   }
@@ -223,6 +224,7 @@ function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptio
     y: placedRoom.y,
     roomId: placedRoom.roomId,
     pendingCardDraw,
+    enteredNewRoom: true,
     ...(leaveCheckResult ? { leaveCheckResult } : {}),
   };
 }
@@ -338,8 +340,8 @@ function resolveTeleportDestination(gameState, playerId) {
 function performTeleport(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const destination = resolveTeleportDestination(gameState, playerId);
-  movePlayerTo(player, destination.floor, destination.x, destination.y, null);
-  return destination;
+  const enteredNewRoom = movePlayerTo(player, destination.floor, destination.x, destination.y, null);
+  return { ...destination, enteredNewRoom };
 }
 
 function moveSummon(gameState, playerId, direction) {

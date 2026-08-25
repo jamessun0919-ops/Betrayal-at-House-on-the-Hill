@@ -61,8 +61,8 @@ function handleMoveToRoom(gameState, playerId, effect) {
     if (!(grid instanceof Map)) continue;
     for (const room of grid.values()) {
       if (room.roomId === effect.targetRoomId) {
-        movePlayerTo(player, floor, room.x, room.y);
-        return { pending: false };
+        const enteredNewRoom = movePlayerTo(player, floor, room.x, room.y);
+        return { pending: false, enteredNewRoom };
       }
     }
   }
@@ -287,6 +287,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   let appliedCount = 0;
   let drawnCards = [];
   let diceCheckResult = null;
+  let enteredNewRoom = null;
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -303,6 +304,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     if (result && result.diceCheckResult) {
       diceCheckResult = result.diceCheckResult;
     }
+    if (result && result.enteredNewRoom !== undefined) {
+      enteredNewRoom = result.enteredNewRoom;
+    }
   }
   const output = { pending: false, appliedCount };
   if (drawnCards.length > 0) {
@@ -310,6 +314,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   }
   if (diceCheckResult) {
     output.diceCheckResult = diceCheckResult;
+  }
+  if (enteredNewRoom !== null) {
+    output.enteredNewRoom = enteredNewRoom;
   }
   return output;
 }

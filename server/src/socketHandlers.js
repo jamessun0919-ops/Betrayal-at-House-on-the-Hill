@@ -308,7 +308,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const destination = performTeleport(gameState, playerId);
             ack(result);
             const enteredRoom = gameState.board[destination.floor].get(coordKey(destination.x, destination.y));
-            io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
+            io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId, enteredNewRoom: destination.enteredNewRoom });
             io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
             return;
           } else {
@@ -349,7 +349,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
             if (moveToRoomEffect && !effectResult.pending) {
-              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: moveToRoomEffect.targetRoomId });
+              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: moveToRoomEffect.targetRoomId, enteredNewRoom: effectResult.enteredNewRoom });
             }
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
@@ -790,7 +790,7 @@ function finishMoveResult(io, socket, gameState, roomCode, playerId, result, eff
 
   if (result.kind === 'move' || result.kind === 'open_door') {
     const enteredRoom = gameState.board[mover.floor].get(coordKey(mover.x, mover.y));
-    io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId });
+    io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId, enteredNewRoom: result.enteredNewRoom });
   }
 
   if (result.pendingCardDraw) {
@@ -1147,6 +1147,7 @@ function resumeCollapseCheckRollChoice(io, socket, effectResolverManager, gameSt
     roomId: room.roomId,
     pendingCardDraw: resumeContext.pendingCardDraw,
     collapseResult,
+    enteredNewRoom: true,
     ...(resumeContext.leaveCheckResult ? { leaveCheckResult: resumeContext.leaveCheckResult } : {}),
   };
   finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);

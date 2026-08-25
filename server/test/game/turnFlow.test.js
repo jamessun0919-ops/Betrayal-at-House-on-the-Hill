@@ -106,10 +106,19 @@ test('moveToRoom moves the player to an already-explored neighbor and deducts 1 
   gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
   const startingAP = player.actionPoints;
   const result = moveToRoom(gameState, 'p1', 'west');
-  expect(result).toEqual({ kind: 'move', x: -1, y: 1 });
+  expect(result).toEqual({ kind: 'move', x: -1, y: 1, enteredNewRoom: true });
   expect(player.x).toBe(-1);
   expect(player.y).toBe(1);
   expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('moveToRoom sets enteredNewRoom to false when moving back into an already-visited room', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  moveToRoom(gameState, 'p1', 'west'); // first visit -> (-1,1) now in visitedRooms
+  player.actionPoints = 4;
+  const result = moveToRoom(gameState, 'p1', 'east'); // back to (0,1), the starting room
+  expect(result.enteredNewRoom).toBe(false);
 });
 
 test('moveToRoom opens a door: draws a room, places it, moves the player, and deducts a flat 2 action points', () => {
@@ -182,6 +191,7 @@ test('moveToRoom with a leaveCheck: passing the roll moves the player and costs 
     kind: 'move',
     x: -1,
     y: 1,
+    enteredNewRoom: true,
     leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
   });
   expect(player.x).toBe(-1);
@@ -211,6 +221,7 @@ test('moveToRoom with a leaveCheck: failing the roll blocks the move, costs exac
     kind: 'move',
     x: -1,
     y: 1,
+    enteredNewRoom: true,
     leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
   });
   expect(player.actionPoints).toBe(startingAP - 2);
@@ -321,6 +332,7 @@ test('moveToRoom with a leaveCheck: a resolvedRoll skips eligibility scanning an
     kind: 'move',
     x: -1,
     y: 1,
+    enteredNewRoom: true,
     leaveCheckResult: { stat: 'might', roomId: 'room_lobby_a', rolled: 6, required: 3, passed: true },
   });
   expect(player.actionPoints).toBe(startingAP - 1);
@@ -542,7 +554,7 @@ test('performTeleport moves a player through a known collapseLink on a Collapsed
 
   const result = performTeleport(gameState, 'p1');
 
-  expect(result).toEqual({ floor: 'basement', x: 7, y: 7 });
+  expect(result).toEqual({ floor: 'basement', x: 7, y: 7, enteredNewRoom: true });
   expect(player.floor).toBe('basement');
   expect(player.x).toBe(7);
   expect(player.y).toBe(7);
@@ -558,7 +570,7 @@ test('performTeleport moves a player from the Gallery to the paired Ballroom at 
 
   const result = performTeleport(gameState, 'p1');
 
-  expect(result).toEqual({ floor: 'ground', x: 3, y: 3 });
+  expect(result).toEqual({ floor: 'ground', x: 3, y: 3, enteredNewRoom: true });
   expect(player.floor).toBe('ground');
   expect(player.x).toBe(3);
   expect(player.y).toBe(3);
