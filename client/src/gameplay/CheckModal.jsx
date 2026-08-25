@@ -7,9 +7,6 @@ const TITLE_BY_KIND = {
   cardCheck: '進入房間 · 抽卡考驗',
 };
 
-// 骰子動畫佔位（開發者之後會自行設計替換），純粹是延遲揭曉結果的固定時長。
-const ANIMATION_MS = 2500;
-
 function resolveSource(check, roomContent, cardContent) {
   if (check.sourceKind === 'room') {
     const room = findRoomInfo(check.sourceId, roomContent);
@@ -17,6 +14,23 @@ function resolveSource(check, roomContent, cardContent) {
   }
   const card = findCardInfo(check.sourceId, cardContent);
   return { name: card ? card.name : check.sourceId, text: card ? (card.text || card.description || '') : '' };
+}
+
+// feedbacktextDice keys are one of: "N+" (>=N), "A-B" (inclusive range), "N"
+// (exact value) -- see data/cards/README.md and the 2026-08-25 popup design doc.
+function matchDiceFeedbackText(rolled, feedbacktextDice) {
+  if (!feedbacktextDice) return '待補充';
+  for (const [key, text] of Object.entries(feedbacktextDice)) {
+    if (key.endsWith('+')) {
+      if (rolled >= Number(key.slice(0, -1))) return text;
+    } else if (key.includes('-')) {
+      const [min, max] = key.split('-').map(Number);
+      if (rolled >= min && rolled <= max) return text;
+    } else if (rolled === Number(key)) {
+      return text;
+    }
+  }
+  return '待補充';
 }
 
 const overlayStyle = {
@@ -46,20 +60,29 @@ export default function CheckModal({ check, roomContent, cardContent, onDone }) 
 
   function handleRoll() {
     setPhase('animating');
-    setTimeout(() => setPhase('result'), ANIMATION_MS);
   }
 
   if (phase === 'animating') {
     return (
       <div style={overlayStyle}>
         <div style={boxStyle}>
-          <p style={{ fontSize: 20, textAlign: 'center', margin: 0 }}>擲骰中...</p>
+          <video
+            src="/videos/roll-dice.mp4"
+            autoPlay
+            onEnded={() => setPhase('result')}
+            style={{ width: '100%', display: 'block', marginBottom: 12 }}
+          />
+          <button style={{ width: '100%', fontSize: 16, padding: 10 }} onClick={() => setPhase('result')}>
+            跳過
+          </button>
         </div>
       </div>
     );
   }
 
   if (phase === 'result') {
+    const card = check.sourceKind !== 'room' ? findCardInfo(check.sourceId, cardContent) : null;
+    const feedbackText = card ? matchDiceFeedbackText(check.rolled, card.feedbacktextDice) : null;
     return (
       <div style={overlayStyle}>
         <div style={boxStyle}>
@@ -70,10 +93,14 @@ export default function CheckModal({ check, roomContent, cardContent, onDone }) 
           <p style={{ fontSize: 22, fontWeight: 'bold', color: check.passed ? '#8ad48a' : '#e08a8a', marginBottom: 10 }}>
             {check.passed ? '成功！' : '失敗...'}
           </p>
-          <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>
-            {statLabel}考驗擲出 {check.rolled} 點
-            {check.threshold != null ? `（需要 ${check.threshold} 以上）` : ''}
-          </p>
+          {feedbackText ? (
+            <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>{feedbackText}</p>
+          ) : (
+            <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>
+              {statLabel}考驗擲出 {check.rolled} 點
+              {check.threshold != null ? `（需要 ${check.threshold} 以上）` : ''}
+            </p>
+          )}
           <button style={{ width: '100%', fontSize: 18, padding: 12 }} onClick={onDone}>
             確認
           </button>
