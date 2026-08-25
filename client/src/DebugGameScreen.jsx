@@ -3,12 +3,38 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import CheckModal from './gameplay/CheckModal';
+import SimplePopup from './gameplay/SimplePopup';
 import { getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
 function findPlayerName(playerId, players) {
   const player = (players || []).find((p) => p.playerId === playerId);
   return player ? player.name : playerId;
+}
+
+function resolveSimplePopupTitle(entry, roomContent, cardContent) {
+  if (entry.kind === 'roomIntro') {
+    const room = findRoomInfo(entry.sourceId, roomContent);
+    return room ? room.name : entry.sourceId;
+  }
+  const card = findCardInfo(entry.sourceId, cardContent);
+  return card ? card.name : entry.sourceId;
+}
+
+function resolveSimplePopupBody(entry, roomContent, cardContent) {
+  if (entry.kind === 'roomIntro') {
+    const room = findRoomInfo(entry.sourceId, roomContent);
+    return room ? room.description : '';
+  }
+  const card = findCardInfo(entry.sourceId, cardContent);
+  if (entry.kind === 'eventIntro') {
+    return card ? card.description : '';
+  }
+  if (entry.kind === 'eventNoCheck' || entry.kind === 'itemUseResolved') {
+    return (card && card.feedbacktextOccur) || '待補充';
+  }
+  // 'itemDrawNoCheck' -- existing pre-change popup content, unchanged
+  return card ? (card.text || card.description || '') : '';
 }
 
 // Fills the blank peek-size x peek-size square at one of the viewport's 4
@@ -555,36 +581,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
             />
           )}
           {pendingCheckQueue.length > 0 && pendingCheckQueue[0].noCheck && (
-            <div
-              style={{
-                position: 'fixed',
-                inset: 0,
-                backgroundColor: 'rgba(0,0,0,0.6)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                zIndex: 70,
-              }}
-            >
-              <div style={{ width: 320, maxWidth: '90%', backgroundColor: '#111', color: '#f5f5f0', borderRadius: 12, padding: 20, boxSizing: 'border-box' }}>
-                {(() => {
-                  const noCheckEntry = pendingCheckQueue[0];
-                  const card = findCardInfo(noCheckEntry.sourceId, cardContent);
-                  return (
-                    <>
-                      <p style={{ fontSize: 20, fontWeight: 'bold', marginBottom: 10 }}>{card ? card.name : noCheckEntry.sourceId}</p>
-                      <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>{card ? (card.text || card.description || '') : ''}</p>
-                    </>
-                  );
-                })()}
-                <button
-                  style={{ width: '100%', fontSize: 18, padding: 12 }}
-                  onClick={() => setPendingCheckQueue((prev) => prev.slice(1))}
-                >
-                  確認
-                </button>
-              </div>
-            </div>
+            <SimplePopup
+              title={resolveSimplePopupTitle(pendingCheckQueue[0], roomContent, cardContent)}
+              body={resolveSimplePopupBody(pendingCheckQueue[0], roomContent, cardContent)}
+              onDone={() => setPendingCheckQueue((prev) => prev.slice(1))}
+            />
           )}
         </div>
       )}
