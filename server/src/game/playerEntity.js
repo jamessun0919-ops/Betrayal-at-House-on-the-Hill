@@ -125,6 +125,7 @@ function movePlayerTo(player, floor, x, y, enteredFromSide = null) {
   if (!alreadyVisited) {
     player.visitedRooms.push({ floor, x, y });
   }
+  return !alreadyVisited;
 }
 
 function addItem(player, item) {

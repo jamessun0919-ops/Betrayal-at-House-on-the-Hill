@@ -185,6 +185,19 @@ test('movePlayerTo does not add a duplicate entry when returning to an already-v
   ]);
 });
 
+test('movePlayerTo returns true when moving into a room not yet in visitedRooms', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  const result = movePlayerTo(player, 'ground', 1, 0);
+  expect(result).toBe(true);
+});
+
+test('movePlayerTo returns false when moving back into an already-visited room', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  movePlayerTo(player, 'ground', 1, 0);
+  const result = movePlayerTo(player, 'ground', 0, 0);
+  expect(result).toBe(false);
+});
+
 test('createPlayer throws MISSING_STAT_DEFINITION if a required stat is missing', () => {
   const incompleteStats = {
     might: { track: [1, 2, 3], baseIndex: 1, skullIndex: 0 },
