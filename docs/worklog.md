@@ -1165,3 +1165,26 @@
 - 下次開工第一件事：Subagent-Driven 執行 docs/superpowers/plans/2026-08-25-game-message-popup.md 的 Task 1
 - data/cards/event-cards.json 目前有開發者自己的未提交修改（跟這次功能無關），本階段全程未觸碰，下次開工前留意不要不小心一併處理掉
 - 收工前確認系統無殘留 node 行程，本階段本來就沒啟動任何伺服器
+
+## 2026-08-25 第 2 次工作階段
+
+**當日工作內容**：
+- 開發者確認執行方式 Subagent-Driven，開獨立 worktree，依序派工 7 個任務（movePlayerTo 首次進入判斷／串 4 條路徑到 enteredNewRoom／game:itemUseResolved 廣播／CheckModal 影片+feedbacktextDice／DebugGameScreen 佇列邏輯／SimplePopup 共用元件／CharacterPanel description），每個任務各自審查一次通過
+- Task 2 implementer 自行抓到並修正 2 個計畫沒列出、但確實被新欄位打壞的既有測試（performTeleport 相關），複審確認修正正確
+- 整分支最終審查（Opus 模型）抓到 3 個 Important＋2 個 Minor：roomIntro 彈窗對 5 間起始房間（樓梯目的地）跳出空白內文（設計文件查證 description 覆蓋率時漏查了 starting-rooms.json）；game:itemUseResolved 原本只廣播給效果承受者，使用者本人收不到回饋；擲骰動畫影片沒加 muted/playsInline 可能被手機瀏覽器擋自動播放
+- 兩個需要開發者決定的 Important 用 AskUserQuestion 確認：itemUseResolved 改成使用者+承受者兩邊都看得到；影片加 muted+playsInline+onError
+- 派遣一次修正波次（含 2 個 Minor 一起處理），複審全數 ADDRESSED、無新增破壞，560/560 測試全綠
+- 合併回本地 main（fast-forward），推送 origin
+- 手動瀏覽器驗證階段遇到環境問題：preview_start 啟動伺服器的 cwd 綁死在主要 repo 根目錄，不會跟著 worktree 走，導致一開始在 worktree 內測試時實際點到的是合併前的舊程式碼（一度誤判 Task 7 沒生效）。跟開發者確認後改成先合併回 main、再在主目錄測試，改用 JS 直接操作 DOM 繞過畫面點擊/截圖逾時的已知限制，成功驗證 roomIntro／itemDrawNoCheck／itemUseResolved 三種新彈窗實際渲染正確
+
+**完成項目**：
+- 遊戲訊息彈窗流程與機制——7 個任務實作、整分支審查（含修正波次）、合併進 main 並推送 origin，全部完成，560/560 測試全綠
+
+**遇到瓶頸**：
+- 手動瀏覽器驗證的環境限制（preview_start 的 cwd 不跟 worktree 走）——已找到根因並用「先合併再在主目錄測試」的方式繞過，未來如果還要在 worktree 內就做瀏覽器驗證，這個限制會再出現，需要重新討論解法
+- eventIntro/eventNoCheck 與 CheckModal 影片/feedbacktextDice 路徑因 RNG 導向沒能手動點到，依賴自動化測試+2 輪程式碼審查佐證
+
+**開發者交代備忘事項**：
+- eventIntro/eventNoCheck 目前廣播給全房間玩家（不只抽卡的人自己會看到），設計文件沒明確規範這點，列為未來待確認的開放問題，非阻塞項目
+- data/cards/README.md／event-cards.json／item-cards.json／omen-cards.json／rooms.json 目前有開發者自己的未提交修改，本階段全程未觸碰
+- 收工前已清理本次啟動的 preview 伺服器，以及 Task 3 派工時遺留、沒有正常結束的 jest 測試行程，確認系統無殘留 node 行程
