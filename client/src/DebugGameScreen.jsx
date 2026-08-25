@@ -148,7 +148,8 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
           ...prev,
           { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
         ]);
-        if (!data.hasCheck) {
+        const drawnCard = findCardInfo(data.cardId, cardContent);
+        if (!data.hasCheck && !(drawnCard && drawnCard.activatedOnUse)) {
           setPendingCheckQueue((prev) => [
             ...prev,
             { noCheck: true, kind: 'eventNoCheck', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
@@ -184,7 +185,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       const room = findRoomInfo(data.roomId, roomContent);
       const playerName = findPlayerName(data.playerId, gameState?.players);
       setMessages((prev) => [...prev, `${playerName} 進入了「${room ? room.name : data.roomId}」`]);
-      if (data.enteredNewRoom && data.playerId === playerId) {
+      if (data.enteredNewRoom && data.playerId === playerId && room && room.description) {
         setPendingCheckQueue((prev) => [
           ...prev,
           { noCheck: true, kind: 'roomIntro', sourceId: data.roomId, queueId: nextCheckQueueId.current++ },

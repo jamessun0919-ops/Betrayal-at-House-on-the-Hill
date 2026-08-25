@@ -2411,6 +2411,45 @@ test('game:selectAction item use with no dice_check broadcasts game:itemUseResol
   httpServer.close();
 });
 
+test('game:selectAction item use with canTargetOthers broadcasts game:itemUseResolved to both the actor and the target', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [
+        { id: 'item_060', name: '可施放於他人的道具', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }], category: 'general', canTargetOthers: true },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_060' });
+
+  // The fix emits game:itemUseResolved twice -- once for the acting player,
+  // once for the effect target -- and both emits are broadcast to the whole
+  // room, so both sockets see both events. Collect everything the
+  // non-acting client's socket receives and check both payloads landed.
+  const otherClientEvents = [];
+  const otherClientDonePromise = new Promise((resolve) => {
+    otherClient.on('game:itemUseResolved', (data) => {
+      otherClientEvents.push(data);
+      if (otherClientEvents.length === 2) resolve();
+    });
+  });
+
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_060', targetPlayerId: otherPlayerId }, resolve)
+  );
+  await otherClientDonePromise;
+
+  expect(otherClientEvents).toContainEqual({ playerId: currentPlayerId, itemId: 'item_060' });
+  expect(otherClientEvents).toContainEqual({ playerId: otherPlayerId, itemId: 'item_060' });
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item use with a dice_check does NOT broadcast game:itemUseResolved', async () => {
   const content = makeContent({
     cards: {

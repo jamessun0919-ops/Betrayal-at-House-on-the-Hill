@@ -349,7 +349,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
-              io.to(roomCode).emit('game:itemUseResolved', { playerId: targetForEffects, itemId });
+              io.to(roomCode).emit('game:itemUseResolved', { playerId, itemId });
+              if (targetForEffects !== playerId) {
+                io.to(roomCode).emit('game:itemUseResolved', { playerId: targetForEffects, itemId });
+              }
             }
             if (moveToRoomEffect && !effectResult.pending) {
               io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: moveToRoomEffect.targetRoomId, enteredNewRoom: effectResult.enteredNewRoom });

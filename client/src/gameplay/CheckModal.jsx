@@ -69,7 +69,10 @@ export default function CheckModal({ check, roomContent, cardContent, onDone }) 
           <video
             src="/videos/roll-dice.mp4"
             autoPlay
+            muted
+            playsInline
             onEnded={() => setPhase('result')}
+            onError={() => setPhase('result')}
             style={{ width: '100%', display: 'block', marginBottom: 12 }}
           />
           <button style={{ width: '100%', fontSize: 16, padding: 10 }} onClick={() => setPhase('result')}>
@@ -93,7 +96,7 @@ export default function CheckModal({ check, roomContent, cardContent, onDone }) 
           <p style={{ fontSize: 22, fontWeight: 'bold', color: check.passed ? '#8ad48a' : '#e08a8a', marginBottom: 10 }}>
             {check.passed ? '成功！' : '失敗...'}
           </p>
-          {feedbackText ? (
+          {feedbackText != null ? (
             <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>{feedbackText}</p>
           ) : (
             <p style={{ fontSize: 16, lineHeight: 1.6, marginBottom: 16 }}>
