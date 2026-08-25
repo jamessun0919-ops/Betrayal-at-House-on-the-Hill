@@ -117,10 +117,21 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setMessages((prev) => [...prev, `待處理動作：${JSON.stringify(data)}`]);
     }
     function onCardDrawn(data) {
-      if (!data.hasCheck) {
+      if (data.deckType === 'event' || data.deckType === 'omen') {
         setPendingCheckQueue((prev) => [
           ...prev,
-          { noCheck: true, playerId: data.playerId, sourceKind: data.deckType, sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+          { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+        ]);
+        if (!data.hasCheck) {
+          setPendingCheckQueue((prev) => [
+            ...prev,
+            { noCheck: true, kind: 'eventNoCheck', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+          ]);
+        }
+      } else if (!data.hasCheck) {
+        setPendingCheckQueue((prev) => [
+          ...prev,
+          { noCheck: true, kind: 'itemDrawNoCheck', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
         ]);
       }
       const card = findCardInfo(data.cardId, cardContent);
@@ -147,10 +158,23 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       const room = findRoomInfo(data.roomId, roomContent);
       const playerName = findPlayerName(data.playerId, gameState?.players);
       setMessages((prev) => [...prev, `${playerName} 進入了「${room ? room.name : data.roomId}」`]);
+      if (data.enteredNewRoom && data.playerId === playerId) {
+        setPendingCheckQueue((prev) => [
+          ...prev,
+          { noCheck: true, kind: 'roomIntro', sourceId: data.roomId, queueId: nextCheckQueueId.current++ },
+        ]);
+      }
     }
     function onSearchEmpty(data) {
       const playerName = findPlayerName(data.playerId, gameState?.players);
       setMessages((prev) => [...prev, `${playerName} 搜索了房間，但沒有找到任何東西`]);
+    }
+    function onItemUseResolved(data) {
+      if (data.playerId !== playerId) return;
+      setPendingCheckQueue((prev) => [
+        ...prev,
+        { noCheck: true, kind: 'itemUseResolved', sourceId: data.itemId, queueId: nextCheckQueueId.current++ },
+      ]);
     }
     function onEffectPendingChoice(data) {
       setPendingEffectChoice(data);
@@ -181,6 +205,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     socket.on('game:checkResolved', onCheckResolved);
     socket.on('game:roomEntered', onRoomEntered);
     socket.on('game:searchEmpty', onSearchEmpty);
+    socket.on('game:itemUseResolved', onItemUseResolved);
 
     return () => {
       socket.off('game:prompt', onPrompt);
@@ -197,6 +222,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       socket.off('game:checkResolved', onCheckResolved);
       socket.off('game:roomEntered', onRoomEntered);
       socket.off('game:searchEmpty', onSearchEmpty);
+      socket.off('game:itemUseResolved', onItemUseResolved);
     };
   }, [socket]);
 
