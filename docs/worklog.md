@@ -1185,6 +1185,6 @@
 - eventIntro/eventNoCheck 與 CheckModal 影片/feedbacktextDice 路徑因 RNG 導向沒能手動點到，依賴自動化測試+2 輪程式碼審查佐證
 
 **開發者交代備忘事項**：
-- eventIntro/eventNoCheck 目前廣播給全房間玩家（不只抽卡的人自己會看到），設計文件沒明確規範這點，列為未來待確認的開放問題，非阻塞項目
+- eventIntro/eventNoCheck 目前廣播給全房間玩家（不只抽卡的人自己會看到）——開發者確認要改成只給抽卡的人自己看，列為下階段待辦（Handover.md 已記錄為項目 4a，含建議修法：比照 onRoomEntered/onItemUseResolved 的既有過濾寫法）
 - data/cards/README.md／event-cards.json／item-cards.json／omen-cards.json／rooms.json 目前有開發者自己的未提交修改，本階段全程未觸碰
 - 收工前已清理本次啟動的 preview 伺服器，以及 Task 3 派工時遺留、沒有正常結束的 jest 測試行程，確認系統無殘留 node 行程
