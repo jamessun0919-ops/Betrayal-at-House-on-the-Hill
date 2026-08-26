@@ -126,6 +126,41 @@ test('resolveEffects lose_item propagates ITEM_NOT_FOUND when the player does no
   ).toThrow('ITEM_NOT_FOUND');
 });
 
+test('resolveEffects lose_item with destination "deck" removes the item and pushes its full card definition onto the item deck', () => {
+  const gameState = makeGameStateWithPlayer('p1', { items: [] });
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_046' });
+  const cardDef = { id: 'item_046', name: '左輪子彈', effects: [] };
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'lose_item', itemId: 'item_046', destination: 'deck' },
+  ], { itemCatalog: [cardDef] });
+  expect(player.inventory).toEqual([]);
+  expect(gameState.itemDeck.cards).toEqual([cardDef]);
+});
+
+test('resolveEffects lose_item with destination "deck" throws UNKNOWN_ITEM_CARD when the catalog has no matching card', () => {
+  const gameState = makeGameStateWithPlayer('p1', { items: [] });
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_046' });
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'lose_item', itemId: 'item_046', destination: 'deck' },
+    ], { itemCatalog: [] })
+  ).toThrow('UNKNOWN_ITEM_CARD');
+});
+
+test('resolveEffects lose_item with destination "room" removes the item and drops it in the player\'s current room', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_047' });
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'lose_item', itemId: 'item_047', destination: 'room' },
+  ]);
+  expect(player.inventory).toEqual([]);
+  const room = gameState.board[player.floor].get(`${player.x},${player.y}`);
+  expect(room.droppedItems).toEqual([{ id: 'item_047' }]);
+});
+
 test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');

@@ -52,9 +52,19 @@ function handleGrantItem(gameState, playerId, effect) {
   return { pending: false, drawnCards: [{ id: effect.itemId }] };
 }
 
-function handleLoseItem(gameState, playerId, effect) {
+function handleLoseItem(gameState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   removeItem(player, effect.itemId);
+  if (effect.destination === 'deck') {
+    const cardDef = ((context && context.itemCatalog) || []).find((c) => c.id === effect.itemId);
+    if (!cardDef) {
+      throw new Error('UNKNOWN_ITEM_CARD');
+    }
+    gameState.itemDeck.cards.push(cardDef);
+  } else if (effect.destination === 'room') {
+    const room = getRoomForPlayer(gameState, player);
+    room.droppedItems.push({ id: effect.itemId });
+  }
   return { pending: false };
 }
 
@@ -278,7 +288,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
   action_points: (gameState, promptState, playerId, effect) => handleActionPoints(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
-  lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
+  lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),

@@ -243,22 +243,20 @@
     "description": "可以用來解渴的一罐礦泉水，除了解渴可能還有其他用處",
     "text": "單獨使用沒有任何效果，單獨使用後回到公用道具牌堆中。",
     "feedbacktextOccur": "你一口喝光了瓶中的水，不再口渴了",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_016", "destination": "deck" }],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false,
-    "isMaterial": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_017",
     "name": "一包泡麵",
     "description": "可以用來充飢的一包泡麵，看上去不太美味。「你拆開包裝吃了幾口，不那麼餓了」",
     "text": "單獨使用沒有任何效果，單獨使用後回到公用道具牌堆中",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_017", "destination": "deck" }],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false,
-    "isMaterial": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_018",
@@ -313,11 +311,10 @@
     "description": "古堡主人珍藏的烈酒，飲用之後會讓人昏昏欲睡",
     "text": "使用沒有任何效果，使用後回到公用道具牌堆中。",
     "feedbacktextOccur": "這酒對你來說太烈了",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_022", "destination": "deck" }],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false,
-    "isMaterial": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_023",
@@ -325,11 +322,10 @@
     "description": "裝在一個高腳杯中的紫紅色飲料，聞起來有葡萄甜香，隱隱有淡淡血腥味",
     "text": "使用沒有任何效果，使用後回到公用道具牌堆中。",
     "feedbacktextOccur": "你喝光了杯中的液體，不那麼口渴，也覺得飽了些",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_023", "destination": "deck" }],
     "category": "consumable",
     "canTargetOthers": false,
-    "needsCustomLogic": false,
-    "isMaterial": true
+    "needsCustomLogic": false
   },
   {
     "id": "item_024",
@@ -571,7 +567,7 @@
     "name": "左輪子彈",
     "description": "搭配左輪手槍使用的子彈",
     "text": "消耗品，被使用後重新回到公用道具牌堆",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_046", "destination": "deck" }],
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -581,7 +577,7 @@
     "name": "十字弩箭",
     "description": "搭配十字弩使用的弩箭",
     "text": "消耗品，被使用後遺留在該房間",
-    "effects": [],
+    "effects": [{ "type": "lose_item", "itemId": "item_047", "destination": "room" }],
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
