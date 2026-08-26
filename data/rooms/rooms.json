@@ -20,7 +20,7 @@
       }
     ],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_050"
   },
   {
     "id": "room_research_lab",
@@ -36,7 +36,7 @@
     "text": "可在此房間進行調配藥劑行動，玩家身上持有木炭item_029與不明粉末item_030時，可以合成黑色火藥item_002",
     "effects": [],
     "needsCustomLogic": false,
-    "item": null
+    "item": "item_038"
   },
   {
     "id": "room_library",
@@ -854,7 +854,7 @@
       }
     },
     "needsCustomLogic": false,
-    "item": ["item_038","item_039","item_034","item_028","item_026","item_044"]
+    "item": ["item_039","item_034","item_028","item_026","item_044"]
   },
   {
     "id": "room_organ",
