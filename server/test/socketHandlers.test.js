@@ -2479,6 +2479,32 @@ test('game:selectAction item use of item_050 (聖水) on another player removes 
   httpServer.close();
 });
 
+test('game:selectAction item use of item_050 (聖水) on a target with no imprint does not consume the item', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], items: [
+        { id: 'item_050', name: '聖水', effects: [{ type: 'remove_imprint' }], category: 'consumable', canTargetOthers: true },
+      ],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' });
+
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_050', targetPlayerId: otherPlayerId }, resolve)
+  );
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_050' }]);
+  expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item use with a dice_check does NOT broadcast game:itemUseResolved', async () => {
   const content = makeContent({
     cards: {

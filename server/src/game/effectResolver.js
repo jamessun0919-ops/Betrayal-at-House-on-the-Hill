@@ -78,7 +78,7 @@ function handleRemoveImprint(gameState, playerId, effect, context) {
       return cardDef && cardDef.category === 'imprint';
     });
   if (imprintIds.length === 0) {
-    return { pending: false };
+    return { pending: false, appliedCount: 0 };
   }
   const chosenId = imprintIds[Math.floor(Math.random() * imprintIds.length)];
   const cardDef = catalog.find((c) => c.id === chosenId);

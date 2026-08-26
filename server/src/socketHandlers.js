@@ -1019,10 +1019,11 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return { pending: true };
   }
   resolverEntry.pendingChoice = null;
-  const player = getPlayer(gameState, actingPlayerId || playerId);
+  const player = getPlayer(gameState, playerId);
   if (consumeItemIfApplied && effectResult.appliedCount > 0) {
     try {
-      removeItem(player, sourceId);
+      const actingPlayer = getPlayer(gameState, actingPlayerId || playerId);
+      removeItem(actingPlayer, sourceId);
     } catch (err) {
       // The item's own effects may have already removed it (e.g. an explicit
       // lose_item targeting itself) -- treat "already gone" as a benign no-op

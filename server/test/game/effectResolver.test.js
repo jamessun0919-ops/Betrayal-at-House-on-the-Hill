@@ -200,6 +200,26 @@ test('resolveEffects remove_imprint does nothing when the player holds no imprin
   expect(player.inventory).toEqual([{ id: 'item_003' }]);
 });
 
+test('resolveEffects remove_imprint reports appliedCount 0 when nothing was removed', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_003' });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { itemCatalog: [{ id: 'item_003', category: 'consumable' }] });
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('resolveEffects remove_imprint removes an imprint with a non-stat_change effect without crashing or applying anything', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_004' });
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: [{ id: 'omen_004', category: 'imprint', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }] });
+  expect(player.inventory).toEqual([]);
+});
+
 test('resolveEffects remove_imprint ignores non-imprint cards even when present in the catalogs', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
@@ -216,14 +236,14 @@ test('resolveEffects remove_imprint ignores non-imprint cards even when present 
 test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
-  player.inventory.push({ id: 'omen_008' });
+  player.inventory.push({ id: 'test_toggle_item' });
   resolveEffects(gameState, createPromptState(), 'p1', [{
     type: 'toggle_active',
-    itemId: 'omen_008',
+    itemId: 'test_toggle_item',
     activeEffects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }, { type: 'stat_change', stat: 'sanity', delta: -2 }],
     inactiveEffects: [{ type: 'stat_change', stat: 'knowledge', delta: -2 }, { type: 'stat_change', stat: 'sanity', delta: 2 }],
   }]);
-  expect(player.inventory).toEqual([{ id: 'omen_008', active: true }]);
+  expect(player.inventory).toEqual([{ id: 'test_toggle_item', active: true }]);
   expect(player.stats.knowledge.currentIndex).toBe(3); // baseIndex 1 + 2
   expect(player.stats.sanity.currentIndex).toBe(1); // baseIndex 2 - 2, clamped to the pre-haunt floor (skullIndex 0 + 1)
 });
@@ -231,14 +251,14 @@ test('resolveEffects toggle_active applies activeEffects and marks the item acti
 test('resolveEffects toggle_active applies inactiveEffects and marks the item inactive when it was active', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
-  player.inventory.push({ id: 'omen_008', active: true });
+  player.inventory.push({ id: 'test_toggle_item', active: true });
   resolveEffects(gameState, createPromptState(), 'p1', [{
     type: 'toggle_active',
-    itemId: 'omen_008',
+    itemId: 'test_toggle_item',
     activeEffects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }, { type: 'stat_change', stat: 'sanity', delta: -2 }],
     inactiveEffects: [{ type: 'stat_change', stat: 'knowledge', delta: -2 }, { type: 'stat_change', stat: 'sanity', delta: 2 }],
   }]);
-  expect(player.inventory).toEqual([{ id: 'omen_008', active: false }]);
+  expect(player.inventory).toEqual([{ id: 'test_toggle_item', active: false }]);
   expect(player.stats.knowledge.currentIndex).toBe(1); // baseIndex 1 - 2, clamped to the pre-haunt floor (skullIndex 0 + 1)
   expect(player.stats.sanity.currentIndex).toBe(4); // baseIndex 2 + 2
 });
@@ -247,7 +267,7 @@ test('resolveEffects toggle_active throws ITEM_NOT_HELD when the player does not
   const gameState = makeGameStateWithPlayer();
   expect(() =>
     resolveEffects(gameState, createPromptState(), 'p1', [{
-      type: 'toggle_active', itemId: 'omen_008', activeEffects: [], inactiveEffects: [],
+      type: 'toggle_active', itemId: 'test_toggle_item', activeEffects: [], inactiveEffects: [],
     }])
   ).toThrow('ITEM_NOT_HELD');
 });
