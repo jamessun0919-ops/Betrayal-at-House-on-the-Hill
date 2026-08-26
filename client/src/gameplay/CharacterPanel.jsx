@@ -198,7 +198,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               item ? (
                 <button
                   key={`${item.id}-${i}`}
-                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), description: findCardInfo(item.id, cardContent)?.description || '', isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent) })}
+                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), description: findCardInfo(item.id, cardContent)?.description || '', isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent), activatedOnUse: Boolean(findCardInfo(item.id, cardContent)?.activatedOnUse) })}
                   style={{
                     width: ITEM_SLOT_WIDTH,
                     flexShrink: 0,
@@ -255,7 +255,14 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               </div>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
-                {selectedItem.isOmen ? (
+                {selectedItem.category === 'imprint' ? (
+                  <>
+                    {selectedItem.activatedOnUse && (
+                      <button onClick={handleUseItem}>使用</button>
+                    )}
+                    <button onClick={closeItemMenu}>查看</button>
+                  </>
+                ) : selectedItem.isOmen ? (
                   !selectedItem.isMaterial && (
                     <button onClick={handleUseItem}>使用</button>
                   )
@@ -280,11 +287,15 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
                     )}
                   </>
                 )}
-                {roommates && roommates.length > 0 && (
+                {selectedItem.category !== 'imprint' && roommates && roommates.length > 0 && (
                   <button onClick={() => setShowGiveTargets(true)}>給予</button>
                 )}
-                <button onClick={handleLeaveItem}>遺留</button>
-                <button onClick={closeItemMenu}>取消</button>
+                {selectedItem.category !== 'imprint' && (
+                  <button onClick={handleLeaveItem}>遺留</button>
+                )}
+                {selectedItem.category !== 'imprint' && (
+                  <button onClick={closeItemMenu}>取消</button>
+                )}
               </div>
             )}
           </div>
