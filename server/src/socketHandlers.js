@@ -249,6 +249,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           selectOptions.itemCategory = itemContent ? itemContent.category : null;
         }
 
+        if (actionType === 'item' && (mode === 'give' || mode === 'leave')) {
+          const itemContent = content.cards.items.find((i) => i.id === itemId) || content.cards.omens.find((o) => o.id === itemId);
+          selectOptions.itemCategory = itemContent ? itemContent.category : null;
+        }
+
         if (actionType === 'room_action') {
           const currentPlayer = getPlayer(gameState, playerId);
           const placedRoom = gameState.board[currentPlayer.floor].get(coordKey(currentPlayer.x, currentPlayer.y));

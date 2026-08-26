@@ -3243,6 +3243,27 @@ test('game:selectAction item mode:give transfers an item to a same-room player v
   httpServer.close();
 });
 
+test('game:selectAction item mode:give rejects an imprint-category card even if the client omits itemCategory', async () => {
+  const content = makeContent({
+    cards: { events: [], items: [], omens: [{ id: 'omen_002', name: '古書', category: 'imprint', effects: [] }] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'omen_002' });
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_002', mode: 'give', targetPlayerId: otherPlayerId }, resolve)
+  );
+
+  expect(result.error).toBe('IMPRINT_CANNOT_BE_GIVEN');
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'omen_002' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item mode:leave then mode:pickup round-trips an item through a room\'s droppedItems', async () => {
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
   const gameState = getGameState(gameManager, roomCode);

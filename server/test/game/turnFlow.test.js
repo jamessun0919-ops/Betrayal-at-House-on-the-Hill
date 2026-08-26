@@ -802,6 +802,26 @@ test('selectAction item mode:leave throws ITEM_NOT_HELD when the player does not
   ).toThrow('ITEM_NOT_HELD');
 });
 
+test('selectAction item mode:give throws IMPRINT_CANNOT_BE_GIVEN for an imprint-category card', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'omen_002' });
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  player2.floor = player.floor; player2.x = player.x; player2.y = player.y;
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'omen_002', mode: 'give', targetPlayerId: 'p2', itemCategory: 'imprint' })
+  ).toThrow('IMPRINT_CANNOT_BE_GIVEN');
+  expect(player.inventory).toEqual([{ id: 'omen_002' }]);
+});
+
+test('selectAction item mode:leave throws IMPRINT_CANNOT_BE_LEFT for an imprint-category card', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.inventory.push({ id: 'omen_002' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'omen_002', mode: 'leave', itemCategory: 'imprint' })
+  ).toThrow('IMPRINT_CANNOT_BE_LEFT');
+  expect(player.inventory).toEqual([{ id: 'omen_002' }]);
+});
+
 test('selectAction item mode:pickup moves a dropped item from the room into inventory', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));

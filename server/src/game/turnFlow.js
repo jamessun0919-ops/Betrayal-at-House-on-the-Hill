@@ -423,10 +423,13 @@ function selectSummonAction(gameState, playerId, actionType, options = {}) {
   return { kind: 'item', mode: 'pickup', itemId };
 }
 
-function giveItemAction(gameState, player, itemId, targetPlayerId) {
+function giveItemAction(gameState, player, itemId, targetPlayerId, itemCategory) {
   const index = player.inventory.findIndex((item) => item.id === itemId);
   if (index === -1) {
     throw new Error('ITEM_NOT_HELD');
+  }
+  if (itemCategory === 'imprint') {
+    throw new Error('IMPRINT_CANNOT_BE_GIVEN');
   }
   const targetPlayer = requirePlayer(gameState, targetPlayerId);
   if (
@@ -443,10 +446,13 @@ function giveItemAction(gameState, player, itemId, targetPlayerId) {
   return { kind: 'item', mode: 'give', itemId, targetPlayerId };
 }
 
-function leaveItemAction(gameState, player, itemId) {
+function leaveItemAction(gameState, player, itemId, itemCategory) {
   const index = player.inventory.findIndex((item) => item.id === itemId);
   if (index === -1) {
     throw new Error('ITEM_NOT_HELD');
+  }
+  if (itemCategory === 'imprint') {
+    throw new Error('IMPRINT_CANNOT_BE_LEFT');
   }
   const [item] = player.inventory.splice(index, 1);
   clearEquipStateIfNeeded(player, itemId);
@@ -528,10 +534,10 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   if (actionType === 'item') {
     const { itemId, targetPlayerId, mode, itemCategory } = options;
     if (mode === 'give') {
-      return giveItemAction(gameState, player, itemId, targetPlayerId);
+      return giveItemAction(gameState, player, itemId, targetPlayerId, itemCategory);
     }
     if (mode === 'leave') {
-      return leaveItemAction(gameState, player, itemId);
+      return leaveItemAction(gameState, player, itemId, itemCategory);
     }
     if (mode === 'pickup') {
       return pickupItemAction(gameState, player, itemId);
