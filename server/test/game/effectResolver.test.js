@@ -161,6 +161,58 @@ test('resolveEffects lose_item with destination "room" removes the item and drop
   expect(room.droppedItems).toEqual([{ id: 'item_047' }]);
 });
 
+test('resolveEffects remove_imprint removes the player\'s only imprint and reverses its stat_change effects', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_002' });
+  const baseKnowledge = player.stats.knowledge.currentIndex;
+  player.stats.knowledge.currentIndex += 2; // simulate having already gained the imprint's +2 on acquire
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: [{ id: 'omen_002', category: 'imprint', effects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }] }] });
+  expect(player.inventory).toEqual([]);
+  expect(player.stats.knowledge.currentIndex).toBe(baseKnowledge);
+});
+
+test('resolveEffects remove_imprint picks the imprint at the index Math.random selects when multiple are held', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_005' }, { id: 'omen_006' });
+  const catalog = [
+    { id: 'omen_005', category: 'imprint', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] },
+    { id: 'omen_006', category: 'imprint', effects: [{ type: 'stat_change', stat: 'sanity', delta: 2 }] },
+  ];
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: catalog });
+  rngSpy.mockRestore();
+  expect(player.inventory).toEqual([{ id: 'omen_005' }]); // omen_006 (index 1) was removed
+});
+
+test('resolveEffects remove_imprint does nothing when the player holds no imprints', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_003' });
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { itemCatalog: [{ id: 'item_003', category: 'consumable' }] });
+  expect(player.inventory).toEqual([{ id: 'item_003' }]);
+});
+
+test('resolveEffects remove_imprint ignores non-imprint cards even when present in the catalogs', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_003' }, { id: 'omen_003' });
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], {
+    itemCatalog: [{ id: 'item_003', category: 'consumable' }],
+    omenCatalog: [{ id: 'omen_003', category: 'consumable' }],
+  });
+  expect(player.inventory).toEqual([{ id: 'item_003' }, { id: 'omen_003' }]);
+});
+
 test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');

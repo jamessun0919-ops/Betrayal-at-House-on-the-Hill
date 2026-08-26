@@ -68,6 +68,29 @@ function handleLoseItem(gameState, playerId, effect, context) {
   return { pending: false };
 }
 
+function handleRemoveImprint(gameState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  const catalog = [...((context && context.itemCatalog) || []), ...((context && context.omenCatalog) || [])];
+  const imprintIds = player.inventory
+    .map((item) => item.id)
+    .filter((id) => {
+      const cardDef = catalog.find((c) => c.id === id);
+      return cardDef && cardDef.category === 'imprint';
+    });
+  if (imprintIds.length === 0) {
+    return { pending: false };
+  }
+  const chosenId = imprintIds[Math.floor(Math.random() * imprintIds.length)];
+  const cardDef = catalog.find((c) => c.id === chosenId);
+  removeItem(player, chosenId);
+  for (const cardEffect of cardDef.effects || []) {
+    if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase) {
+      changeStat(player, cardEffect.stat, -cardEffect.delta, gameState.hauntStarted);
+    }
+  }
+  return { pending: false };
+}
+
 // Moves the player to wherever a specific room (by id) is currently placed
 // on the board -- floor-agnostic by design, so it keeps working once a third
 // floor exists. Used by the entrance-hall stairs rooms (LobbyC <-> upper
@@ -289,6 +312,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   action_points: (gameState, promptState, playerId, effect) => handleActionPoints(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
+  remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, playerId, effect, context),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
