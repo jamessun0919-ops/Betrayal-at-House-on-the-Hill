@@ -97,6 +97,7 @@ const ITEM_SLOT_WIDTH = '22.5%';
 export default function CharacterPanel({ player, cardContent, characterContent, onSelectAction, roommates }) {
   const [selectedItem, setSelectedItem] = useState(null); // { itemId, name, isMaterial, category, isOmen } | null
   const [showGiveTargets, setShowGiveTargets] = useState(false);
+  const [showUseTargets, setShowUseTargets] = useState(false);
 
   const speed = player.stats.speed;
   const maxActionPoints = speed.track[speed.currentIndex] + (speed.overflow || 0);
@@ -105,10 +106,18 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
   function closeItemMenu() {
     setSelectedItem(null);
     setShowGiveTargets(false);
+    setShowUseTargets(false);
   }
-  function handleUseItem() {
-    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'use' });
+  function handleUseItem(targetPlayerId) {
+    onSelectAction('item', { itemId: selectedItem.itemId, mode: 'use', ...(targetPlayerId ? { targetPlayerId } : {}) });
     closeItemMenu();
+  }
+  function handleUseClick() {
+    if (selectedItem.canTargetOthers && roommates && roommates.length > 0) {
+      setShowUseTargets(true);
+    } else {
+      handleUseItem();
+    }
   }
   function handleLeaveItem() {
     onSelectAction('item', { itemId: selectedItem.itemId, mode: 'leave' });
@@ -198,7 +207,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
               item ? (
                 <button
                   key={`${item.id}-${i}`}
-                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), description: findCardInfo(item.id, cardContent)?.description || '', isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent), activatedOnUse: Boolean(findCardInfo(item.id, cardContent)?.activatedOnUse) })}
+                  onClick={() => setSelectedItem({ itemId: item.id, name: findCardName(item.id, cardContent), description: findCardInfo(item.id, cardContent)?.description || '', isMaterial: Boolean(findCardInfo(item.id, cardContent)?.isMaterial), category: findCardCategory(item.id, cardContent), isOmen: isOmenCard(item.id, cardContent), activatedOnUse: Boolean(findCardInfo(item.id, cardContent)?.activatedOnUse), canTargetOthers: Boolean(findCardInfo(item.id, cardContent)?.canTargetOthers) })}
                   style={{
                     width: ITEM_SLOT_WIDTH,
                     flexShrink: 0,
@@ -253,18 +262,28 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
                 ))}
                 <button onClick={() => setShowGiveTargets(false)}>返回</button>
               </div>
+            ) : showUseTargets ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <button onClick={() => handleUseItem()}>自己</button>
+                {(roommates || []).map((p) => (
+                  <button key={p.playerId} onClick={() => handleUseItem(p.playerId)}>
+                    {p.name}
+                  </button>
+                ))}
+                <button onClick={() => setShowUseTargets(false)}>返回</button>
+              </div>
             ) : (
               <div style={{ display: 'flex', gap: 8 }}>
                 {selectedItem.category === 'imprint' ? (
                   <>
                     {selectedItem.activatedOnUse && (
-                      <button onClick={handleUseItem}>使用</button>
+                      <button onClick={handleUseClick}>使用</button>
                     )}
                     <button onClick={closeItemMenu}>查看</button>
                   </>
                 ) : selectedItem.isOmen ? (
                   !selectedItem.isMaterial && (
-                    <button onClick={handleUseItem}>使用</button>
+                    <button onClick={handleUseClick}>使用</button>
                   )
                 ) : (
                   <>
@@ -283,7 +302,7 @@ export default function CharacterPanel({ player, cardContent, characterContent, 
                       )
                     )}
                     {(selectedItem.category === 'consumable' || selectedItem.category === 'reusable') && !selectedItem.isMaterial && (
-                      <button onClick={handleUseItem}>使用</button>
+                      <button onClick={handleUseClick}>使用</button>
                     )}
                   </>
                 )}
