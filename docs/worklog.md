@@ -1188,3 +1188,32 @@
 - eventIntro/eventNoCheck 目前廣播給全房間玩家（不只抽卡的人自己會看到）——開發者確認要改成只給抽卡的人自己看，列為下階段待辦（Handover.md 已記錄為項目 4a，含建議修法：比照 onRoomEntered/onItemUseResolved 的既有過濾寫法）
 - data/cards/README.md／event-cards.json／item-cards.json／omen-cards.json／rooms.json 目前有開發者自己的未提交修改，本階段全程未觸碰
 - 收工前已清理本次啟動的 preview 伺服器，以及 Task 3 派工時遺留、沒有正常結束的 jest 測試行程，確認系統無殘留 node 行程
+
+## 2026-08-26 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者要求處理修改後 item/event/omen 的 effect 欄位，依 text 內容填寫。先查證未提交的資料改動範圍，發現比預期大很多（8 張預兆卡改成新分類 imprint、新增 event_036/item_050）
+- 確認範圍：52 張 effects:[] 的卡片全部要處理，先做現有機制可直接寫的，需要新機制的列為待辦
+- 完成 4 張現有機制可直接寫的卡片（event_018/034、item_021/032）
+- 新增 action_points 效果類型（歸零/相對扣減），補完 5 張行動力事件卡（event_017/020/023/024/025），event_004 行動力部分補上、移動回前一個房間部分維持待補
+- event_012/022 開發者補完文字後處理：event_022 完整可做，event_012 失敗分支是 M3 傷害缺口，修正 needsCustomLogic 誤標
+- 房間門狀態變動 4 張事件卡（014/015/016/028）查證後確認需要兩種全新能力，開發者確認列為待辦（Handover 項目 13）
+- 擴充 lose_item 效果新增 destination 欄位，補完 item_046/047；開發者追問 item_022/023 是否套用同機制，發現 item_016/017 也是一樣模式，一併處理共 4+2 張；開發者進一步指示這 4 張的 category 要優先於 isMaterial，移除其 isMaterial:true（查證後確認純前端旗標，伺服器不讀取，不影響廚房合成機制）
+- 開發者說明銘印機制設計方向（跟道具一樣影響屬性、不能給予/遺留、只能被特定道具/事件消除、放同一個道具欄），走完整 brainstorming：反向復原機制確認系統自動計算；獵犬/面具的主動觸發衝突分別確認保留使用鈕／改寫成純被動
+- 設計文件寫完並 commit，開發者確認無需修改，呼叫 writing-plans 產出 4 個任務的實作計畫，過程中查證發現 item_050 需要一併補上 canTargetOthers 資料修正、新增 remove_imprint 需要 omenCatalog 才能查到預兆卡定義（既有 context 只有 itemCatalog）
+- 開發者確認執行方式為 Subagent-Driven，選擇先收工，下次開工直接開始派工
+
+**完成項目**：
+- 6 張卡片的 effects 補完（event_018/034、item_021/032/046/047）並合併進 main
+- action_points 新效果類型 + 5 張行動力事件卡（event_017/020/023/024/025）
+- event_012/022 文字補完後的處理
+- lose_item 擴充 destination 欄位 + item_016/017/022/023/046/047 共 6 張卡片、isMaterial 選單優先權修正
+- 銘印機制——設計文件、實作計畫全部完成並 commit，尚未開始實作
+
+**遇到瓶頸**：
+- 無重大瓶頸，多次發現的資料不一致（item_032/050 的 canTargetOthers、event_012/004 的 needsCustomLogic 誤標）都是查證程式碼/資料後直接修正，未卡住流程
+
+**開發者交代備忘事項**：
+- 下次開工第一件事：Subagent-Driven 執行 docs/superpowers/plans/2026-08-26-imprint-mechanism.md 的 Task 1
+- 房間門狀態變動事件卡（event_014/015/016/028）跟 event_036 的隨機加值子機制，都列為待辦，需要先 brainstorm 才能動工
+- 收工前確認系統無殘留 node 行程，本階段沒有啟動任何伺服器
