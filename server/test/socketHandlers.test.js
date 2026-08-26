@@ -2450,6 +2450,35 @@ test('game:selectAction item use with canTargetOthers broadcasts game:itemUseRes
   httpServer.close();
 });
 
+test('game:selectAction item use of item_050 (聖水) on another player removes the target\'s imprint, not the user\'s', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], items: [
+        { id: 'item_050', name: '聖水', effects: [{ type: 'remove_imprint' }], category: 'consumable', canTargetOthers: true },
+      ],
+      omens: [
+        { id: 'omen_002', name: '古書', category: 'imprint', effects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }] },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' }, { id: 'omen_002' });
+  getPlayer(gameState, otherPlayerId).inventory.push({ id: 'omen_002' });
+
+  await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_050', targetPlayerId: otherPlayerId }, resolve)
+  );
+
+  expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([]);
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'omen_002' }]); // item_050 itself is consumed by consumeItemIfApplied, the user's own omen_002 is untouched
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item use with a dice_check does NOT broadcast game:itemUseResolved', async () => {
   const content = makeContent({
     cards: {

@@ -61,20 +61,10 @@
   { "id": "omen_008", "name": "面具", 
     "description":"踏入房間後，一幅景象逐漸浮現。一名平凡男子拾起古老的木製面具，好奇地將它覆上臉龐。面具瞬間緊貼皮膚，整個人瘋狂旋轉變形；再次現身時，他已化為綠色面孔的怪人，舉手投足都能扭曲現實。你的手臂上出現了一個「面具」的印記",
     "text": "持有「面具」時，玩家速度上升兩個級別，知識下降兩個級別。若失去「面具」，速度下降兩個級別，知識上升兩個級別。", 
-    "effects": [{
-    "type": "dice_check",
-    "stat": "sanity",
-    "tiers": [
-      { "min": 4, "max": 8, "effects": [{
-        "type": "toggle_active",
-        "itemId": "omen_008",
-        "activeEffects": [{ "type": "stat_change", "stat": "knowledge", "delta": 2 }, { "type": "stat_change", "stat": "sanity", "delta": -2 }],
-        "inactiveEffects": [{ "type": "stat_change", "stat": "knowledge", "delta": -2 }, { "type": "stat_change", "stat": "sanity", "delta": 2 }]
-      }] },
-      { "min": 0, "max": 3, "effects": [] }
-    ]
-  }], 
-    "activatedOnUse": true, 
+    "effects": [
+      { "type": "stat_change", "stat": "speed", "delta": 2 },
+      { "type": "stat_change", "stat": "knowledge", "delta": -2 }
+    ], 
     "category": "imprint", 
     "needsCustomLogic": false 
 },

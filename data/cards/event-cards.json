@@ -385,8 +385,8 @@
     "description": "你在房間裡發現一台神秘儀器，旁邊的說明書詳細說明了如何進行能量的轉換，可以將這間古堡內的神祕能量，做為強化身體素質的燃料",
     "text": "如果角色身上有銘印，隨機消滅一個銘印，並提升一個隨機能力的級別。",
     "feedbacktextOccur": "你手臂上的一個詭異印記消失，你感覺一股能量改造了你的身體。",
-    "effects": [],
-    "needsCustomLogic": false
+    "effects": [{ "type": "remove_imprint" }],
+    "needsCustomLogic": true
   }
 
 ]

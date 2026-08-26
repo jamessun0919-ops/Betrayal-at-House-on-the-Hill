@@ -777,20 +777,20 @@ test('selectAction item mode:leave clears the player\'s wornGearIds when leaving
   expect(player.wornGearIds).toEqual([]);
 });
 
-test('selectAction item mode:leave preserves the item object\'s extra fields (e.g. an activated mask\'s active flag)', () => {
+test('selectAction item mode:leave preserves the item object\'s extra fields (e.g. a toggled flag)', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  player.inventory.push({ id: 'omen_008', active: true });
-  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'leave' });
+  player.inventory.push({ id: 'test_flagged_item', active: true });
+  selectAction(gameState, 'p1', 'item', { itemId: 'test_flagged_item', mode: 'leave' });
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
-  expect(room.droppedItems).toEqual([{ id: 'omen_008', active: true }]);
+  expect(room.droppedItems).toEqual([{ id: 'test_flagged_item', active: true }]);
 });
 
 test('selectAction item mode:leave then mode:pickup round-trips the item object without losing extra fields', () => {
   const { gameState, player } = makeGameStateWithPlayer();
-  player.inventory.push({ id: 'omen_008', active: true });
-  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'leave' });
-  selectAction(gameState, 'p1', 'item', { itemId: 'omen_008', mode: 'pickup' });
-  expect(player.inventory).toEqual([{ id: 'omen_008', active: true }]);
+  player.inventory.push({ id: 'test_flagged_item', active: true });
+  selectAction(gameState, 'p1', 'item', { itemId: 'test_flagged_item', mode: 'leave' });
+  selectAction(gameState, 'p1', 'item', { itemId: 'test_flagged_item', mode: 'pickup' });
+  expect(player.inventory).toEqual([{ id: 'test_flagged_item', active: true }]);
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
   expect(room.droppedItems).toEqual([]);
 });

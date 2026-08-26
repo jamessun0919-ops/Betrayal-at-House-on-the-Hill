@@ -607,10 +607,10 @@
     "name": "聖水",
     "description": "以精緻的高腳杯裝的一杯清澈液體，在祭壇上接受月光的沐浴，有著洗滌邪惡的效果",
     "text": "對自己或對同房間玩家使用，消除其身上的一個銘蔭效果。",
-    "effects": [],
+    "effects": [{ "type": "remove_imprint" }],
     "category": "consumable",
     "feedbacktextOccur":"「你使用聖水消除了身上的詭異印記」",
-    "canTargetOthers": false,
+    "canTargetOthers": true,
     "needsCustomLogic": false
   }
  

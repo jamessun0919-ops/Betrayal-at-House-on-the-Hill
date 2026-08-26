@@ -352,7 +352,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const targetForEffects = result.targetPlayerId || playerId;
             const moveToRoomEffect = sourceEffects.find((e) => e.type === 'move_to_room');
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
-            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
+            const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, playerId);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
               io.to(roomCode).emit('game:itemUseResolved', { playerId, itemId });
               if (targetForEffects !== playerId) {
@@ -991,7 +991,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
 // now or wait until the choice this call may have just opened gets resolved
 // (see M2c-2 final review, Critical C1: advancing the turn while a choice is
 // still pending let a second card draw collide with the first).
-function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false, content = null, rollChoiceTimeouts = null, rollChoiceTimeoutMs = 20000, inventoryChoiceTimeoutMs = 20000) {
+function handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied = false, content = null, rollChoiceTimeouts = null, rollChoiceTimeoutMs = 20000, inventoryChoiceTimeoutMs = 20000, actingPlayerId = null) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   if (effectResult.pending && effectResult.rollChoice) {
     return handleRollChoicePending(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, consumeItemIfApplied, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, effectChoiceTimeouts, content);
@@ -1019,7 +1019,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return { pending: true };
   }
   resolverEntry.pendingChoice = null;
-  const player = getPlayer(gameState, playerId);
+  const player = getPlayer(gameState, actingPlayerId || playerId);
   if (consumeItemIfApplied && effectResult.appliedCount > 0) {
     try {
       removeItem(player, sourceId);
