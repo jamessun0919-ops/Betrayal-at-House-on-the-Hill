@@ -54,6 +54,34 @@ test('resolveEffects does not lower a stat that is already at or above baseIndex
   expect(player.stats.might.currentIndex).toBe(4); // unchanged, restoreToBase only raises
 });
 
+test('resolveEffects action_points sets actionPoints to the given setTo value', () => {
+  const gameState = makeGameStateWithPlayer();
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'action_points', setTo: 0 },
+  ]);
+  expect(gameState.players.get('p1').actionPoints).toBe(0);
+});
+
+test('resolveEffects action_points applies a negative delta, clamped at 0', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.actionPoints = 0;
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'action_points', delta: -1 },
+  ]);
+  expect(player.actionPoints).toBe(0); // already 0, does not go negative
+});
+
+test('resolveEffects action_points applies a negative delta above 0', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.actionPoints = 4;
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'action_points', delta: -1 },
+  ]);
+  expect(player.actionPoints).toBe(3);
+});
+
 test('resolveEffects processes multiple effects in order', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [

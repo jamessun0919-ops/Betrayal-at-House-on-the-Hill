@@ -45,13 +45,8 @@
     "description": "你正在探索時，手中的手電筒忽然閃爍幾下，微弱的光束迅速黯淡，最後徹底熄滅。黑暗瞬間吞沒四周，只剩不知從何處傳來的細碎腳步聲。",
     "text": "行動力歸零，角色移動回前一個房間。",
     "feedbacktextOccur": "你在被黑暗壟罩之前，及時退出了房間。手電筒閃爍了幾下，又恢復正常了",
-    "effects": [{
-      "type": "persistent_modifier",
-      "appliesTo": "player",
-      "effects": [{ "hookType": "blocksOpenDoor" }],
-      "removeWhen": [{ "type": "meetsAnotherPlayer" }, { "type": "holdsItem", "itemId": "item_010" }]
-    }],
-    "needsCustomLogic": false
+    "effects": [{ "type": "action_points", "setTo": 0 }],
+    "needsCustomLogic": true
   },
   {
     "id": "event_005",
@@ -158,7 +153,7 @@
     "id": "event_012",
     "name": "毒蛇襲擊",
     "description": "腳邊的陰影忽然竄動。一條毒蛇從破舊家具下猛然撲出，張開毒牙直取你的小腿。你倉促向後閃避，蛇身隨即盤起，發出尖銳嘶聲；冰冷的雙眼緊盯著你，隨時準備再次發動攻擊。",
-    "text": "以速度進行考驗。骰數大於等於４：；骰數０到３：",
+    "text": "以速度進行考驗。骰數大於等於４：通過；骰數０到３：失敗",
     "feedbacktextDice": {"4+":"你爆發出了潛力，驚險躲過了毒蛇，你感覺更靈巧了(速度提升一個級別)","0-3":"你盡力躲避，但還是受到了一點傷害"},
     "effects": [],
     "needsCustomLogic": false
@@ -203,8 +198,8 @@
     "description": "一縷帶著異樣甜味的白煙便從牆角緩緩湧出。吸入幾口後，視野開始扭曲，四肢也逐漸失去力氣。你試圖轉身逃離，意識卻迅速模糊，最終倒在冰冷的地板上，徹底失去了知覺。",
     "text": "行動力歸零。",
     "feedbacktextOccur": "你昏了過去",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{ "type": "action_points", "setTo": 0 }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_018",
@@ -230,14 +225,14 @@
     "description": "經過斑駁的牆壁時，一隻慘白乾瘦的手臂突然從裂縫中伸出，死死抓住你的手腕。冰冷手指逐漸收緊，拚命將你拖向牆內。你費盡力氣掙脫後，那隻手卻瞬間縮回，只留下幾道發紫的指痕。",
     "text": "行動力歸零，力量下降一個級別。",
     "feedbacktextOccur": "被詭手抓過的地方持續感受到冰冷的寒意（力量下降一個級別）",
-    "effects": [],
+    "effects": [{ "type": "action_points", "setTo": 0 }, { "type": "stat_change", "stat": "might", "delta": -1 }],
     "needsCustomLogic": false
   },
   {
     "id": "event_021",
     "name": "墜落吊燈",
     "description": "頭頂忽然傳來金屬斷裂的刺耳聲響。懸掛多年的巨大吊燈猛然墜落，在你身旁重重砸碎。玻璃與金屬碎片四處飛濺，你狼狽地閃向一旁，只差一步便會被壓在下面。",
-    "text": "以速度進行考驗。骰數大於等於４：；骰數０到３：",
+    "text": "以速度進行考驗。骰數大於等於４：通過；骰數０到３：速度下降一",
     "feedbacktextDice": {"4+":"你驚險閃過了砸落的物品，雖然飛濺的碎片在你身上划出了一些傷口，但是沒有大礙（無事發生）","0-3":"你閃避不及，被壓傷了腿（速度下降一個級別）"},
     "effects": [],
     "needsCustomLogic": true
@@ -246,7 +241,7 @@
     "id": "event_022",
     "name": "詭鏡",
     "description": "經過一面布滿污漬的古老鏡子時，你無意間瞥見自己的倒影。起初一切正常，直到你轉身離開，鏡中的「你」卻依舊站在原地。它緩緩抬起頭，嘴角浮現詭異笑容，目光始終追隨著你的身影。",
-    "text": "以意志進行考驗。骰數大於等於４：；骰數０到３：",
+    "text": "以意志進行考驗。骰數大於等於４：獲得一件物品；骰數０到３：知識下降一",
     "feedbacktextDice": {"4+":"你堅定地認為是幻覺，鼓起勇氣拿起手上的東西朝鏡子砸去，鏡子破碎後露出一個暗格（隨機取得一件物品）","0-3":"你被嚇得倉皇失措，跌坐在地上撞到了頭（知識下降一個級別）"},
     "effects": [],
     "needsCustomLogic": false
@@ -257,8 +252,14 @@
     "description": "冰冷的房間裡，一座老舊壁爐竟仍燃著微弱餘火。你靠近火光坐下，久違的溫暖逐漸驅散身上的寒意與疲憊。雖然不知道是誰留下了火種，但短暫的休息讓你重新恢復了繼續探索的力氣。",
     "text": "行動力歸零，所有低於角色初始級別的能力，都恢復到初始級別，高於初始級別的能力不變動。",
     "feedbacktextOccur": "充分的休息讓你受創的身心得到了極大的改善",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [
+      { "type": "action_points", "setTo": 0 },
+      { "type": "stat_change", "stat": "might", "restoreToBase": true },
+      { "type": "stat_change", "stat": "speed", "restoreToBase": true },
+      { "type": "stat_change", "stat": "knowledge", "restoreToBase": true },
+      { "type": "stat_change", "stat": "sanity", "restoreToBase": true }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_024",
@@ -266,7 +267,11 @@
     "description": "你在倒塌的櫃子旁發現一只沾滿灰塵的急救箱。箱扣雖已生鏽，裡面的繃帶、消毒用品與藥物卻仍保存完好。這些物資或許是過去某位探索者留下的，如今正好能處理你一路累積的傷勢。",
     "text": "行動力歸零，如力量、速度或兩者都低於角色初始級別，則恢復到初始級別，高於初始級別則不變動。",
     "feedbacktextOccur": "你打開了急救箱，治療了你身上的創傷",
-    "effects": [],
+    "effects": [
+      { "type": "action_points", "setTo": 0 },
+      { "type": "stat_change", "stat": "might", "restoreToBase": true },
+      { "type": "stat_change", "stat": "speed", "restoreToBase": true }
+    ],
     "needsCustomLogic": false
   },
   {
@@ -275,8 +280,11 @@
     "description": "牆上一幅傾斜的古老肖像引起了你的注意。將沉重畫框移開後，後方竟露出一個隱藏暗格。鏽蝕的小門被緩緩拉開，裡面靜靜躺著幾件被刻意藏起的物品，或許能成為接下來探索的重要助力。",
     "text": "行動力減一，從公用牌堆中得到一件隨機物品。該房間仍能正常行動探索。",
     "feedbacktextOccur": "你很仔細地尋找，終於找到了被隱藏的物品（行動力減一，得到隨機物品）",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [
+      { "type": "action_points", "delta": -1 },
+      { "type": "draw_card", "deck": "item", "count": 1 }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_026",

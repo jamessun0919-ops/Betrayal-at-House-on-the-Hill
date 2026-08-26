@@ -36,6 +36,16 @@ function handleStatChange(gameState, playerId, effect) {
   return { pending: false };
 }
 
+function handleActionPoints(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  if (effect.setTo !== undefined) {
+    player.actionPoints = effect.setTo;
+  } else {
+    player.actionPoints = Math.max(0, player.actionPoints + effect.delta);
+  }
+  return { pending: false };
+}
+
 function handleGrantItem(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   addItem(player, { id: effect.itemId });
@@ -266,6 +276,7 @@ function resolveChoiceOption(options, optionId) {
 
 const HANDLERS = Object.assign(Object.create(null), {
   stat_change: (gameState, promptState, playerId, effect) => handleStatChange(gameState, playerId, effect),
+  action_points: (gameState, promptState, playerId, effect) => handleActionPoints(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect) => handleLoseItem(gameState, playerId, effect),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
