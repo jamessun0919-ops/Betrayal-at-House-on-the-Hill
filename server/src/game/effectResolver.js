@@ -3,6 +3,7 @@ const { changeStat, addItem, removeItem, getStatValue, movePlayerTo } = require(
 const { attachModifier } = require('./modifiers');
 const { coordKey, DIRECTION_DELTA } = require('./boardGenerator');
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
+const { dropToBasement } = require('./collapseFall');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
 const { createPrompt } = require('./promptState');
 const { hasCards, drawCard } = require('./cardDeck');
@@ -136,6 +137,13 @@ function handleAddRoomDoor(gameState, playerId) {
       neighbor.doorSides.push(facingSide);
     }
   }
+  return { pending: false };
+}
+
+function handleFallToBasement(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  const currentRoom = getRoomForPlayer(gameState, player);
+  dropToBasement(gameState, player, currentRoom);
   return { pending: false };
 }
 
@@ -363,6 +371,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, playerId, effect, context),
   remove_room_doors: (gameState, promptState, playerId, effect) => handleRemoveRoomDoors(gameState, playerId, effect),
   add_room_door: (gameState, promptState, playerId, effect) => handleAddRoomDoor(gameState, playerId),
+  fall_to_basement: (gameState, promptState, playerId) => handleFallToBasement(gameState, playerId),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),

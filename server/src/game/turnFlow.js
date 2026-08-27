@@ -1,6 +1,7 @@
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordKey, DIRECTION_DELTA, isDoorLayoutFeasible } = require('./boardGenerator');
-const { drawRoom, drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
+const { drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
+const { dropToBasement } = require('./collapseFall');
 const { getPlayer } = require('./gameState');
 const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem, clearEquipStateIfNeeded } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
@@ -264,30 +265,20 @@ function applyCollapseCheck(gameState, player, placedRoom, rolled) {
   if (rolled >= COLLAPSE_CHECK_MIN) {
     return { fell: false, rolled, stat: COLLAPSE_CHECK_STAT, required: COLLAPSE_CHECK_MIN, roomId: placedRoom.roomId };
   }
-  const guaranteedSide = SIDES[Math.floor(Math.random() * SIDES.length)];
-  const basementRoomDefinition = drawRoom(gameState.roomDeck, 'basement');
-  const basementRoom = placeRoomAt(
-    gameState.board,
-    'basement',
-    placedRoom.x,
-    placedRoom.y,
-    basementRoomDefinition,
-    guaranteedSide
-  );
-  // Recorded on the collapsed room's own board instance (not the static
-  // room definition) so later players standing here can find where "down"
-  // leads without re-rolling -- see the room_action jump-down mechanic.
-  placedRoom.collapseLink = { x: basementRoom.x, y: basementRoom.y };
-  movePlayerTo(player, 'basement', basementRoom.x, basementRoom.y, null);
+  // dropToBasement also records placedRoom.collapseLink (on the collapsed
+  // room's own board instance, not the static room definition) so later
+  // players standing here can find where "down" leads without re-rolling --
+  // see the room_action jump-down mechanic.
+  const { basementRoomId, x, y } = dropToBasement(gameState, player, placedRoom);
   return {
     fell: true,
     rolled,
     stat: COLLAPSE_CHECK_STAT,
     required: COLLAPSE_CHECK_MIN,
     roomId: placedRoom.roomId,
-    basementRoomId: basementRoom.roomId,
-    x: basementRoom.x,
-    y: basementRoom.y,
+    basementRoomId,
+    x,
+    y,
   };
 }
 

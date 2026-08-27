@@ -1000,3 +1000,20 @@ test('resolveEffects take_previewed_card no-ops gracefully if the card already l
   expect(result).toEqual({ pending: false, appliedCount: 0 });
   expect(gameState.players.get('p1').inventory).toEqual([]);
 });
+
+test('resolveEffects fall_to_basement drops the player into a new basement room at the same (x,y)', () => {
+  const gameState = createGameState(STARTING_ROOMS, [{ id: 'room_basement_new', doors: 4, floor: 'basement' }]);
+  addPlayer(gameState, { playerId: 'p1', name: 'Alice', stats: makeStats() });
+  const player = gameState.players.get('p1');
+  const currentRoom = { roomId: 'room_current', x: 8, y: 8, doorSides: ['north'], droppedItems: [], item: null };
+  gameState.board.ground.set('8,8', currentRoom);
+  player.floor = 'ground';
+  player.x = 8;
+  player.y = 8;
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'fall_to_basement' },
+  ]);
+  expect(player.floor).toBe('basement');
+  expect(gameState.board.basement.get('8,8').roomId).toBe('room_basement_new');
+  expect(currentRoom.collapseLink).toEqual({ x: 8, y: 8 });
+});
