@@ -17,7 +17,7 @@ event_028（秘密通道）：抽出此卡時檢查，如果當前房間為四�
 
 查證現有程式碼確認以下兩點，作為設計依據：
 
-- **這 4 張卡的抽卡時機必定伴隨明確的進入方向。** 事件卡只在新開門進入房間時觸發抽卡（`turnFlow.js` 的 `open_door` 流程，`pendingCardDraw` 只在 `placeNewRoom` 之後設置，且一定緊接 `movePlayerTo(player, ..., OPPOSITE_SIDE[direction])`）。因此 `player.enteredFromSide` 在這 4 張卡觸發的當下必定是有效方向，不會是出生點/樓梯抵達時的 `null`，014/015 不需要處理「無進入方向」的邊界情況。
+- **這 4 張卡的抽卡時機通常伴隨明確的進入方向，但有一個例外會讓 `enteredFromSide` 為 `null`。** 事件卡只在新開門進入房間時觸發抽卡（`turnFlow.js` 的 `open_door` 流程，`pendingCardDraw` 只在 `placeNewRoom` 之後設置，且一定緊接 `movePlayerTo(player, ..., OPPOSITE_SIDE[direction])`），這個路徑下 `player.enteredFromSide` 必定是有效方向。**例外**：`room_collapsed_room` 的 `drawType:"event"` 會在骰速度檢定失敗、玩家透過 `dropToBasement` 落到地下室之後才解析事件卡效果——`dropToBasement`／`movePlayerTo` 會把 `enteredFromSide` 設為 `null`（落下不是「從某個方向開門進入」），此時若抽到的正是 014/015（`remove_room_doors`），卡片解析時看到的就是 `null`。`remove_room_doors` 的實作（`effectResolver.js` 的 `handleRemoveRoomDoors`）已對此加了防呆：`enteredFromSide` 為 `null` 時直接回傳 `{ pending: false, appliedCount: 0 }`（無操作），不會假設它必為有效方向，也不會因此清空剛放置、通常還沒有鄰房的地下室房間的所有門。
 - **現有崩塌機制不施加物理傷害。** `applyCollapseCheck`（`turnFlow.js:263-292`）的 fail 分支明確記載「不施加物理傷害，因為 M3 傷害分配系統（玩家自選哪個屬性承受傷害）尚未存在，這是刻意保留的缺口」。event_016 卡面 `feedbacktextOccur`「落地時受了一點傷」延用同樣的缺口範圍，這次不施加傷害（開發者確認）。
 
 ## 能力一：`redrawIf` 條件重抽

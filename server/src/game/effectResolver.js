@@ -97,7 +97,21 @@ function handleRemoveRoomDoors(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   const room = getRoomForPlayer(gameState, player);
   const enteredFromSide = player.enteredFromSide;
+  if (!enteredFromSide) {
+    // Can happen when a collapsed-room fall drops the player into a fresh
+    // basement room before this event card's own draw resolves against it
+    // (see docs/superpowers/specs/2026-08-27-room-door-state-design.md,
+    // 前置事實確認) -- no valid entry side to remove doors relative to, so
+    // no-op rather than stripping every door off a room with no neighbors.
+    return { pending: false, appliedCount: 0 };
+  }
   if (effect.mode === 'entry') {
+    if (room.doorSides.length <= 1) {
+      // redrawIf (roomDoorCount==1) is not a hard guarantee -- drawFeasibleCard
+      // can still hand out a rejected card as a fallback. Removing the only
+      // remaining door would leave the room with zero doors, so no-op instead.
+      return { pending: false, appliedCount: 0 };
+    }
     room.doorSides = room.doorSides.filter((side) => side !== enteredFromSide);
     const delta = DIRECTION_DELTA[enteredFromSide];
     const neighbor = gameState.board[player.floor].get(coordKey(player.x + delta.dx, player.y + delta.dy));

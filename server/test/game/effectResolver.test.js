@@ -265,6 +265,36 @@ test('resolveEffects remove_room_doors mode:"unexplored_except_entry" strips une
   expect(gameState.board.ground.get('20,20').doorSides.slice().sort()).toEqual(['north', 'south']);
 });
 
+test('resolveEffects remove_room_doors returns a no-op when player.enteredFromSide is null', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  player.enteredFromSide = null; // e.g. just dropped into a freshly placed basement room via collapse fall
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east'], droppedItems: [], item: null });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_room_doors', mode: 'unexplored_except_entry' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(gameState.board.ground.get('20,20').doorSides).toEqual(['north', 'east']);
+});
+
+test('resolveEffects remove_room_doors mode:"entry" returns a no-op instead of removing the last door when the room has only 1 door', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  player.enteredFromSide = 'north';
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north'], droppedItems: [], item: null });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_room_doors', mode: 'entry' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(gameState.board.ground.get('20,20').doorSides).toEqual(['north']);
+});
+
 test('resolveEffects add_room_door adds a door on the only doorless side and syncs an already-placed neighbor there', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
