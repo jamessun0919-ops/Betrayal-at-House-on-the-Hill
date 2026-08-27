@@ -1699,6 +1699,76 @@ test('drawing a card whose effect is a dice_check broadcasts a cardCheck game:ch
   httpServer.close();
 });
 
+test('an event card with redrawIf roomDoorCount==4 is skipped when the room actually has 4 doors, drawing the next card instead', async () => {
+  const REDRAW_CARD = { id: 'event_x', name: '重抽測試', text: '測試', redrawIf: { check: 'roomDoorCount', op: '==', value: 4 }, effects: [], needsCustomLogic: false };
+  const NORMAL_CARD = { id: 'event_y', name: '一般事件', text: '測試', effects: [], needsCustomLogic: false };
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: { events: [REDRAW_CARD, NORMAL_CARD], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const cardDrawn = await cardDrawnPromise;
+
+  expect(cardDrawn.cardId).toBe('event_y'); // event_x was rejected (room really has 4 doors)
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState.eventDeck.cards.some((c) => c.id === 'event_x')).toBe(true); // cycled to the bottom, not lost
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('an event card with redrawIf roomDoorCount==4 is drawn normally when the room does not have 4 doors', async () => {
+  const REDRAW_CARD = { id: 'event_x', name: '重抽測試', text: '測試', redrawIf: { check: 'roomDoorCount', op: '==', value: 4 }, effects: [], needsCustomLogic: false };
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 2, floor: 'ground', drawType: 'event' }],
+    cards: { events: [REDRAW_CARD], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const cardDrawn = await cardDrawnPromise;
+
+  expect(cardDrawn.cardId).toBe('event_x'); // room has 2 doors, condition doesn't match -- drawn immediately
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('an event card with redrawIf playerFloor=="basement" is skipped when the player is actually in the basement', async () => {
+  const REDRAW_CARD = { id: 'event_x', name: '重抽測試（地下室）', text: '測試', redrawIf: { check: 'playerFloor', op: '==', value: 'basement' }, effects: [], needsCustomLogic: false };
+  const NORMAL_CARD = { id: 'event_y', name: '一般事件', text: '測試', effects: [], needsCustomLogic: false };
+  const content = makeContent({
+    rooms: [{ id: 'room_basement_new', doors: 4, floor: 'basement', drawType: 'event' }],
+    cards: { events: [REDRAW_CARD, NORMAL_CARD], items: [], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  // Manually place the player in a basement room with one unexplored door --
+  // there's no normal (non-collapse) way to reach basement in this test's
+  // scope, so this mirrors how turnFlow.test.js manually seeds board state.
+  player.floor = 'basement';
+  player.x = 20;
+  player.y = 20;
+  gameState.board.basement.set(coordKey(20, 20), { roomId: 'room_manual_basement', x: 20, y: 20, doorSides: ['north'], droppedItems: [], item: null });
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'north' }, resolve));
+  const cardDrawn = await cardDrawnPromise;
+
+  expect(cardDrawn.cardId).toBe('event_y'); // event_x rejected -- player really is in the basement
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into a room whose deck is empty draws nothing and does not crash', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
