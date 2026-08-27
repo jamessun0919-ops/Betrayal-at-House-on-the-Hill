@@ -123,6 +123,9 @@ function handleAddRoomDoor(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const room = getRoomForPlayer(gameState, player);
   const candidateSides = SIDES.filter((side) => !room.doorSides.includes(side));
+  if (candidateSides.length === 0) {
+    throw new Error('NO_DOORLESS_WALL_AVAILABLE');
+  }
   const chosenSide = candidateSides[Math.floor(Math.random() * candidateSides.length)];
   room.doorSides.push(chosenSide);
   const delta = DIRECTION_DELTA[chosenSide];

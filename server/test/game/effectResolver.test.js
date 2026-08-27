@@ -294,6 +294,37 @@ test('resolveEffects add_room_door only touches the current room when no neighbo
   expect(gameState.board.ground.has('19,20')).toBe(false);
 });
 
+test('resolveEffects add_room_door idempotency guard: does not duplicate a facing door already present on the neighbor', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east', 'south'], droppedItems: [], item: null }); // only west is doorless
+  gameState.board.ground.set('19,20', { roomId: 'room_west_neighbor', x: 19, y: 20, doorSides: ['east'], droppedItems: [], item: null }); // west neighbor already has the facing 'east' door
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'add_room_door', target: 'random_doorless_wall' },
+  ]);
+  expect(gameState.board.ground.get('20,20').doorSides).toContain('west');
+  const neighborDoors = gameState.board.ground.get('19,20').doorSides;
+  const eastCount = neighborDoors.filter((s) => s === 'east').length;
+  expect(eastCount).toBe(1); // exactly one occurrence, no duplicate pushed
+});
+
+test('resolveEffects add_room_door throws NO_DOORLESS_WALL_AVAILABLE when all 4 sides already have doors', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [], item: null }); // all 4 doors present
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'add_room_door', target: 'random_doorless_wall' },
+    ])
+  ).toThrow('NO_DOORLESS_WALL_AVAILABLE');
+});
+
 test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
