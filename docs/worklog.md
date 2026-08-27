@@ -1241,3 +1241,25 @@
 - 房間門狀態變動事件卡（event_014/015/016/028）跟 event_036 的隨機加值子機制，仍為既有待辦，本階段未處理
 - 3 個 pendingChoice/擲骰續行相關呼叫點潛藏跟這次修的 bug 同一種風險，目前沒有卡片會踩到，列為技術債記錄在 Handover
 - 收工前確認系統無殘留 node 行程
+
+## 2026-08-27 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者指示進行房間門狀態變動事件卡（event_014/015/016/028）的 brainstorm，走完整 brainstorming 流程：釐清 event_016 統一固定落到地下室（不分觸發樓層）、redrawIf 重抽被拒的卡放回牌堆最下面、event_016「受了一點傷」這次不施加傷害（延用既有 M3 傷害缺口）
+- 確認兩個新架構：redrawIf 條件重抽（資料驅動，仿照既有 drawFeasibleRoom 模式）、門狀態變動效果類型拆成 remove_room_doors/add_room_door 兩個獨立類型（而非單一泛用類型）
+- 設計文件、實作計畫皆完成並 commit
+- 開發者選擇 Subagent-Driven 執行，開獨立 worktree，依序完成 4 個任務：Task 1（redrawIf 機制）、Task 2（remove_room_doors/add_room_door，reviewer 抓到冪等性測試缺口+邊界防呆缺口，修正一輪後複審通過）、Task 3（fall_to_basement + dropToBasement 從 applyCollapseCheck 抽成共用模組，重構確認行為不變）、Task 4（4 張卡資料串接）
+- Task 4 執行中發現 worktree 的 event_016 文字跟 main checkout 未 commit 的修正版本不一致，implementer 正確停下回報，controller 直接讀取 main checkout 確認正確文字後補上（同時發現 description 欄位也有同樣落差，跟開發者確認後一併同步）
+- 全分支最終審查（Opus 模型）抓到 1 個 Critical + 2 個 Important：崩塌摔落後才抽事件卡導致 enteredFromSide 為 null，event_014 會清空新地下室房間所有門造成無法回復卡關；redrawIf 非硬保證，event_015 缺少對應防護；fall_to_basement 落點已有房間時會靜默失效。跟開發者確認 3 項修法後一次修復，複審全數 ADDRESSED
+- 合併回本地 main：main checkout 先前未 commit 的 event_016 文字修正先幫忙 commit 保存，合併分支時該卡同一區塊產生 merge conflict（雙方都改了同一段），手動確認取分支版本（更完整）解決，595/595 測試全綠
+- 清理過程再度遇到殘留背景行程（本次工作階段稍早一個逾時被移到背景的 find 指令）卡住 git worktree remove，排查清除後手動移除目錄完成——第三次踩到同一類問題，已記錄在 Handover
+
+**完成項目**：
+- 房間門狀態變動事件卡（event_014/015/016/028）——brainstorm、設計文件、實作計畫、4 個任務實作、全分支審查（含修正波次）、合併進 main，全部完成，595/595 測試全綠，Handover 項目 13 完成
+
+**遇到瓶頸**：
+- 無重大瓶頸。merge conflict 因為開發者在 main checkout 有未 commit 的並行文字修改，先 commit 保存再合併順利解決；殘留背景行程卡住 worktree 刪除是重複出現的已知模式，排查流程已熟練
+
+**開發者交代備忘事項**：
+- Handover 待辦清單剩餘項目（角色 icon 六格定位、擲骰機制複查、道具相關新機制一批、eventIntro/eventNoCheck 廣播範圍收斂等），本階段未處理
+- 收工前確認系統無殘留 node 行程
