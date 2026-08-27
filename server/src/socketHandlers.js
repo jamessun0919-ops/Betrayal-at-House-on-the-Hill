@@ -19,7 +19,7 @@ const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
-const { hasCards, drawCard } = require('./game/cardDeck');
+const { hasCards, drawCard, drawFeasibleCard } = require('./game/cardDeck');
 const { addItem, removeItem, getStatValue } = require('./game/playerEntity');
 const { checkRemoveConditions } = require('./game/modifiers');
 
@@ -931,6 +931,31 @@ function performSearch(gameState, placedRoom) {
   return { found: false };
 }
 
+// Evaluates a card's optional redrawIf clause against live game state.
+// Returns true when the condition MATCHES -- meaning the card should be
+// rejected and redrawn (event_015/016/028's "抽出此卡時檢查...重抽事件卡").
+// Only the two checks these 3 cards actually need are supported; add more
+// only when a new card needs one.
+function isRedrawRejected(redrawIf, gameState, playerId) {
+  if (!redrawIf) {
+    return false;
+  }
+  const player = getPlayer(gameState, playerId);
+  let actual;
+  if (redrawIf.check === 'roomDoorCount') {
+    const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
+    actual = room.doorSides.length;
+  } else if (redrawIf.check === 'playerFloor') {
+    actual = player.floor;
+  } else {
+    throw new Error('UNKNOWN_REDRAW_CHECK');
+  }
+  if (redrawIf.op === '==') {
+    return actual === redrawIf.value;
+  }
+  throw new Error('UNKNOWN_REDRAW_OP');
+}
+
 function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerId, deckType, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs) {
   const deckField = DECK_FIELD_BY_TYPE[deckType];
   if (!deckField) {
@@ -940,7 +965,9 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
   if (!hasCards(deck)) {
     return { pending: false };
   }
-  const card = drawCard(deck);
+  const card = deckType === 'event'
+    ? drawFeasibleCard(deck, (c) => !isRedrawRejected(c.redrawIf, gameState, playerId))
+    : drawCard(deck);
   const hasCheck = !card.activatedOnUse && Array.isArray(card.effects) && card.effects.some((e) => e.type === 'dice_check');
   io.to(roomCode).emit('game:cardDrawn', { playerId, deckType, cardId: card.id, cardName: card.name, hasCheck });
 

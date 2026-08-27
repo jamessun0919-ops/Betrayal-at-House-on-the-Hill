@@ -1,4 +1,4 @@
-const { createCardDeck, hasCards, drawCard, getRemainingCount } = require('../../src/game/cardDeck');
+const { createCardDeck, hasCards, drawCard, drawFeasibleCard, getRemainingCount } = require('../../src/game/cardDeck');
 
 function makeCards(count) {
   const cards = [];
@@ -69,4 +69,30 @@ test('drawCard throws CARD_DECK_EMPTY once every card has been drawn', () => {
 test('drawCard throws CARD_DECK_EMPTY immediately for a deck created empty', () => {
   const deck = createCardDeck([]);
   expect(() => drawCard(deck)).toThrow('CARD_DECK_EMPTY');
+});
+
+test('drawFeasibleCard returns the first card matching isFeasible, cycling non-matches to the back', () => {
+  const cards = [
+    { id: 'bad_1' },
+    { id: 'ok' },
+    { id: 'bad_2' },
+  ];
+  const deck = createCardDeck(cards);
+  const drawn = drawFeasibleCard(deck, (card) => card.id === 'ok');
+  expect(drawn.id).toBe('ok');
+  expect(getRemainingCount(deck)).toBe(2);
+  expect(deck.cards.some((c) => c.id === 'bad_1')).toBe(true);
+  expect(deck.cards.some((c) => c.id === 'bad_2')).toBe(true);
+});
+
+test('drawFeasibleCard falls back to a plain draw when no remaining card satisfies isFeasible', () => {
+  const deck = createCardDeck(makeCards(3));
+  const drawn = drawFeasibleCard(deck, () => false); // nothing is ever feasible
+  expect(['card_0', 'card_1', 'card_2']).toContain(drawn.id);
+  expect(getRemainingCount(deck)).toBe(2);
+});
+
+test('drawFeasibleCard throws CARD_DECK_EMPTY when the deck starts empty', () => {
+  const deck = createCardDeck([]);
+  expect(() => drawFeasibleCard(deck, () => true)).toThrow('CARD_DECK_EMPTY');
 });

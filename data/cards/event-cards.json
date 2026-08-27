@@ -172,7 +172,7 @@
     "name": "前進無門",
     "description": "你踏入房間仔細搜尋，卻發現前方所有通道都被倒塌的牆壁與沉重雜物徹底封死。繞行一圈後，仍找不到任何能繼續深入的出口。無奈之下，你只能沿著原路退回，重新尋找其他通往古堡深處的道路。",
     "text": "當前房間除了進入方向已開啟的房門之外，其他未探索的房間變成牆，美術圖不變，不可再被探索",
-    "effects": [],
+    "effects": [{ "type": "remove_room_doors", "mode": "unexplored_except_entry" }],
     "needsCustomLogic": false
   },
   {
@@ -180,16 +180,18 @@
     "name": "後無退路",
     "description": "身後突然傳來沉重的撞擊聲。還未回頭，原本敞開的房門竟自行關上，老舊門鎖發出清脆的喀嚓聲。轉眼間，你進入房間的門被封死，任憑你如何拉扯，門扉依舊紋絲不動。",
     "text": "抽出此卡時檢查，如果當前房間為單一門房型，重抽事件卡。本卡效果：當前房間進入方向已開啟的那個房門，變成牆的狀態不可被探索，美術圖不變，該門相鄰的房間狀態也同步改變，其他房間門狀態不變。",
-    "effects": [],
-    "needsCustomLogic": true
+    "redrawIf": { "check": "roomDoorCount", "op": "==", "value": 1 },
+    "effects": [{ "type": "remove_room_doors", "mode": "entry" }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_016",
     "name": "地板陷落",
     "description": "腳下腐朽的地板突然發出刺耳斷裂聲。還來不及後退，木板便整片向下崩塌，你隨著碎木與塵土墜入黑暗。短暫失重後，你重重摔落在地下室冰冷的地面，只聽見上方殘骸仍不斷墜落。",
     "text": "抽出此卡時檢查，如果當前房間為地下室，重抽事件卡。落下至地下室相同座標的房間，機制同崩塌的房間。此事件卡效果可發生在二樓，此時角色進入到地下室的對應房間。",
-    "feedbacktextOccur": "你掉落到了下一層的房間，落地時受了一點傷",
-    "effects": [],
+    "redrawIf": { "check": "playerFloor", "op": "==", "value": "basement" },
+    "feedbacktextOccur": "你掉落到了地下室，落地時受了一點傷",
+    "effects": [{ "type": "fall_to_basement" }],
     "needsCustomLogic": false
   },
   {
@@ -316,7 +318,8 @@
     "name": "秘密通道",
     "description": "搜尋時，無意間碰動牆上一盞老舊燭台。伴隨低沉的機關聲，一旁沉重的書櫃竟緩緩向側面移開，露出後方狹窄幽暗的秘密通道。冰冷氣流從深處吹來，這條路或許能帶你繞過前方的危險。",
     "text": "抽出此卡時檢查，如果當前房間為四門的房型，重抽事件卡。在其中一個隨機無門的牆面上，生成一個可通行的門。如果該位置有對應的鄰房並且無門，則兩個房間都生成新的門相通",
-    "effects": [],
+    "redrawIf": { "check": "roomDoorCount", "op": "==", "value": 4 },
+    "effects": [{ "type": "add_room_door", "target": "random_doorless_wall" }],
     "needsCustomLogic": false
   },
   {

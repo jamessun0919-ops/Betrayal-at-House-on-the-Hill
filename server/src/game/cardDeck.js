@@ -27,8 +27,26 @@ function drawCard(deck) {
   return deck.cards.shift();
 }
 
+// Mirrors roomDeck.js's drawFeasibleRoom -- cycles non-matching cards to the
+// bottom across one full pass, then falls back to a plain drawCard() so the
+// draw can never deadlock even if every remaining card fails isFeasible.
+function drawFeasibleCard(deck, isFeasible) {
+  if (!hasCards(deck)) {
+    throw new Error('CARD_DECK_EMPTY');
+  }
+  const attempts = deck.cards.length;
+  for (let i = 0; i < attempts; i++) {
+    const card = deck.cards.shift();
+    if (isFeasible(card)) {
+      return card;
+    }
+    deck.cards.push(card); // put back at bottom, try the next card
+  }
+  return drawCard(deck);
+}
+
 function getRemainingCount(deck) {
   return deck.cards.length;
 }
 
-module.exports = { createCardDeck, hasCards, drawCard, getRemainingCount };
+module.exports = { createCardDeck, hasCards, drawCard, drawFeasibleCard, getRemainingCount };
