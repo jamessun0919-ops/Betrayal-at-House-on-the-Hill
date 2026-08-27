@@ -233,6 +233,67 @@ test('resolveEffects remove_imprint ignores non-imprint cards even when present 
   expect(player.inventory).toEqual([{ id: 'item_003' }, { id: 'omen_003' }]);
 });
 
+test('resolveEffects remove_room_doors mode:"entry" removes the entry-direction door and syncs the neighbor', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  player.enteredFromSide = 'north';
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east'], droppedItems: [], item: null });
+  gameState.board.ground.set('20,19', { roomId: 'room_neighbor', x: 20, y: 19, doorSides: ['south', 'west'], droppedItems: [], item: null }); // north of (20,20)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_room_doors', mode: 'entry' },
+  ]);
+  expect(gameState.board.ground.get('20,20').doorSides).toEqual(['east']);
+  expect(gameState.board.ground.get('20,19').doorSides).toEqual(['west']);
+});
+
+test('resolveEffects remove_room_doors mode:"unexplored_except_entry" strips unexplored doors but keeps the entry side and already-explored sides', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  player.enteredFromSide = 'north';
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [], item: null });
+  gameState.board.ground.set('20,21', { roomId: 'room_explored_south', x: 20, y: 21, doorSides: ['north'], droppedItems: [], item: null }); // south of (20,20), already explored
+  // east (21,20) and west (19,20) have no placed neighbor -- unexplored, removed
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_room_doors', mode: 'unexplored_except_entry' },
+  ]);
+  expect(gameState.board.ground.get('20,20').doorSides.slice().sort()).toEqual(['north', 'south']);
+});
+
+test('resolveEffects add_room_door adds a door on the only doorless side and syncs an already-placed neighbor there', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east', 'south'], droppedItems: [], item: null }); // only west is doorless
+  gameState.board.ground.set('19,20', { roomId: 'room_west_neighbor', x: 19, y: 20, doorSides: [], droppedItems: [], item: null }); // west of (20,20)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'add_room_door', target: 'random_doorless_wall' },
+  ]);
+  expect(gameState.board.ground.get('20,20').doorSides).toContain('west');
+  expect(gameState.board.ground.get('19,20').doorSides).toContain('east');
+});
+
+test('resolveEffects add_room_door only touches the current room when no neighbor is placed at the chosen side', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 20;
+  player.y = 20;
+  gameState.board.ground.set('20,20', { roomId: 'room_current', x: 20, y: 20, doorSides: ['north', 'east', 'south'], droppedItems: [], item: null }); // only west is doorless, nothing placed at (19,20)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'add_room_door', target: 'random_doorless_wall' },
+  ]);
+  expect(gameState.board.ground.get('20,20').doorSides.slice().sort()).toEqual(['east', 'north', 'south', 'west']);
+  expect(gameState.board.ground.has('19,20')).toBe(false);
+});
+
 test('resolveEffects toggle_active applies activeEffects and marks the item active when it was inactive', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');

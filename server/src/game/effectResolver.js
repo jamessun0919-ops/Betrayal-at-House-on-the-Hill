@@ -1,7 +1,8 @@
 const { getPlayer } = require('./gameState');
 const { changeStat, addItem, removeItem, getStatValue, movePlayerTo } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
-const { coordKey } = require('./boardGenerator');
+const { coordKey, DIRECTION_DELTA } = require('./boardGenerator');
+const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
 const { createPrompt } = require('./promptState');
 const { hasCards, drawCard } = require('./cardDeck');
@@ -86,6 +87,50 @@ function handleRemoveImprint(gameState, playerId, effect, context) {
   for (const cardEffect of cardDef.effects || []) {
     if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase) {
       changeStat(player, cardEffect.stat, -cardEffect.delta, gameState.hauntStarted);
+    }
+  }
+  return { pending: false };
+}
+
+function handleRemoveRoomDoors(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  const room = getRoomForPlayer(gameState, player);
+  const enteredFromSide = player.enteredFromSide;
+  if (effect.mode === 'entry') {
+    room.doorSides = room.doorSides.filter((side) => side !== enteredFromSide);
+    const delta = DIRECTION_DELTA[enteredFromSide];
+    const neighbor = gameState.board[player.floor].get(coordKey(player.x + delta.dx, player.y + delta.dy));
+    if (neighbor) {
+      const facingSide = OPPOSITE_SIDE[enteredFromSide];
+      neighbor.doorSides = neighbor.doorSides.filter((side) => side !== facingSide);
+    }
+  } else if (effect.mode === 'unexplored_except_entry') {
+    room.doorSides = room.doorSides.filter((side) => {
+      if (side === enteredFromSide) {
+        return true;
+      }
+      const delta = DIRECTION_DELTA[side];
+      const hasNeighbor = gameState.board[player.floor].has(coordKey(player.x + delta.dx, player.y + delta.dy));
+      return hasNeighbor; // keep already-explored sides, drop unexplored ones
+    });
+  } else {
+    throw new Error('UNKNOWN_REMOVE_ROOM_DOORS_MODE');
+  }
+  return { pending: false };
+}
+
+function handleAddRoomDoor(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  const room = getRoomForPlayer(gameState, player);
+  const candidateSides = SIDES.filter((side) => !room.doorSides.includes(side));
+  const chosenSide = candidateSides[Math.floor(Math.random() * candidateSides.length)];
+  room.doorSides.push(chosenSide);
+  const delta = DIRECTION_DELTA[chosenSide];
+  const neighbor = gameState.board[player.floor].get(coordKey(player.x + delta.dx, player.y + delta.dy));
+  if (neighbor) {
+    const facingSide = OPPOSITE_SIDE[chosenSide];
+    if (!neighbor.doorSides.includes(facingSide)) {
+      neighbor.doorSides.push(facingSide);
     }
   }
   return { pending: false };
@@ -313,6 +358,8 @@ const HANDLERS = Object.assign(Object.create(null), {
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
   remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, playerId, effect, context),
+  remove_room_doors: (gameState, promptState, playerId, effect) => handleRemoveRoomDoors(gameState, playerId, effect),
+  add_room_door: (gameState, promptState, playerId, effect) => handleAddRoomDoor(gameState, playerId),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
