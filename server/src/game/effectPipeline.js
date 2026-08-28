@@ -1,13 +1,13 @@
 const DIE_FACES = [0, 0, 1, 1, 2, 2];
 
-function rollDice(count, rng = Math.random) {
+function rollDice(count, rng = Math.random, faces = DIE_FACES) {
   if (!Number.isInteger(count) || count < 0) {
     throw new Error('INVALID_DICE_COUNT');
   }
   let sum = 0;
   for (let i = 0; i < count; i++) {
-    const index = Math.floor(rng() * DIE_FACES.length);
-    sum += DIE_FACES[index];
+    const index = Math.floor(rng() * faces.length);
+    sum += faces[index];
   }
   return sum;
 }

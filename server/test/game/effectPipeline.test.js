@@ -20,6 +20,19 @@ test('rollDice defaults to Math.random when no rng is given', () => {
   jest.restoreAllMocks();
 });
 
+test('rollDice uses a custom faces array when provided, instead of the default DIE_FACES', () => {
+  const values = [0, 0.2, 0.4, 0.6, 0.8, 0.99]; // -> indices 0..5
+  let call = 0;
+  const rng = () => values[call++];
+  const customFaces = [1, 1, 1, 2, 2, 2]; // same bucket layout as DIE_FACES, shifted up by 1 for indices 0-1
+  expect(rollDice(6, rng, customFaces)).toBe(1 + 1 + 1 + 2 + 2 + 2); // 9, vs 6 with the default DIE_FACES
+});
+
+test('rollDice falls back to the default DIE_FACES when faces is not provided', () => {
+  const rng = () => 0; // index 0
+  expect(rollDice(1, rng)).toBe(0); // DIE_FACES[0] === 0
+});
+
 test('rollDice throws INVALID_DICE_COUNT for a negative or non-integer count', () => {
   expect(() => rollDice(-1)).toThrow('INVALID_DICE_COUNT');
   expect(() => rollDice(1.5)).toThrow('INVALID_DICE_COUNT');

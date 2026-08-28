@@ -944,6 +944,28 @@ test('computeInterjectedRoll is exported and applies a chosen interjection\'s co
   expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
 });
 
+test('computeInterjectedRoll uses the chosen interjection\'s customFaces for the roll', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_049' });
+  const rng = jest.fn().mockReturnValue(0); // face index 0
+  const diceInterjection = {
+    scope: 'any',
+    customFaces: [1, 1, 1, 2, 2, 2], // index 0 -> face 1, vs default DIE_FACES index 0 -> face 0
+    consumesItem: true,
+  };
+  const result = computeInterjectedRoll(
+    gameState,
+    createPromptState(),
+    'p1',
+    1,
+    [],
+    { itemId: 'item_049', diceInterjection, overrideValue: undefined },
+    { rng }
+  );
+  expect(result).toBe(1); // with the default DIE_FACES this would be 0 -- proves customFaces was actually used
+});
+
 test('resolveEffects dice_check propagates the matched tier\'s pass value into diceCheckResult', () => {
   const gameState = makeGameStateWithPlayer();
   const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2

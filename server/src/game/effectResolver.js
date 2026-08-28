@@ -280,7 +280,7 @@ function computeInterjectedRoll(gameState, promptState, playerId, baseCount, mod
   }
   const boostedCount = baseCount + (diceInterjection.bonusDice || 0);
   const adjustedCount = Math.max(1, Math.min(8, applyModifiers(boostedCount, modifiers, 'onBeforeRoll', context)));
-  const rolled = rollDice(adjustedCount, context.rng);
+  const rolled = rollDice(adjustedCount, context.rng, diceInterjection.customFaces);
   return applyModifiers(rolled, modifiers, 'onAfterRoll', context);
 }
 
