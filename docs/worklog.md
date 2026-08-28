@@ -1288,3 +1288,22 @@
 **開發者交代備忘事項**：
 - 下次開工請先列出道具卡未完成需要繼續的清單（Handover 項目 11，已更新，剩 item_038/044/048/049/999）
 - 收工前確認系統無殘留 node 行程，本階段所有 preview server 已正常關閉
+
+## 2026-08-28 第 2 次工作階段
+
+**當日工作內容**：
+- 開發者指示「item_048/049 一起先討論」，走完整 brainstorming 流程：確認方案A（`dice_check` tier 新增卡片作者自行標記的 `pass:true/false` 欄位，取代既有靠 tierEffects 內容猜 passed 的脆弱判斷法）；確認 `item_048`（海盜金幣）需要 `bonusOnPass`（通過才額外執行的效果陣列）、`item_049`（賭神骰子）需要 `customFaces`（單次擲骰暫時覆蓋 `DIE_FACES`）
+- `writing-plans` 產出 4 任務實作計畫，開發者選擇 Subagent-Driven，建立獨立 worktree，依序完成：Task 1（`pass` 欄位＋修正 `game:checkResolved` 的猜測式 passed 判斷，過程中發現並修正計畫自己的 bug——原本設計的回歸測試用 1 顆骰子配 min:8 的 tier，數學上不可能骰到）、Task 2（`customFaces`，確認正確落在 `computeInterjectedRoll` 而非不可達的 `resolveFinalRoll` 分支）、Task 3（`bonusOnPass`，確認 `tierEffects` 回報範圍不含 `bonusOnPass` 本身，前端顯示邏輯不受影響）、Task 4（8 張既有卡補 `pass`、`item_048`/`049` 資料串接，兩個新 e2e 測試皆確認 RNG mock+牌堆過濾為決定性、不會 flaky）
+- 全分支最終審查（Opus）抓到 1 個 Critical＋2 個 Important：①`room_vault`（保險庫）的 `dice_check` 是設計文件掃描漏掉的第 9 個位置（當初只 grep 了 data/cards/），沒補 pass 導致真正成功開鎖顯示成失敗，是這次分支造成的真實回歸；②`item_048` 的 `scope:"any"` 在完全不讀 `bonusOnPass` 的 leaveCheck/collapseCheck 也能被選用，玩家白付代價拿不到獎勵；③設計文件「已知限制」低估風險，實際是 `event_010`＋`omen_003` 兩張常見門檻的卡都會讓 `bonusOnPass` 被通過 tier 自己的待處理選擇效果吞掉，不是原以為的 1 張罕見案例
+- 跟開發者確認三項修法（room_vault 補 pass＋新增完整性測試；`diceInterjection.js` 新增 `scope:"diceCheckOnly"`，利用 leaveCheck/collapseCheck 本來就傳字面 null 這個既有訊號排除 item_048；新增 `pendingBonusEffects` 欄位貫穿選擇彈窗的兩個恢復點）——Important #3 開發者一開始要求先說明具體會造成的 bug 情況，說明後決定這次一併修復（不只留設計文件記錄）
+- 修正派工＋複審皆通過（0 Critical/Important；1 個 Minor 記錄為技術債——`pendingBonusEffects` 只撐得住一層待處理），629/629 測試全綠，合併回本地 main（fast-forward）並推送 origin，worktree 與分支已清理
+
+**完成項目**：
+- item_048（海盜金幣）＋item_049（賭神骰子）擲骰前介入道具——完整流程完成並合併，含全分支審查抓到並修復的 1 個 Critical＋2 個 Important，629/629 測試全綠
+- Handover 項目 11 剩 item_038/044/999
+
+**遇到瓶頸**：
+- 無重大瓶頸。全分支審查的 3 項發現都跟開發者逐一確認方向後才動手，沒有自行猜測；Important #3 開發者要求先解釋清楚 bug 情境才決定修法，屬於正常討論流程
+
+**開發者交代備忘事項**：
+- 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server（只跑了自動化測試，無需手動瀏覽器驗證）
