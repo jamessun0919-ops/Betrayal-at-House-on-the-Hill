@@ -362,9 +362,10 @@
     "id": "item_027",
     "name": "魔力樂譜",
     "description": "一份完整的樂譜，在月光下散發出微微的光芒，似乎有某種魔力，也許應該找個地方試著彈奏",
-    "text": "於特定房間行動需要的道具。",
+    "feedbacktextOccur":"你演奏了這份樂譜，這是首配合彌撒進行的頌恩聖歌．你因此充滿了力量（能力隨機上升一級別）",
+    "text": "於特定房間行動需要的道具。在room_organ或room_piano使用，增加隨機一點能力。在非特定的房間無事發生",
     "effects": [],
-    "category": "decoration",
+    "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
   },
