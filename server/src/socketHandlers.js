@@ -1114,7 +1114,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       rolled: effectResult.diceCheckResult.rolled,
       threshold: null,
       tierEffects: effectResult.diceCheckResult.tierEffects,
-      passed: !effectResult.diceCheckResult.tierEffects.some((e) => e.type === 'stat_change' && e.delta < 0),
+      passed: effectResult.diceCheckResult.pass,
     });
   }
   io.to(roomCode).emit('game:effectResolved', { playerId, sourceId });

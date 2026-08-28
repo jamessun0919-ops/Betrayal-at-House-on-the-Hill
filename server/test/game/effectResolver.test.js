@@ -944,6 +944,21 @@ test('computeInterjectedRoll is exported and applies a chosen interjection\'s co
   expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
 });
 
+test('resolveEffects dice_check propagates the matched tier\'s pass value into diceCheckResult', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+
+  const passResult = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'dice_check', diceCount: 1, tiers: [{ min: 0, max: 8, pass: true, effects: [] }] },
+  ], { rng });
+  expect(passResult.diceCheckResult.pass).toBe(true);
+
+  const failResult = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'dice_check', diceCount: 1, tiers: [{ min: 0, max: 8, pass: false, effects: [] }] },
+  ], { rng });
+  expect(failResult.diceCheckResult.pass).toBe(false);
+});
+
 test('resolveEffects appliedCount is 0 for an empty effects array', () => {
   const gameState = makeGameStateWithPlayer();
   const result = resolveEffects(gameState, createPromptState(), 'p1', []);

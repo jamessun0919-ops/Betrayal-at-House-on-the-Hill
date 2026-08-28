@@ -311,7 +311,7 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   const nestedResult = resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
   return {
     ...nestedResult,
-    diceCheckResult: { stat: effect.stat, diceCount: baseCount, rolled: finalSum, tierEffects: tier.effects },
+    diceCheckResult: { stat: effect.stat, diceCount: baseCount, rolled: finalSum, tierEffects: tier.effects, pass: tier.pass },
   };
 }
 

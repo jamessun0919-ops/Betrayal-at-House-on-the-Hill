@@ -1620,9 +1620,9 @@ const EVENT_001_DICE_CHECK = {
     type: 'dice_check',
     stat: 'sanity',
     tiers: [
-      { min: 5, max: 8, effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] },
-      { min: 1, max: 4, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
-      { min: 0, max: 0, effects: [
+      { min: 5, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] },
+      { min: 1, max: 4, pass: false, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+      { min: 0, max: 0, pass: false, effects: [
         { type: 'stat_change', stat: 'might', delta: -1 },
         { type: 'stat_change', stat: 'speed', delta: -1 },
         { type: 'stat_change', stat: 'knowledge', delta: -1 },
@@ -1693,6 +1693,43 @@ test('drawing a card whose effect is a dice_check broadcasts a cardCheck game:ch
   expect(checkResolved.threshold).toBeNull();
   expect(Array.isArray(checkResolved.tierEffects)).toBe(true);
   expect(typeof checkResolved.passed).toBe('boolean');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:checkResolved passed field reflects the tier\'s explicit pass flag, not a guess from tierEffects content', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_x',
+        name: '測試',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 1,
+          tiers: [
+            // "passed" tier that still applies a negative stat_change -- the
+            // old heuristic (guessing from tierEffects) would have said
+            // false here; the fix must read the explicit pass:true instead.
+            { min: 0, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+          ],
+        }],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient } = await setUpStartedGameWithContent(content);
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  const checkResolvedPromise = new Promise((resolve) => otherClient.once('game:checkResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const checkResolved = await checkResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(checkResolved.passed).toBe(true);
 
   clientA.close();
   clientB.close();
