@@ -2643,6 +2643,105 @@ test('game:selectAction item: a consumable item that fails its check is not remo
   httpServer.close();
 });
 
+const ITEM_027_MUSIC_SCORE = {
+  id: 'item_027',
+  name: '魔力樂譜',
+  effects: [{
+    type: 'room_gate',
+    roomIds: ['room_organ', 'room_piano'],
+    effects: [{
+      type: 'dice_check',
+      stat: 'knowledge',
+      tiers: [
+        { min: 6, max: 8, effects: [{ type: 'stat_change', stat: 'speed', delta: 1 }] },
+        { min: 0, max: 5, effects: [] },
+      ],
+    }],
+  }],
+  category: 'consumable',
+  canTargetOthers: false,
+};
+
+test('game:selectAction item_027 in room_organ with a passing knowledge check: speed +1, item consumed', async () => {
+  const content = makeContent({
+    cards: { events: [], items: [ITEM_027_MUSIC_SCORE], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_027' });
+  player.floor = 'ground';
+  player.x = 40;
+  player.y = 40;
+  player.stats.knowledge.currentIndex = 3; // 4 dice at baseIndex+2 track value -- guarantees a sum >= 6 with the mock below
+  gameState.board.ground.set('40,40', { roomId: 'room_organ', x: 40, y: 40, doorSides: ['north'], droppedItems: [], item: null });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // every die -> highest face, guaranteed pass
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_027' }, resolve));
+  await effectResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(getPlayer(gameState, currentPlayerId).stats.speed.currentIndex).toBe(3); // baseIndex 2 + 1
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([]); // consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_027 in room_organ with a failing knowledge check: no stat change, item kept', async () => {
+  const content = makeContent({
+    cards: { events: [], items: [ITEM_027_MUSIC_SCORE], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_027' });
+  player.floor = 'ground';
+  player.x = 40;
+  player.y = 40;
+  gameState.board.ground.set('40,40', { roomId: 'room_organ', x: 40, y: 40, doorSides: ['north'], droppedItems: [], item: null });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // every die -> lowest face, guaranteed fail
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_027' }, resolve));
+  await effectResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(getPlayer(gameState, currentPlayerId).stats.speed.currentIndex).toBe(2); // unchanged (baseIndex)
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_027' }]); // not consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_027 outside room_organ/room_piano: no effect, item kept', async () => {
+  const content = makeContent({
+    cards: { events: [], items: [ITEM_027_MUSIC_SCORE], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_027' });
+  player.floor = 'ground';
+  player.x = 40;
+  player.y = 40;
+  gameState.board.ground.set('40,40', { roomId: 'room_lobby_a', x: 40, y: 40, doorSides: ['north'], droppedItems: [], item: null });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_027' }, resolve));
+  await effectResolvedPromise;
+
+  expect(getPlayer(gameState, currentPlayerId).stats.speed.currentIndex).toBe(2); // unchanged
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_027' }]); // not consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction room_action: resolves the current room\'s effects', async () => {
   const content = makeContent({
     rooms: [{
