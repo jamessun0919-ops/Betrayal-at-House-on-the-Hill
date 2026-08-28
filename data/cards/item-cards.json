@@ -363,6 +363,7 @@
     "name": "魔力樂譜",
     "description": "一份完整的樂譜，在月光下散發出微微的光芒，似乎有某種魔力，也許應該找個地方試著彈奏",
     "text": "於特定房間行動需要的道具。在room_organ或room_piano使用，通過知識考驗（骰數６以上），提升速度一個級別。未通過考驗或在非特定房間使用，皆無事發生，道具保留。",
+    "feedbacktextOccur": "這裡沒有可以演奏的樂器，你把樂譜收了回去",
     "feedbacktextDice": {"6+":"你演奏了這份樂譜，這是首配合彌撒進行的頌恩聖歌。你因此充滿了力量（速度提升一個級別）","0-5":"你嘗試演奏，但彈得荒腔走板，什麼也沒發生"},
     "effects": [{
       "type": "room_gate",
@@ -371,7 +372,7 @@
         "type": "dice_check",
         "stat": "knowledge",
         "tiers": [
-          { "min": 6, "max": 8, "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }] },
+          { "min": 6, "max": 16, "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }] },
           { "min": 0, "max": 5, "effects": [] }
         ]
       }]
