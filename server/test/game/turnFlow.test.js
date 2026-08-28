@@ -141,6 +141,40 @@ test('moveToRoom allows opening a door with exactly 2 action points, leaving 0 a
   expect(player.actionPoints).toBe(0);
 });
 
+test('getAvailableDirections and moveToRoom use a 1 action point cost for a player holding item_028 (萬能鑰匙)', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, floor: 'ground' }]);
+  player.inventory.push({ id: 'item_028' });
+  const startingAP = player.actionPoints; // 4, from the default makeStats() speed value
+  const available = getAvailableDirections(gameState, 'p1');
+  expect(available.find((a) => a.direction === 'east')).toEqual({ direction: 'east', kind: 'open_door' });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.kind).toBe('open_door');
+  expect(player.actionPoints).toBe(startingAP - 1);
+});
+
+test('a player holding item_028 with only 1 action point can still open a door, ending at 0', () => {
+  const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, floor: 'ground' }]);
+  player.inventory.push({ id: 'item_028' });
+  player.actionPoints = 1;
+  const available = getAvailableDirections(gameState, 'p1');
+  expect(available.find((a) => a.direction === 'east')).toEqual({ direction: 'east', kind: 'open_door' });
+  const result = moveToRoom(gameState, 'p1', 'east');
+  expect(result.kind).toBe('open_door');
+  expect(player.actionPoints).toBe(0);
+});
+
+test('door-open cost reverts to 2 action points immediately after item_028 leaves the inventory (no residual discount)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  player.inventory.push({ id: 'item_028' });
+  player.actionPoints = 1;
+  const withKey = getAvailableDirections(gameState, 'p1');
+  expect(withKey.filter((a) => a.kind === 'open_door').length).toBeGreaterThan(0); // affordable at 1 AP with the discount
+  player.inventory = [];
+  const withoutKey = getAvailableDirections(gameState, 'p1');
+  expect(withoutKey.filter((a) => a.kind === 'open_door')).toEqual([]); // no longer affordable at 1 AP, full price applies immediately
+});
+
 test('moveToRoom throws INVALID_MOVE_DIRECTION when attempting to open a door with only 1 action point', () => {
   const { gameState, player } = makeGameStateWithPlayer([{ id: 'room_new', doors: 4, floor: 'ground' }]);
   player.actionPoints = 1;
