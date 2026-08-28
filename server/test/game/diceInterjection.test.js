@@ -34,6 +34,23 @@ test('findInterjectionOptions excludes eventTriggered items unless sourceDeckTyp
   expect(eventOptions).toEqual([{ itemId: 'item_010', name: '蠟燭', diceInterjection: makeCatalog()[2].diceInterjection }]);
 });
 
+test('findInterjectionOptions excludes diceCheckOnly items when sourceDeckType is null (leaveCheck/collapseCheck)', () => {
+  const player = { inventory: [{ id: 'item_048' }] };
+  const itemCatalog = [{ id: 'item_048', name: '海盜金幣', diceInterjection: { scope: 'diceCheckOnly', bonusDice: -1, consumesItem: true } }];
+  expect(findInterjectionOptions(player, itemCatalog, null)).toEqual([]);
+});
+
+test('findInterjectionOptions includes diceCheckOnly items when sourceDeckType is undefined or a string (real dice_check)', () => {
+  const player = { inventory: [{ id: 'item_048' }] };
+  const itemCatalog = [{ id: 'item_048', name: '海盜金幣', diceInterjection: { scope: 'diceCheckOnly', bonusDice: -1, consumesItem: true } }];
+  expect(findInterjectionOptions(player, itemCatalog, undefined)).toEqual([
+    { itemId: 'item_048', name: '海盜金幣', diceInterjection: itemCatalog[0].diceInterjection },
+  ]);
+  expect(findInterjectionOptions(player, itemCatalog, 'event')).toEqual([
+    { itemId: 'item_048', name: '海盜金幣', diceInterjection: itemCatalog[0].diceInterjection },
+  ]);
+});
+
 test('findInterjectionOptions excludes a non-consumable item already used this turn', () => {
   const player = { inventory: [{ id: 'item_006' }], diceInterjectionUsedThisTurn: ['item_006'] };
   expect(findInterjectionOptions(player, makeCatalog(), undefined)).toEqual([]);

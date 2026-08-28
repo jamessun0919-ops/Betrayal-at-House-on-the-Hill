@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('../../src/game/effectResolver');
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { createPromptState, respondToPrompt } = require('../../src/game/promptState');
@@ -1022,6 +1024,38 @@ test('resolveEffects dice_check propagates the matched tier\'s pass value into d
   expect(failResult.diceCheckResult.pass).toBe(false);
 });
 
+test('resolveEffects dice_check attaches pendingBonusEffects when the pass tier\'s own effects pend, so bonusOnPass is not silently dropped', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_048' });
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const diceInterjection = { scope: 'any', bonusDice: -1, consumesItem: true, bonusOnPass: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 4,
+      tiers: [
+        {
+          min: 6,
+          max: 8,
+          pass: true,
+          effects: [{
+            type: 'choice',
+            description: 'x',
+            timeoutMs: 1000,
+            defaultOptionId: 'a',
+            options: [{ optionId: 'a', label: 'A', effects: [] }],
+          }],
+        },
+        { min: 0, max: 5, pass: false, effects: [] },
+      ],
+    },
+  ], { rng, interjectionChoice: { itemId: 'item_048', diceInterjection, overrideValue: undefined } });
+  expect(result.pending).toBe(true);
+  expect(result.pendingBonusEffects).toEqual([{ type: 'stat_change', stat: 'sanity', delta: 1 }]);
+  expect(player.stats.sanity.currentIndex).toBe(2); // unchanged so far -- bonusOnPass has not fired yet, only carried forward
+});
+
 test('resolveEffects appliedCount is 0 for an empty effects array', () => {
   const gameState = makeGameStateWithPlayer();
   const result = resolveEffects(gameState, createPromptState(), 'p1', []);
@@ -1236,4 +1270,36 @@ test('resolveEffects remove_imprint with nested effects does not resolve them wh
   expect(player.stats.speed.currentIndex).toBe(2);
   expect(player.stats.knowledge.currentIndex).toBe(1);
   expect(player.stats.sanity.currentIndex).toBe(2);
+});
+
+function collectDiceCheckTiers(node, tiers) {
+  if (Array.isArray(node)) {
+    for (const item of node) collectDiceCheckTiers(item, tiers);
+  } else if (node && typeof node === 'object') {
+    if (node.type === 'dice_check' && Array.isArray(node.tiers)) {
+      tiers.push(...node.tiers);
+    }
+    for (const value of Object.values(node)) collectDiceCheckTiers(value, tiers);
+  }
+}
+
+test('every dice_check tier in data/cards and data/rooms has an explicit boolean pass field', () => {
+  const dataFiles = [
+    ...fs.readdirSync(path.join(__dirname, '../../../data/cards')).filter((f) => f.endsWith('.json')),
+  ].map((f) => path.join(__dirname, '../../../data/cards', f))
+    .concat(
+      fs.readdirSync(path.join(__dirname, '../../../data/rooms')).filter((f) => f.endsWith('.json'))
+        .map((f) => path.join(__dirname, '../../../data/rooms', f)),
+    );
+
+  const tiers = [];
+  for (const file of dataFiles) {
+    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+    collectDiceCheckTiers(parsed, tiers);
+  }
+
+  expect(tiers.length).toBeGreaterThan(0); // sanity check -- the scan actually found dice_check tiers
+  for (const tier of tiers) {
+    expect(typeof tier.pass).toBe('boolean');
+  }
 });

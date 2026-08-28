@@ -602,7 +602,7 @@
     "description": "傳說中能夠實現貪婪者願望，但是會讓使用者詛咒纏身的金幣。",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次考驗減少一顆骰子，如該考驗通過，則額外隨機取得一件物品（原考驗內容與結果不受影響）。",
     "effects": [],
-    "diceInterjection": { "scope": "any", "consumesItem": true, "bonusDice": -1, "bonusOnPass": [{ "type": "draw_card", "deck": "item", "count": 1 }] },
+    "diceInterjection": { "scope": "diceCheckOnly", "consumesItem": true, "bonusDice": -1, "bonusOnPass": [{ "type": "draw_card", "deck": "item", "count": 1 }] },
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false

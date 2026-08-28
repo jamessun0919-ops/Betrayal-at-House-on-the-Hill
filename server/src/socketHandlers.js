@@ -477,11 +477,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'NO_ACTIVE_EFFECT_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied } = resolverEntry.pendingChoice;
+        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied, pendingBonusEffects } = resolverEntry.pendingChoice;
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
-        const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
+        const chosenEffects = [...resolveChoiceOption(options, result.chosenOptionId), ...(pendingBonusEffects || [])];
         const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
         const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
         if (resolveOutcome.drawnCards) {
@@ -1070,6 +1070,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       playerId,
       sourceId,
       consumeItemIfApplied,
+      pendingBonusEffects: effectResult.pendingBonusEffects || [],
     };
     io.to(roomCode).emit('game:effectPendingChoice', {
       playerId,
@@ -1274,13 +1275,13 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     const resolverEntry = getResolver(effectResolverManager, roomCode);
     if (!resolverEntry || !resolverEntry.pendingChoice) return;
     effectChoiceTimeouts.delete(roomCode);
-    const { playerId, sourceId, options, defaultOptionId, consumeItemIfApplied } = resolverEntry.pendingChoice;
+    const { playerId, sourceId, options, defaultOptionId, consumeItemIfApplied, pendingBonusEffects } = resolverEntry.pendingChoice;
     const result = resolvePromptTimeout(resolverEntry.promptState, { promptId, defaultOptionId });
     if (!result) {
       return;
     }
     io.to(roomCode).emit('game:promptResolved', result);
-    const chosenEffects = resolveChoiceOption(options, result.chosenOptionId);
+    const chosenEffects = [...resolveChoiceOption(options, result.chosenOptionId), ...(pendingBonusEffects || [])];
     const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
     const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
     io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));

@@ -402,6 +402,7 @@
               {
                 "min": 6,
                 "max": 8,
+                "pass": true,
                 "effects": [
                   {
                     "type": "draw_card",
@@ -413,6 +414,7 @@
               {
                 "min": 0,
                 "max": 5,
+                "pass": false,
                 "effects": []
               }
             ]

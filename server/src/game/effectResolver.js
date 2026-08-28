@@ -312,6 +312,13 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
     ? interjectionChoice.diceInterjection.bonusOnPass
     : [];
   const nestedResult = resolveEffects(gameState, promptState, playerId, [...tier.effects, ...bonusOnPass], restContext);
+  if (nestedResult.pending) {
+    const pendingResult = { ...nestedResult };
+    if (bonusOnPass.length > 0) {
+      pendingResult.pendingBonusEffects = bonusOnPass;
+    }
+    return pendingResult;
+  }
   return {
     ...nestedResult,
     diceCheckResult: { stat: effect.stat, diceCount: baseCount, rolled: finalSum, tierEffects: tier.effects, pass: tier.pass },

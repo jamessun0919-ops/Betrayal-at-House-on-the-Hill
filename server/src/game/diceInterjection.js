@@ -12,6 +12,7 @@ function findInterjectionOptions(player, itemCatalog, sourceDeckType) {
     if (content.category === 'gear' && !player.wornGearIds.includes(invItem.id)) continue;
     const di = content.diceInterjection;
     if (di.scope === 'eventTriggered' && sourceDeckType !== 'event') continue;
+    if (di.scope === 'diceCheckOnly' && sourceDeckType === null) continue;
     if (!di.consumesItem && used.includes(invItem.id)) continue;
     options.push({ itemId: invItem.id, name: content.name, diceInterjection: di });
   }

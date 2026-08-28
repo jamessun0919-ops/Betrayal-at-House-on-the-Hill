@@ -856,6 +856,53 @@ test('game:move with an eligible interjection item held on a leaveCheck room pau
   httpServer.close();
 });
 
+test('game:move on a leaveCheck room does not offer a diceCheckOnly-scoped item as an interjection option', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        {
+          id: 'item_048',
+          name: '海盜金幣',
+          diceInterjection: { scope: 'diceCheckOnly', bonusDice: -1, consumesItem: true, bonusOnPass: [{ type: 'draw_card', deck: 'item', count: 1 }] },
+        },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_048' });
+
+  const checkResolvedPromise = new Promise((resolve) => currentClient.once('game:checkResolved', resolve));
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // guaranteed pass -- proves it resolved immediately, not paused for a roll choice
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  // The default room deck (room_new) means leaving room_lobby_a opens a new
+  // door rather than moving into an already-placed room, so the resolved
+  // kind here is 'open_door' -- the point of this assertion is that it is
+  // NOT 'leaveCheckPending', i.e. item_048 was not offered as an
+  // interjection option and the leaveCheck resolved immediately instead of
+  // pausing for a roll choice.
+  expect(result.kind).toBe('open_door');
+  const checkResolved = await checkResolvedPromise;
+  expect(checkResolved.checkKind).toBe('leaveCheck');
+  expect(checkResolved.passed).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into room_collapsed_room: failing the speed check drops the player to a new basement room at the same coordinate', async () => {
   const content = makeContent({
     rooms: [
@@ -1800,6 +1847,80 @@ test('game:selectAction item_049 changes the roll outcome via its custom dice fa
 
   expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(3); // baseIndex 2 + 1 -- pass tier hit, only reachable with customFaces
   expect(getPlayer(gameState, currentPlayerId).inventory.some((i) => i.id === 'item_049')).toBe(false); // consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('item_048 bonusOnPass survives a pass tier whose own effects are a pending choice (event_010/omen_003 shape)', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_x',
+        name: '測試',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 5,
+          tiers: [
+            {
+              min: 4,
+              max: 10,
+              pass: true,
+              effects: [{
+                type: 'choice',
+                description: '選擇一項能力提升一個級別',
+                timeoutMs: 20000,
+                defaultOptionId: 'might',
+                options: [
+                  { optionId: 'might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+                ],
+              }],
+            },
+            { min: 0, max: 3, pass: false, effects: [] },
+          ],
+        }],
+      }],
+      items: [{
+        id: 'item_048',
+        name: '海盜金幣',
+        effects: [],
+        diceInterjection: { scope: 'any', consumesItem: true, bonusDice: -1, bonusOnPass: [{ type: 'draw_card', deck: 'item', count: 1 }] },
+        category: 'consumable',
+      }, {
+        id: 'item_100',
+        name: '測試獎勵道具',
+        effects: [],
+        category: 'decoration',
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_048' });
+  // Filter the item deck down to a single deterministic draw target, same technique as the existing
+  // item_048 bonus test around line 1740 -- otherwise the bonus draw_card could randomly redraw item_048.
+  gameState.itemDeck.cards = gameState.itemDeck.cards.filter((c) => c.id === 'item_100');
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 4 dice (5-1 bonusDice) * face 2 = 8, lands in the pass tier
+  const diceOptionsPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await diceOptionsPromise;
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_048' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+  rngSpy.mockRestore();
+
+  const cardsDrawnPromise = new Promise((resolve) => currentClient.once('game:cardsDrawn', resolve));
+  await new Promise((resolve) => currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'might' }, resolve));
+  const cardsDrawn = await cardsDrawnPromise;
+
+  const player = getPlayer(gameState, currentPlayerId);
+  expect(player.stats.might.currentIndex).toBe(3); // baseIndex 2 + 1 -- the choice's own stat_change fired
+  expect(cardsDrawn.cards.some((c) => c.id === 'item_100')).toBe(true); // bonusOnPass survived the pending choice and fired after resume
+  expect(player.inventory.some((i) => i.id === 'item_048')).toBe(false); // consumed
 
   clientA.close();
   clientB.close();
