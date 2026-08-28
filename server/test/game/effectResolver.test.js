@@ -1048,6 +1048,27 @@ test('resolveEffects fall_to_basement drops the player into a new basement room 
   expect(currentRoom.collapseLink).toEqual({ x: 8, y: 8 });
 });
 
+test('resolveEffects reveal_player_locations gathers every other player\'s floor/x/y, excluding the acting player', () => {
+  const gameState = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  const p2 = gameState.players.get('p2');
+  p2.floor = 'ground';
+  p2.x = 5;
+  p2.y = 5;
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'reveal_player_locations' },
+  ]);
+  expect(result.revealedLocations).toEqual([{ playerId: 'p2', floor: 'ground', x: 5, y: 5 }]);
+});
+
+test('resolveEffects reveal_player_locations returns an empty array when the acting player is alone', () => {
+  const gameState = makeGameStateWithPlayer();
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'reveal_player_locations' },
+  ]);
+  expect(result.revealedLocations).toEqual([]);
+});
+
 test('resolveEffects random_stat_change picks might when Math.random selects index 0', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');

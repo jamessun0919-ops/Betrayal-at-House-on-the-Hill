@@ -354,9 +354,18 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, playerId);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
-              io.to(roomCode).emit('game:itemUseResolved', { playerId, itemId });
+              const revealText = buildRevealText(gameState, content, effectResult.revealedLocations);
+              const itemUsePayload = { playerId, itemId };
+              if (revealText) {
+                itemUsePayload.revealText = revealText;
+              }
+              io.to(roomCode).emit('game:itemUseResolved', itemUsePayload);
               if (targetForEffects !== playerId) {
-                io.to(roomCode).emit('game:itemUseResolved', { playerId: targetForEffects, itemId });
+                const targetPayload = { playerId: targetForEffects, itemId };
+                if (revealText) {
+                  targetPayload.revealText = revealText;
+                }
+                io.to(roomCode).emit('game:itemUseResolved', targetPayload);
               }
             }
             if (moveToRoomEffect && !effectResult.pending) {
@@ -746,6 +755,27 @@ function findRoomDefinition(content, roomId) {
     content.rooms.find((r) => r.id === roomId) ||
     content.startingRooms.find((r) => r.id === roomId)
   );
+}
+
+function buildRevealText(gameState, content, revealedLocations) {
+  if (!Array.isArray(revealedLocations)) {
+    return null;
+  }
+  if (revealedLocations.length === 0) {
+    return '目前沒有發現其他玩家的蹤跡';
+  }
+  const namesByRoom = new Map();
+  for (const loc of revealedLocations) {
+    const otherPlayer = getPlayer(gameState, loc.playerId);
+    const room = gameState.board[loc.floor].get(coordKey(loc.x, loc.y));
+    const roomDefinition = findRoomDefinition(content, room.roomId);
+    const roomName = (roomDefinition && roomDefinition.name) || '未知房間';
+    if (!namesByRoom.has(roomName)) {
+      namesByRoom.set(roomName, []);
+    }
+    namesByRoom.get(roomName).push(otherPlayer.name);
+  }
+  return [...namesByRoom.entries()].map(([roomName, names]) => `${names.join('、')} 在 ${roomName} 內`).join('；');
 }
 
 function findSourceKind(content, sourceId) {

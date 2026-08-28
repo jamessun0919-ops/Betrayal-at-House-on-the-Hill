@@ -2456,6 +2456,116 @@ test('game:selectAction item: a general-category item is not removed from invent
   httpServer.close();
 });
 
+const REVEAL_ITEM_ROOMS = [{ id: 'room_kitchen', name: '廚房', doors: 4, floor: 'ground' }];
+const REVEAL_ITEM_CARD = { id: 'item_036', name: '老鷹木雕', effects: [{ type: 'reveal_player_locations' }], category: 'reusable', canTargetOthers: false };
+
+test('game:selectAction item_036 reveals another player\'s room via revealText on game:itemUseResolved', async () => {
+  const content = makeContent({
+    rooms: REVEAL_ITEM_ROOMS,
+    cards: { events: [], items: [REVEAL_ITEM_CARD], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_036' });
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.floor = 'ground';
+  otherPlayer.x = 99;
+  otherPlayer.y = 99;
+  gameState.board.ground.set(coordKey(99, 99), { roomId: 'room_kitchen', x: 99, y: 99, doorSides: ['north'], droppedItems: [], item: null });
+
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_036' }, resolve));
+  const data = await itemUseResolvedPromise;
+
+  expect(data.revealText).toContain('廚房');
+  expect(data.revealText).toContain(otherPlayer.name);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_036 groups two other players in the same room onto one line', async () => {
+  const content = makeContent({
+    rooms: REVEAL_ITEM_ROOMS,
+    cards: { events: [], items: [REVEAL_ITEM_CARD], omens: [] },
+  });
+  // setUpStartedGameWithContent only sets up 2 real socket clients/players (clientA/clientB) --
+  // for a THIRD player, insert a synthetic player object directly into gameState.players (a Map)
+  // after setup, rather than a third real socket client. Only the fields getPlayer/buildRevealText
+  // actually read are required: playerId, name, floor, x, y.
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_036' });
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.floor = 'ground';
+  otherPlayer.x = 99;
+  otherPlayer.y = 99;
+  gameState.players.set('synthetic_p3', { playerId: 'synthetic_p3', name: 'Carol-synthetic', floor: 'ground', x: 99, y: 99, inventory: [] });
+  gameState.board.ground.set(coordKey(99, 99), { roomId: 'room_kitchen', x: 99, y: 99, doorSides: ['north'], droppedItems: [], item: null });
+
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_036' }, resolve));
+  const data = await itemUseResolvedPromise;
+
+  // Both other players share room_kitchen -> exactly one room-group, both names on it
+  expect(data.revealText).toContain('廚房');
+  expect(data.revealText).toContain(otherPlayer.name);
+  expect(data.revealText).toContain('Carol-synthetic');
+  expect(data.revealText.split('；').length).toBe(1); // one room-group, not two separate lines
+  expect(data.revealText).toMatch(/、/); // the two names are joined with 、 within that one group
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_036 used while alone (no other players) returns the fixed fallback text', async () => {
+  const content = makeContent({
+    cards: { events: [], items: [REVEAL_ITEM_CARD], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_036' });
+  gameState.players.delete(otherPlayerId); // simulate being alone -- only the acting player remains
+
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_036' }, resolve));
+  const data = await itemUseResolvedPromise;
+
+  expect(data.revealText).toBe('目前沒有發現其他玩家的蹤跡');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction a normal item without reveal_player_locations still emits game:itemUseResolved with no revealText field', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [{ id: 'item_001', name: '測試道具', effects: [{ type: 'stat_change', stat: 'might', delta: 1 }], category: 'consumable' }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_001' });
+
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_001' }, resolve));
+  const data = await itemUseResolvedPromise;
+
+  expect(data).toEqual({ playerId: currentPlayerId, itemId: 'item_001' });
+  expect(data.revealText).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item use with no dice_check broadcasts game:itemUseResolved', async () => {
   const content = makeContent({
     cards: {

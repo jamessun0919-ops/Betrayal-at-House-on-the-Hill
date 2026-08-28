@@ -171,6 +171,16 @@ function handleFallToBasement(gameState, playerId) {
   return { pending: false };
 }
 
+function handleRevealPlayerLocations(gameState, playerId) {
+  requirePlayer(gameState, playerId);
+  const revealedLocations = [];
+  for (const other of gameState.players.values()) {
+    if (other.playerId === playerId) continue;
+    revealedLocations.push({ playerId: other.playerId, floor: other.floor, x: other.x, y: other.y });
+  }
+  return { pending: false, revealedLocations };
+}
+
 // Moves the player to wherever a specific room (by id) is currently placed
 // on the board -- floor-agnostic by design, so it keeps working once a third
 // floor exists. Used by the entrance-hall stairs rooms (LobbyC <-> upper
@@ -407,6 +417,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   remove_room_doors: (gameState, promptState, playerId, effect) => handleRemoveRoomDoors(gameState, playerId, effect),
   add_room_door: (gameState, promptState, playerId, effect) => handleAddRoomDoor(gameState, playerId),
   fall_to_basement: (gameState, promptState, playerId) => handleFallToBasement(gameState, playerId),
+  reveal_player_locations: (gameState, promptState, playerId) => handleRevealPlayerLocations(gameState, playerId),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
@@ -427,6 +438,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   let drawnCards = [];
   let diceCheckResult = null;
   let enteredNewRoom = null;
+  let revealedLocations = null;
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -446,6 +458,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     if (result && result.enteredNewRoom !== undefined) {
       enteredNewRoom = result.enteredNewRoom;
     }
+    if (result && Array.isArray(result.revealedLocations)) {
+      revealedLocations = result.revealedLocations;
+    }
   }
   const output = { pending: false, appliedCount };
   if (drawnCards.length > 0) {
@@ -456,6 +471,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   }
   if (enteredNewRoom !== null) {
     output.enteredNewRoom = enteredNewRoom;
+  }
+  if (revealedLocations !== null) {
+    output.revealedLocations = revealedLocations;
   }
   return output;
 }
