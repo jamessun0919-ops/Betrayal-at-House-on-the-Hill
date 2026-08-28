@@ -966,6 +966,47 @@ test('computeInterjectedRoll uses the chosen interjection\'s customFaces for the
   expect(result).toBe(1); // with the default DIE_FACES this would be 0 -- proves customFaces was actually used
 });
 
+test('resolveEffects dice_check applies bonusOnPass effects when the interjection item is used and the matched tier has pass:true', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_048' });
+  const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2
+  const diceInterjection = { scope: 'any', bonusDice: -1, consumesItem: true, bonusOnPass: [{ type: 'stat_change', stat: 'might', delta: 1 }] };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 4,
+      tiers: [
+        { min: 6, max: 8, pass: true, effects: [] },
+        { min: 0, max: 5, pass: false, effects: [] },
+      ],
+    },
+  ], { rng, interjectionChoice: { itemId: 'item_048', diceInterjection, overrideValue: undefined } });
+  expect(result.pending).toBe(false);
+  expect(player.stats.might.currentIndex).toBe(3); // baseIndex 2 + 1 from bonusOnPass -- (4-1 dice)*2=6 lands in the min:6-8 pass tier
+  expect(player.inventory).toEqual([]); // consumesItem -- removed
+});
+
+test('resolveEffects dice_check does not apply bonusOnPass effects when the matched tier has pass:false', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_048' });
+  const rng = jest.fn().mockReturnValue(0); // every die -> face 0
+  const diceInterjection = { scope: 'any', bonusDice: -1, consumesItem: true, bonusOnPass: [{ type: 'stat_change', stat: 'might', delta: 1 }] };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 4,
+      tiers: [
+        { min: 6, max: 8, pass: true, effects: [] },
+        { min: 0, max: 5, pass: false, effects: [] },
+      ],
+    },
+  ], { rng, interjectionChoice: { itemId: 'item_048', diceInterjection, overrideValue: undefined } });
+  expect(result.pending).toBe(false);
+  expect(player.stats.might.currentIndex).toBe(2); // unchanged -- fail tier (sum=0, min:0-5), bonusOnPass not applied
+});
+
 test('resolveEffects dice_check propagates the matched tier\'s pass value into diceCheckResult', () => {
   const gameState = makeGameStateWithPlayer();
   const rng = jest.fn().mockReturnValue(0.99); // every die -> face 2

@@ -308,7 +308,10 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   const { interjectionChoice, ...restContext } = context;
   const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice || null, restContext);
   const tier = evaluateTiers(finalSum, effect.tiers);
-  const nestedResult = resolveEffects(gameState, promptState, playerId, tier.effects, restContext);
+  const bonusOnPass = (tier.pass && interjectionChoice && Array.isArray(interjectionChoice.diceInterjection.bonusOnPass))
+    ? interjectionChoice.diceInterjection.bonusOnPass
+    : [];
+  const nestedResult = resolveEffects(gameState, promptState, playerId, [...tier.effects, ...bonusOnPass], restContext);
   return {
     ...nestedResult,
     diceCheckResult: { stat: effect.stat, diceCount: baseCount, rolled: finalSum, tierEffects: tier.effects, pass: tier.pass },
