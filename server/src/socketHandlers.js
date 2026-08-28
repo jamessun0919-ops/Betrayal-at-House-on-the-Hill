@@ -354,6 +354,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, playerId);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
+              // revealedLocations excludes whoever resolveEffects ran as (targetForEffects), so this
+              // is only correct while reveal_player_locations is used exclusively by canTargetOthers:false
+              // items (item_036 today) -- a future canTargetOthers:true reveal card would need this
+              // reworked, since the list should exclude the actor, not the target.
               const revealText = buildRevealText(gameState, content, effectResult.revealedLocations);
               const itemUsePayload = { playerId, itemId };
               if (revealText) {
@@ -764,18 +768,23 @@ function buildRevealText(gameState, content, revealedLocations) {
   if (revealedLocations.length === 0) {
     return '目前沒有發現其他玩家的蹤跡';
   }
-  const namesByRoom = new Map();
+  // Grouped by room INSTANCE (floor+roomId), not by display name -- several
+  // distinct room cells share the same name (e.g. the 3 starting "大門廳"
+  // cells), so grouping by name alone would wrongly merge players who are
+  // actually in different rooms.
+  const namesByRoomInstance = new Map();
   for (const loc of revealedLocations) {
     const otherPlayer = getPlayer(gameState, loc.playerId);
     const room = gameState.board[loc.floor].get(coordKey(loc.x, loc.y));
     const roomDefinition = findRoomDefinition(content, room.roomId);
     const roomName = (roomDefinition && roomDefinition.name) || '未知房間';
-    if (!namesByRoom.has(roomName)) {
-      namesByRoom.set(roomName, []);
+    const instanceKey = `${loc.floor}:${loc.x}:${loc.y}`;
+    if (!namesByRoomInstance.has(instanceKey)) {
+      namesByRoomInstance.set(instanceKey, { roomName, names: [] });
     }
-    namesByRoom.get(roomName).push(otherPlayer.name);
+    namesByRoomInstance.get(instanceKey).names.push(otherPlayer.name);
   }
-  return [...namesByRoom.entries()].map(([roomName, names]) => `${names.join('、')} 在 ${roomName} 內`).join('；');
+  return [...namesByRoomInstance.values()].map(({ roomName, names }) => `${names.join('、')} 在 ${roomName} 內`).join('；');
 }
 
 function findSourceKind(content, sourceId) {

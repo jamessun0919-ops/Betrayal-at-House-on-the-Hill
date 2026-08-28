@@ -2522,6 +2522,39 @@ test('game:selectAction item_036 groups two other players in the same room onto 
   httpServer.close();
 });
 
+test('game:selectAction item_036 does not merge two other players who are in different rooms that happen to share a name', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_hall_1', name: '大門廳', doors: 4, floor: 'ground' },
+      { id: 'room_hall_2', name: '大門廳', doors: 4, floor: 'ground' },
+    ],
+    cards: { events: [], items: [REVEAL_ITEM_CARD], omens: [] },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_036' });
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.floor = 'ground';
+  otherPlayer.x = 50;
+  otherPlayer.y = 50;
+  gameState.board.ground.set(coordKey(50, 50), { roomId: 'room_hall_1', x: 50, y: 50, doorSides: ['north'], droppedItems: [], item: null });
+  gameState.players.set('synthetic_p3', { playerId: 'synthetic_p3', name: 'Carol-synthetic', floor: 'ground', x: 60, y: 60, inventory: [] });
+  gameState.board.ground.set(coordKey(60, 60), { roomId: 'room_hall_2', x: 60, y: 60, doorSides: ['north'], droppedItems: [], item: null });
+
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_036' }, resolve));
+  const data = await itemUseResolvedPromise;
+
+  // Same room NAME, but different room cells -- must stay two separate groups, not merge into one
+  expect(data.revealText.split('；').length).toBe(2);
+  expect(data.revealText).not.toMatch(/、/); // no two names joined onto the same line
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item_036 used while alone (no other players) returns the fixed fallback text', async () => {
   const content = makeContent({
     cards: { events: [], items: [REVEAL_ITEM_CARD], omens: [] },

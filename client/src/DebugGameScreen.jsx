@@ -31,6 +31,9 @@ function resolveSimplePopupBody(entry, roomContent, cardContent) {
     return card ? card.description : '';
   }
   if (entry.kind === 'eventNoCheck' || entry.kind === 'itemUseResolved') {
+    // overrideText carries server-computed dynamic text (e.g. item_036's
+    // revealText) -- most cards don't set it, falling through to the static
+    // feedbacktextOccur lookup as before.
     return entry.overrideText || (card && card.feedbacktextOccur) || '待補充';
   }
   // 'itemDrawNoCheck' -- existing pre-change popup content, unchanged
