@@ -126,6 +126,7 @@
           {
             "min": 5,
             "max": 8,
+            "pass": true,
             "effects": [
               {
                 "type": "draw_card",
@@ -137,6 +138,7 @@
           {
             "min": 0,
             "max": 4,
+            "pass": false,
             "effects": []
           }
         ]
@@ -372,8 +374,8 @@
         "type": "dice_check",
         "stat": "knowledge",
         "tiers": [
-          { "min": 6, "max": 16, "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }] },
-          { "min": 0, "max": 5, "effects": [] }
+          { "min": 6, "max": 16, "pass": true, "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }] },
+          { "min": 0, "max": 5, "pass": false, "effects": [] }
         ]
       }]
     }],
@@ -600,6 +602,7 @@
     "description": "傳說中能夠實現貪婪者願望，但是會讓使用者詛咒纏身的金幣。",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次考驗減少一顆骰子，如該考驗通過，則額外隨機取得一件物品（原考驗內容與結果不受影響）。",
     "effects": [],
+    "diceInterjection": { "scope": "any", "consumesItem": true, "bonusDice": -1, "bonusOnPass": [{ "type": "draw_card", "deck": "item", "count": 1 }] },
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -610,6 +613,7 @@
     "description": "傳說中的賭神隨身攜帶的骰子，使用前記得驗牌",
     "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次擲骰的骰子六面點數設定從[0,0,1,1,2,2]改為[1,1,1,2,2,2]，考驗完成後修改回原設定。",
     "effects": [],
+    "diceInterjection": { "scope": "any", "consumesItem": true, "customFaces": [1, 1, 1, 2, 2, 2] },
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false

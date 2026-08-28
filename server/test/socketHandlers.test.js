@@ -1699,6 +1699,113 @@ test('drawing a card whose effect is a dice_check broadcasts a cardCheck game:ch
   httpServer.close();
 });
 
+test('game:selectAction item_048 grants a bonus item only when the check it was used on passes', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_x',
+        name: '測試',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 5,
+          tiers: [
+            { min: 4, max: 10, pass: true, effects: [] },
+            { min: 0, max: 3, pass: false, effects: [] },
+          ],
+        }],
+      }],
+      items: [{
+        id: 'item_048',
+        name: '海盜金幣',
+        effects: [],
+        diceInterjection: { scope: 'any', consumesItem: true, bonusDice: -1, bonusOnPass: [{ type: 'draw_card', deck: 'item', count: 1 }] },
+        category: 'consumable',
+      }, {
+        id: 'item_100',
+        name: '測試獎勵道具',
+        effects: [],
+        category: 'decoration',
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_048' });
+  // The item deck built from content.cards.items still contains BOTH item_048
+  // and item_100 as drawable cards -- filter it down to just item_100 so the
+  // bonus draw_card below is deterministic (otherwise it could randomly draw
+  // item_048 back out of the deck instead, making the assertion flaky).
+  gameState.itemDeck.cards = gameState.itemDeck.cards.filter((c) => c.id === 'item_100');
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 4 dice (5-1 bonusDice) * face 2 = 8, lands in the pass tier
+  const cardsDrawnPromise = new Promise((resolve) => currentClient.once('game:cardsDrawn', resolve));
+  const diceOptionsPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await diceOptionsPromise;
+  await new Promise((resolve) => currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_048' }, resolve));
+  const cardsDrawn = await cardsDrawnPromise;
+  rngSpy.mockRestore();
+
+  expect(cardsDrawn.cards.some((c) => c.id === 'item_100')).toBe(true); // the bonus draw actually happened
+  expect(getPlayer(gameState, currentPlayerId).inventory.some((i) => i.id === 'item_048')).toBe(false); // consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_049 changes the roll outcome via its custom dice faces', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_x',
+        name: '測試',
+        effects: [{
+          type: 'dice_check',
+          diceCount: 1,
+          tiers: [
+            { min: 1, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+            { min: 0, max: 0, pass: false, effects: [] },
+          ],
+        }],
+      }],
+      items: [{
+        id: 'item_049',
+        name: '賭神骰子',
+        effects: [],
+        diceInterjection: { scope: 'any', consumesItem: true, customFaces: [1, 1, 1, 2, 2, 2] },
+        category: 'consumable',
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_049' });
+
+  // Every die face 0 under the DEFAULT DIE_FACES would land on min:0 (fail),
+  // but item_049's customFaces [1,1,1,2,2,2] has no 0 face at all -- proves
+  // customFaces was actually applied, not just the default table.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const diceOptionsPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pending = await diceOptionsPromise;
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_049' }, resolve));
+  await effectResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(getPlayer(gameState, currentPlayerId).stats.might.currentIndex).toBe(3); // baseIndex 2 + 1 -- pass tier hit, only reachable with customFaces
+  expect(getPlayer(gameState, currentPlayerId).inventory.some((i) => i.id === 'item_049')).toBe(false); // consumed
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:checkResolved passed field reflects the tier\'s explicit pass flag, not a guess from tierEffects content', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
