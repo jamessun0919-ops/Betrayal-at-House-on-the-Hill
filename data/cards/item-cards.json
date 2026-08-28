@@ -471,12 +471,11 @@
     "id": "item_036",
     "name": "老鷹木雕",
     "description": "古樸風格的老鷹木雕，雙眼是兩顆深邃的黑色寶石，寄宿著老鷹的靈魂供你驅使",
-    "text": "使用後可以得知其他玩家/怪物/惡人位在哪個房間內。",
-    "feedbacktextOccur": "xxx在xxx間內；ooo在ooo房間內",
-    "effects": [],
+    "text": "使用後可以得知其他玩家位在哪個房間內。（怪物/惡人位置待後續版本補上）",
+    "effects": [{ "type": "reveal_player_locations" }],
     "category": "reusable",
     "canTargetOthers": false,
-    "needsCustomLogic": false
+    "needsCustomLogic": true
   },
   {
     "id": "item_037",

@@ -31,7 +31,7 @@ function resolveSimplePopupBody(entry, roomContent, cardContent) {
     return card ? card.description : '';
   }
   if (entry.kind === 'eventNoCheck' || entry.kind === 'itemUseResolved') {
-    return (card && card.feedbacktextOccur) || '待補充';
+    return entry.overrideText || (card && card.feedbacktextOccur) || '待補充';
   }
   // 'itemDrawNoCheck' -- existing pre-change popup content, unchanged
   return card ? (card.text || card.description || '') : '';
@@ -200,7 +200,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       if (data.playerId !== playerId) return;
       setPendingCheckQueue((prev) => [
         ...prev,
-        { noCheck: true, kind: 'itemUseResolved', sourceId: data.itemId, queueId: nextCheckQueueId.current++ },
+        { noCheck: true, kind: 'itemUseResolved', sourceId: data.itemId, overrideText: data.revealText, queueId: nextCheckQueueId.current++ },
       ]);
     }
     function onEffectPendingChoice(data) {
