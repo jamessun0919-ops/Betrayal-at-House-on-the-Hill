@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { changeStat, addItem, removeItem, getStatValue, movePlayerTo } = require('./playerEntity');
+const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
 const { coordKey, DIRECTION_DELTA } = require('./boardGenerator');
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
@@ -38,6 +38,13 @@ function handleStatChange(gameState, playerId, effect) {
   return { pending: false };
 }
 
+function handleRandomStatChange(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  const stat = STATS[Math.floor(Math.random() * STATS.length)];
+  changeStat(player, stat, effect.delta, gameState.hauntStarted);
+  return { pending: false };
+}
+
 function handleActionPoints(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   if (effect.setTo !== undefined) {
@@ -70,7 +77,7 @@ function handleLoseItem(gameState, playerId, effect, context) {
   return { pending: false };
 }
 
-function handleRemoveImprint(gameState, playerId, effect, context) {
+function handleRemoveImprint(gameState, promptState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   const catalog = [...((context && context.itemCatalog) || []), ...((context && context.omenCatalog) || [])];
   const imprintIds = player.inventory
@@ -89,6 +96,9 @@ function handleRemoveImprint(gameState, playerId, effect, context) {
     if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase) {
       changeStat(player, cardEffect.stat, -cardEffect.delta, gameState.hauntStarted);
     }
+  }
+  if (Array.isArray(effect.effects) && effect.effects.length > 0) {
+    return resolveEffects(gameState, promptState, playerId, effect.effects, context);
   }
   return { pending: false };
 }
@@ -192,6 +202,15 @@ function handleToggleActive(gameState, promptState, playerId, effect, context) {
   item.active = !wasActive;
   const effectsToApply = wasActive ? effect.inactiveEffects : effect.activeEffects;
   return resolveEffects(gameState, promptState, playerId, effectsToApply, context);
+}
+
+function handleRoomGate(gameState, promptState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  const room = getRoomForPlayer(gameState, player);
+  if (!effect.roomIds.includes(room.roomId)) {
+    return { pending: false, appliedCount: 0 };
+  }
+  return resolveEffects(gameState, promptState, playerId, effect.effects, context);
 }
 
 function handleSwitchControl(gameState, playerId, effect) {
@@ -382,7 +401,9 @@ const HANDLERS = Object.assign(Object.create(null), {
   action_points: (gameState, promptState, playerId, effect) => handleActionPoints(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
-  remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, playerId, effect, context),
+  remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, promptState, playerId, effect, context),
+  random_stat_change: (gameState, promptState, playerId, effect) => handleRandomStatChange(gameState, playerId, effect),
+  room_gate: (gameState, promptState, playerId, effect, context) => handleRoomGate(gameState, promptState, playerId, effect, context),
   remove_room_doors: (gameState, promptState, playerId, effect) => handleRemoveRoomDoors(gameState, playerId, effect),
   add_room_door: (gameState, promptState, playerId, effect) => handleAddRoomDoor(gameState, playerId),
   fall_to_basement: (gameState, promptState, playerId) => handleFallToBasement(gameState, playerId),

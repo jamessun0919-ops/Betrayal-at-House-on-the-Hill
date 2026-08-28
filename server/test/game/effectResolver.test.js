@@ -1047,3 +1047,94 @@ test('resolveEffects fall_to_basement drops the player into a new basement room 
   expect(gameState.board.basement.get('8,8').roomId).toBe('room_basement_new');
   expect(currentRoom.collapseLink).toEqual({ x: 8, y: 8 });
 });
+
+test('resolveEffects random_stat_change picks might when Math.random selects index 0', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'random_stat_change', delta: 1 },
+  ]);
+  rngSpy.mockRestore();
+  expect(player.stats.might.currentIndex).toBe(3); // baseIndex 2 + 1
+  expect(player.stats.speed.currentIndex).toBe(2);
+  expect(player.stats.knowledge.currentIndex).toBe(1);
+  expect(player.stats.sanity.currentIndex).toBe(2);
+});
+
+test('resolveEffects random_stat_change picks sanity when Math.random selects the last index', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'random_stat_change', delta: 1 },
+  ]);
+  rngSpy.mockRestore();
+  expect(player.stats.sanity.currentIndex).toBe(3); // baseIndex 2 + 1
+  expect(player.stats.might.currentIndex).toBe(2);
+  expect(player.stats.speed.currentIndex).toBe(2);
+  expect(player.stats.knowledge.currentIndex).toBe(1);
+});
+
+test('resolveEffects room_gate resolves nested effects when the player is in a matching room', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 30;
+  player.y = 30;
+  gameState.board.ground.set('30,30', { roomId: 'room_organ', x: 30, y: 30, doorSides: ['north'], droppedItems: [], item: null });
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'room_gate', roomIds: ['room_organ', 'room_piano'], effects: [
+      { type: 'stat_change', stat: 'speed', delta: 1 },
+    ] },
+  ]);
+  expect(player.stats.speed.currentIndex).toBe(3); // baseIndex 2 + 1
+});
+
+test('resolveEffects room_gate no-ops (appliedCount:0) when the player is not in a matching room', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.floor = 'ground';
+  player.x = 30;
+  player.y = 30;
+  gameState.board.ground.set('30,30', { roomId: 'room_lobby_a', x: 30, y: 30, doorSides: ['north'], droppedItems: [], item: null });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'room_gate', roomIds: ['room_organ', 'room_piano'], effects: [
+      { type: 'stat_change', stat: 'speed', delta: 1 },
+    ] },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(player.stats.speed.currentIndex).toBe(2); // unchanged
+});
+
+test('resolveEffects remove_imprint with nested effects resolves them only when an imprint was actually removed', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_002' });
+  player.stats.knowledge.currentIndex += 2; // simulate having already gained the imprint's own +2
+  const rngSpy = jest.spyOn(Math, 'random')
+    .mockReturnValueOnce(0.5) // remove_imprint's imprint-index pick (only 1 held -> value irrelevant)
+    .mockReturnValueOnce(0); // random_stat_change picks might (index 0)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint', effects: [{ type: 'random_stat_change', delta: 1 }] },
+  ], { omenCatalog: [{ id: 'omen_002', category: 'imprint', effects: [{ type: 'stat_change', stat: 'knowledge', delta: 2 }] }] });
+  rngSpy.mockRestore();
+  expect(player.inventory).toEqual([]);
+  expect(player.stats.knowledge.currentIndex).toBe(1); // baseIndex, reverted by remove_imprint's own reversal
+  expect(player.stats.might.currentIndex).toBe(3); // baseIndex 2 + 1, from the nested random_stat_change
+});
+
+test('resolveEffects remove_imprint with nested effects does not resolve them when the player holds no imprints', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_003' });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint', effects: [{ type: 'random_stat_change', delta: 1 }] },
+  ], { itemCatalog: [{ id: 'item_003', category: 'consumable' }] });
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(player.inventory).toEqual([{ id: 'item_003' }]);
+  expect(player.stats.might.currentIndex).toBe(2); // unchanged -- nested effect never ran
+  expect(player.stats.speed.currentIndex).toBe(2);
+  expect(player.stats.knowledge.currentIndex).toBe(1);
+  expect(player.stats.sanity.currentIndex).toBe(2);
+});
