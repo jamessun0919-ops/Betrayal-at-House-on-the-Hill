@@ -118,7 +118,7 @@ test('game:checkResolved passed field reflects the tier\'s explicit pass flag, n
         name: '測試',
         effects: [{
           type: 'dice_check',
-          diceCount: 1,
+          diceCount: 4, // max achievable sum is 4*2=8 -- enough to actually reach the min:8 tier below
           tiers: [
             // "passed" tier that still applies a negative stat_change -- the
             // old heuristic (guessing from tierEffects) would have said

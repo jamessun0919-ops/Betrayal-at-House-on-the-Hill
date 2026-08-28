@@ -1708,12 +1708,15 @@ test('game:checkResolved passed field reflects the tier\'s explicit pass flag, n
         name: '測試',
         effects: [{
           type: 'dice_check',
-          diceCount: 1,
+          diceCount: 4, // max achievable sum is 4*2=8 -- enough to actually reach the min:8 tier below
           tiers: [
             // "passed" tier that still applies a negative stat_change -- the
             // old heuristic (guessing from tierEffects) would have said
             // false here; the fix must read the explicit pass:true instead.
-            { min: 0, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { min: 8, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            // "failed" tier with no effects at all -- the old heuristic
+            // would have said true here (no negative stat_change present).
+            { min: 0, max: 7, pass: false, effects: [] },
           ],
         }],
       }],
@@ -1723,7 +1726,7 @@ test('game:checkResolved passed field reflects the tier\'s explicit pass flag, n
   });
   const { httpServer, clientA, clientB, currentClient, otherClient } = await setUpStartedGameWithContent(content);
 
-  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // guaranteed to land in the min:8 (pass:true) tier
   const checkResolvedPromise = new Promise((resolve) => otherClient.once('game:checkResolved', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   const checkResolved = await checkResolvedPromise;
