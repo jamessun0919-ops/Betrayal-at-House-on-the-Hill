@@ -696,6 +696,24 @@ test('resolveEffects random_effect picks a different option with a different rng
   expect(player.stats.speed.currentIndex).toBe(2); // unchanged
 });
 
+test('resolveEffects random_effect attaches randomEffectIndex to its output', () => {
+  const gameState = makeGameStateWithPlayer();
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5); // 0.5 * 4 options -> index 2
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'random_effect',
+      options: [
+        { effects: [] },
+        { effects: [] },
+        { effects: [] },
+        { effects: [] },
+      ],
+    },
+  ]);
+  rngSpy.mockRestore();
+  expect(result.randomEffectIndex).toBe(2);
+});
+
 test('resolveEffects random_effect throws INVALID_RANDOM_EFFECT_OPTIONS for an empty options array', () => {
   const gameState = makeGameStateWithPlayer();
   expect(() =>

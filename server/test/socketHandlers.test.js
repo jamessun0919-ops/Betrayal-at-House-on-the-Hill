@@ -2842,6 +2842,110 @@ test('game:selectAction item_044 with rng landing on option 1 (移動到隨機�
   httpServer.close();
 });
 
+test('game:selectAction item_044 with rng landing on option 6: sends the matching feedbacktextDice string as randomEffectText', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_044',
+        name: '有限手套',
+        feedbacktextDice: {
+          '1': '藍色寶石閃了一下，你被移動到了隔壁房間',
+          '2': '橙色寶石閃了一下，你心中充滿了惡念',
+          '3': '黃色寶石閃了一下，你感覺遺忘了很多事情',
+          '4': '紫色寶石閃了一下，你感覺手套吸走了你的力量',
+          '5': '綠色寶石閃了一下，你感覺自己變遲鈍了',
+          '6': '紅色寶石閃了一下，你無法動彈了',
+        },
+        effects: [{
+          type: 'random_effect',
+          options: [
+            { effects: [{ type: 'move_to_random_neighbor_room' }] },
+            { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+            { effects: [{ type: 'action_points', setTo: 0 }] },
+          ],
+        }],
+        category: 'reusable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_044' });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 0.99 * 6 options -> index 5
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_044' }, resolve));
+  const itemUseResolved = await itemUseResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(itemUseResolved.randomEffectText).toBe('紅色寶石閃了一下，你無法動彈了');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_044 with rng landing on option 1: broadcasts game:roomEntered when the random neighbor is a room the player has never visited', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_044',
+        name: '有限手套',
+        effects: [{
+          type: 'random_effect',
+          options: [
+            { effects: [{ type: 'move_to_random_neighbor_room' }] },
+            { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+            { effects: [{ type: 'action_points', setTo: 0 }] },
+          ],
+        }],
+        category: 'reusable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_044' });
+
+  // Manually place a not-yet-visited neighbor to the east of the player's starting room
+  // (room_lobby_a, (0,1)) so move_to_random_neighbor_room has a genuinely new room to reach.
+  gameState.board.ground.set('1,1', { roomId: 'room_new_neighbor', x: 1, y: 1, doorSides: ['west'], droppedItems: [], item: null });
+
+  // room_lobby_a's default board placement already has a door to room_lobby_b
+  // (north), so 'north' is also a valid move_to_random_neighbor_room candidate
+  // alongside our manually-placed east neighbor. Two sequential values pin
+  // both rng calls deterministically: 0 for the outer 6-option pick (index 0,
+  // move_to_random_neighbor_room) and 0.99 for the inner 2-candidate pick
+  // (candidates are [north, east] in SIDES order -> index 1, east).
+  const rngSpy = jest.spyOn(Math, 'random');
+  rngSpy.mockReturnValueOnce(0);
+  rngSpy.mockReturnValueOnce(0.99);
+  const roomEnteredPromise = new Promise((resolve) => currentClient.once('game:roomEntered', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_044' }, resolve));
+  const roomEntered = await roomEnteredPromise;
+  rngSpy.mockRestore();
+
+  expect(roomEntered.enteredNewRoom).toBe(true);
+  expect(roomEntered.roomId).toBe('room_new_neighbor');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item_038 sets might to the non-lethal floor and speed to max, reverting both at the start of the user\'s next turn', async () => {
   const content = makeContent({
     cards: {

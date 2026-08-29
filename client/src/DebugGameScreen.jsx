@@ -203,7 +203,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       if (data.playerId !== playerId) return;
       setPendingCheckQueue((prev) => [
         ...prev,
-        { noCheck: true, kind: 'itemUseResolved', sourceId: data.itemId, overrideText: data.revealText, queueId: nextCheckQueueId.current++ },
+        { noCheck: true, kind: 'itemUseResolved', sourceId: data.itemId, overrideText: data.revealText || data.randomEffectText, queueId: nextCheckQueueId.current++ },
       ]);
     }
     function onEffectPendingChoice(data) {

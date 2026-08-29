@@ -350,7 +350,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           try {
             const resolverEntry = getResolver(effectResolverManager, roomCode);
             const targetForEffects = result.targetPlayerId || playerId;
-            const moveToRoomEffect = sourceEffects.find((e) => e.type === 'move_to_room');
             const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, playerId);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
@@ -359,9 +358,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
               // items (item_036 today) -- a future canTargetOthers:true reveal card would need this
               // reworked, since the list should exclude the actor, not the target.
               const revealText = buildRevealText(gameState, content, effectResult.revealedLocations);
+              const randomEffectText = buildRandomEffectText(content, sourceId, effectResult.randomEffectIndex);
               const itemUsePayload = { playerId, itemId };
               if (revealText) {
                 itemUsePayload.revealText = revealText;
+              }
+              if (randomEffectText) {
+                itemUsePayload.randomEffectText = randomEffectText;
               }
               io.to(roomCode).emit('game:itemUseResolved', itemUsePayload);
               if (targetForEffects !== playerId) {
@@ -369,11 +372,16 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
                 if (revealText) {
                   targetPayload.revealText = revealText;
                 }
+                if (randomEffectText) {
+                  targetPayload.randomEffectText = randomEffectText;
+                }
                 io.to(roomCode).emit('game:itemUseResolved', targetPayload);
               }
             }
-            if (moveToRoomEffect && !effectResult.pending) {
-              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: moveToRoomEffect.targetRoomId, enteredNewRoom: effectResult.enteredNewRoom });
+            if (!effectResult.pending && effectResult.enteredNewRoom !== undefined) {
+              const movedPlayer = getPlayer(gameState, targetForEffects);
+              const enteredRoom = gameState.board[movedPlayer.floor].get(coordKey(movedPlayer.x, movedPlayer.y));
+              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: enteredRoom.roomId, enteredNewRoom: effectResult.enteredNewRoom });
             }
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
@@ -785,6 +793,19 @@ function buildRevealText(gameState, content, revealedLocations) {
     namesByRoomInstance.get(instanceKey).names.push(otherPlayer.name);
   }
   return [...namesByRoomInstance.values()].map(({ roomName, names }) => `${names.join('、')} 在 ${roomName} 內`).join('；');
+}
+
+function buildRandomEffectText(content, sourceId, randomEffectIndex) {
+  if (typeof randomEffectIndex !== 'number') {
+    return null;
+  }
+  const card = content.cards.items.find((c) => c.id === sourceId)
+    || content.cards.events.find((c) => c.id === sourceId)
+    || content.cards.omens.find((c) => c.id === sourceId);
+  if (!card || !card.feedbacktextDice) {
+    return null;
+  }
+  return card.feedbacktextDice[String(randomEffectIndex + 1)] || null;
 }
 
 function findSourceKind(content, sourceId) {

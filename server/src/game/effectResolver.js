@@ -253,7 +253,11 @@ function handleRandomEffect(gameState, promptState, playerId, effect, context) {
     throw new Error('INVALID_RANDOM_EFFECT_OPTIONS');
   }
   const index = Math.floor(Math.random() * effect.options.length);
-  return resolveEffects(gameState, promptState, playerId, effect.options[index].effects, context);
+  const nestedResult = resolveEffects(gameState, promptState, playerId, effect.options[index].effects, context);
+  if (nestedResult.pending) {
+    return nestedResult;
+  }
+  return { ...nestedResult, randomEffectIndex: index };
 }
 
 function handleToggleActive(gameState, promptState, playerId, effect, context) {
@@ -519,6 +523,7 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   let diceCheckResult = null;
   let enteredNewRoom = null;
   let revealedLocations = null;
+  let randomEffectIndex = null;
   for (const effect of effects) {
     const handler = HANDLERS[effect.type];
     if (!handler) {
@@ -541,6 +546,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
     if (result && Array.isArray(result.revealedLocations)) {
       revealedLocations = result.revealedLocations;
     }
+    if (result && typeof result.randomEffectIndex === 'number') {
+      randomEffectIndex = result.randomEffectIndex;
+    }
   }
   const output = { pending: false, appliedCount };
   if (drawnCards.length > 0) {
@@ -554,6 +562,9 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
   }
   if (revealedLocations !== null) {
     output.revealedLocations = revealedLocations;
+  }
+  if (randomEffectIndex !== null) {
+    output.randomEffectIndex = randomEffectIndex;
   }
   return output;
 }
