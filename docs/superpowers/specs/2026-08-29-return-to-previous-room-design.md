@@ -68,3 +68,11 @@ function movePlayerTo(player, floor, x, y, enteredFromSide = null) {
 - 不處理「前一個位置」再往前追溯（只保留緊接著的一步，不做完整移動歷史堆疊）
 - `event_029` 的濃煙標記不做任何移除條件（開發者已確認永久存在）
 - `move_to_previous_room` 不重新觸發新房間的抽卡（比照既有 `move_to_room` 效果類型）
+
+## 已知規則後果（開發者已確認接受，不修改程式碼）
+
+`dropToBasement`（`collapseFall.js`）跟其他所有移動方式一樣經過 `movePlayerTo`，所以崩塌摔落後
+`player.previousPosition` 會變成「玩家剛剛摔落的那間地面樓層房間」。如果玩家摔到地下室後，在地下室
+房間抽到 `event_004`／`event_029`／`event_035`，「回到前一個房間」會把玩家送回剛剛摔落的洞口——
+等於免費爬回去。開發者已確認這個規則後果可以接受（可以當成一種奇幻的遊戲情境：一陣風把你吹回剛剛
+掉下去的地方），不需要修改 `dropToBasement` 去保存/還原摔落前的 `previousPosition`。

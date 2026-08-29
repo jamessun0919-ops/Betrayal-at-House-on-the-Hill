@@ -1439,3 +1439,34 @@ test('item_038 in data/cards/item-cards.json has the expected setToLevel/revertA
     { type: 'stat_change', stat: 'speed', setToLevel: 'max', revertAtNextTurnStart: true },
   ]);
 });
+
+test('event_004/event_029/event_035 in data/cards/event-cards.json have the expected return-to-previous-room effects', () => {
+  const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
+
+  const event004 = eventCards.find((c) => c.id === 'event_004');
+  expect(event004).toBeDefined();
+  expect(event004.effects).toEqual([
+    { type: 'action_points', setTo: 0 },
+    { type: 'move_to_previous_room' },
+  ]);
+
+  const event035 = eventCards.find((c) => c.id === 'event_035');
+  expect(event035).toBeDefined();
+  expect(event035.effects).toEqual([
+    { type: 'move_to_previous_room' },
+  ]);
+
+  // event_029's order is load-bearing: persistent_modifier (the smoke marker) must attach to
+  // the room the player is still standing in, BEFORE move_to_previous_room moves them away
+  // from it. Reversed order would silently attach the marker to the wrong room.
+  const event029 = eventCards.find((c) => c.id === 'event_029');
+  expect(event029).toBeDefined();
+  expect(event029.effects).toEqual([
+    {
+      type: 'persistent_modifier',
+      appliesTo: 'roomAndNeighbors',
+      effects: [{ hookType: 'onBeforeRoll', delta: -1 }],
+    },
+    { type: 'move_to_previous_room' },
+  ]);
+});
