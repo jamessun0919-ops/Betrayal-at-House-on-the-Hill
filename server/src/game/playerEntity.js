@@ -53,6 +53,7 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     enteredFromSide: null, // null = arrived by spawn/stairs (badge centered), else the door side entered through
     wieldedWeaponId: null, // id of the currently wielded weapon-category item, at most one
     wornGearIds: [], // ids of currently worn gear-category items, no cap
+    pendingStatReverts: [], // {stat, delta} entries applied and cleared by advanceTurn when this player's own next turn starts
   };
 }
 

@@ -43,6 +43,11 @@ test('createPlayer initializes empty equip state (wieldedWeaponId null, wornGear
   expect(player.wornGearIds).toEqual([]);
 });
 
+test('createPlayer initializes pendingStatReverts as an empty array', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(player.pendingStatReverts).toEqual([]);
+});
+
 test('createPlayer stores the given characterId (used by the client to look up portrait/icon assets)', () => {
   const player = createPlayer({
     playerId: 'p1',

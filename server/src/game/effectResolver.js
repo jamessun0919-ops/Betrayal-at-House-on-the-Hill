@@ -32,6 +32,24 @@ function handleStatChange(gameState, playerId, effect) {
     }
     const delta = Math.max(0, statTrack.baseIndex - statTrack.currentIndex);
     changeStat(player, effect.stat, delta, gameState.hauntStarted);
+  } else if (effect.setToLevel) {
+    const statTrack = player.stats[effect.stat];
+    if (!statTrack) {
+      throw new Error('UNKNOWN_STAT');
+    }
+    let targetIndex;
+    if (effect.setToLevel === 'min') {
+      targetIndex = statTrack.skullIndex + 1;
+    } else if (effect.setToLevel === 'max') {
+      targetIndex = statTrack.track.length - 1;
+    } else {
+      throw new Error('INVALID_SET_TO_LEVEL');
+    }
+    const delta = targetIndex - statTrack.currentIndex;
+    changeStat(player, effect.stat, delta, gameState.hauntStarted);
+    if (effect.revertAtNextTurnStart) {
+      player.pendingStatReverts.push({ stat: effect.stat, delta: -delta });
+    }
   } else {
     changeStat(player, effect.stat, effect.delta, gameState.hauntStarted);
   }

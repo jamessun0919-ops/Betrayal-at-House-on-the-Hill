@@ -56,6 +56,53 @@ test('resolveEffects does not lower a stat that is already at or above baseIndex
   expect(player.stats.might.currentIndex).toBe(4); // unchanged, restoreToBase only raises
 });
 
+test('resolveEffects stat_change setToLevel:"min" sets the stat to skullIndex+1 (non-lethal floor)', () => {
+  const gameState = makeGameStateWithPlayer();
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', setToLevel: 'min' },
+  ]);
+  expect(gameState.players.get('p1').stats.might.currentIndex).toBe(1); // skullIndex 0 + 1
+});
+
+test('resolveEffects stat_change setToLevel:"max" sets the stat to the last track index', () => {
+  const gameState = makeGameStateWithPlayer();
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'speed', setToLevel: 'max' },
+  ]);
+  expect(gameState.players.get('p1').stats.speed.currentIndex).toBe(4); // track.length 5 - 1
+});
+
+test('resolveEffects stat_change throws INVALID_SET_TO_LEVEL for an unrecognized setToLevel value', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() => resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', setToLevel: 'bogus' },
+  ])).toThrow('INVALID_SET_TO_LEVEL');
+});
+
+test('resolveEffects stat_change setToLevel with revertAtNextTurnStart pushes the reverse delta onto player.pendingStatReverts', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', setToLevel: 'min', revertAtNextTurnStart: true },
+    { type: 'stat_change', stat: 'speed', setToLevel: 'max', revertAtNextTurnStart: true },
+  ]);
+  expect(player.stats.might.currentIndex).toBe(1); // baseIndex 2 -> min index 1, delta -1
+  expect(player.stats.speed.currentIndex).toBe(4); // baseIndex 2 -> max index 4, delta +2
+  expect(player.pendingStatReverts).toEqual([
+    { stat: 'might', delta: 1 },  // reverse of the -1 that was applied
+    { stat: 'speed', delta: -2 }, // reverse of the +2 that was applied
+  ]);
+});
+
+test('resolveEffects stat_change setToLevel without revertAtNextTurnStart does not push to pendingStatReverts', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', setToLevel: 'min' },
+  ]);
+  expect(player.pendingStatReverts).toEqual([]);
+});
+
 test('resolveEffects action_points sets actionPoints to the given setTo value', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
