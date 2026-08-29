@@ -1307,3 +1307,26 @@
 
 **開發者交代備忘事項**：
 - 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server（只跑了自動化測試，無需手動瀏覽器驗證）
+
+## 2026-08-29 第 1 次工作階段
+
+**當日工作內容**：
+- 開發者指示討論 item_044 淘汰玩家機制：淘汰效果視為攻擊，房間內除自己以外的所有其他角色（不限玩家/怪物/NPC）各受到肉體與精神各 99 點傷害（M3 傷害系統設計出來前的必定淘汰數值佔位）；因傷害系統排在 M3，這次只記錄設計、不實作
+- 開發者提出 item_038（可疑藥丸）建議方向：借用銘印機制反向套用 delta 的簡化精神，做出「使用後屬性推到極值、下回合開始自動恢復」的能力。走完整 brainstorming 流程確認機制：`stat_change` 新增 `setToLevel:"min"/"max"`（設到絕對級別）＋`revertAtNextTurnStart`（記進新欄位 `player.pendingStatReverts`），觸發點選在 `turnFlow.js` 的 `advanceTurn`（換人時本來就會 resetActionPoints，順便套用並清空進來這位玩家自己的還原佇列）
+- `writing-plans` 產出 3 任務實作計畫，開發者選擇 Subagent-Driven，建立獨立 worktree，依序完成：Task 1（`setToLevel`/`revertAtNextTurnStart`/`pendingStatReverts`）、Task 2（`advanceTurn` 還原邏輯）、Task 3（item_038 資料串接＋端對端測試），各自審查通過
+- 全分支最終審查（Opus）抓到 3 個 Important：①`setToLevel:"min"` 沒把既有的屬性 overflow 算進去，屬性曾經爆表過的情況下「降到最低級別」實際上沒有真的降到底——真的功能缺陷，審查者用真實角色數值驗證出 1 行修法；②Task 3 的端對端測試沒有真的測到 `data/cards/item-cards.json` 的真實資料；③`advanceTurn` 先算行動力才做屬性還原的順序是刻意且必要的（不然速度提升效果完全沒用），但沒有測試鎖住這個順序
+- 跟開發者確認三項 Important 全修＋2 個 Minor 順手一起修（remove_imprint 反向套用排除 setToLevel、setToLevel 已在目標級別時不推入空轉還原條目）；另外 2 個設計後果性 Minor（藥效期間搜索到新道具會依降低後負重上限強制丟棄且拿不回來；力量停在既有下限期間對力量傷害免疫）跟開發者確認接受不改，且開發者明確表示 M3 傷害系統做出來後也維持後者這條規則
+- 修正派工＋複審皆通過（0 open findings），641/641 測試全綠
+- 合併回本地 main 時遇到環境狀況：main checkout 上開發者同時在編輯 item-cards.json 的武器欄位（未 commit，跟 item_038 完全不同區塊）——git 安全機制擋下快轉合併，跟開發者確認後用 git stash → 合併 → git stash pop 完整保留雙方內容，確認無衝突標記、JSON 合法、雙方修改都正確落地。worktree/分支已清理，尚未推送 origin（留到收工一起推）
+
+**完成項目**：
+- item_038（可疑藥丸）暫時屬性置換機制——完整流程完成並合併，含全分支審查抓到並修復的 3 個 Important，641/641 測試全綠
+- item_044 淘汰玩家機制設計已確認並記錄（留給 M3 實作）
+- Handover 項目 11 剩 item_044（設計已確認）／item_999
+
+**遇到瓶頸**：
+- 合併時因為 main 上有開發者並行進行中的未 commit 編輯（同一份 item-cards.json，不同區塊）被 git 安全機制擋下，屬於已知、可預期的 git 行為，非重大瓶頸，用 stash 流程順利解決
+
+**開發者交代備忘事項**：
+- 開發者在 main 上有一筆進行中、尚未 commit 的武器屬性編輯（item-cards.json），本階段結束時仍未 commit，內容原封不動保留，下次開工先確認狀態
+- 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server
