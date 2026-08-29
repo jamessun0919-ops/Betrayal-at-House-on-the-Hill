@@ -51,6 +51,7 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     inventory: [],
     visitedRooms: [{ floor, x, y }],
     enteredFromSide: null, // null = arrived by spawn/stairs (badge centered), else the door side entered through
+    previousPosition: null, // {floor,x,y} snapshot of where the player was immediately before their current position, set by movePlayerTo; null until they've moved at least once
     wieldedWeaponId: null, // id of the currently wielded weapon-category item, at most one
     wornGearIds: [], // ids of currently worn gear-category items, no cap
     pendingStatReverts: [], // {stat, delta} entries applied and cleared by advanceTurn when this player's own next turn starts
@@ -116,6 +117,7 @@ function resetActionPoints(player) {
 }
 
 function movePlayerTo(player, floor, x, y, enteredFromSide = null) {
+  player.previousPosition = { floor: player.floor, x: player.x, y: player.y };
   player.floor = floor;
   player.x = x;
   player.y = y;
