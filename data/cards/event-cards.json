@@ -45,8 +45,16 @@
     "description": "你正在探索時，手中的手電筒忽然閃爍幾下，微弱的光束迅速黯淡，最後徹底熄滅。黑暗瞬間吞沒四周，只剩不知從何處傳來的細碎腳步聲。",
     "text": "行動力歸零，角色移動回前一個房間。",
     "feedbacktextOccur": "你在被黑暗壟罩之前，及時退出了房間。手電筒閃爍了幾下，又恢復正常了",
-    "effects": [{ "type": "action_points", "setTo": 0 }],
-    "needsCustomLogic": true
+    "effects": [
+      {
+        "type": "action_points",
+        "setTo": 0
+      },
+      {
+        "type": "move_to_previous_room"
+      }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_005",
@@ -359,8 +367,22 @@
     "description": "一旁老舊燭台突然傾倒，火苗迅速點燃散落的紙張與破布。火勢雖然不大，你及時將火勢撲滅，濃煙卻開始在房內瀰漫。你只好先退出房間。",
     "text": "角色回到前一個房間。將「濃煙」標記，放在此房間與已生成的相鄰房間中，任何角色在此房間進行任何考驗時，減少一顆骰子，最少仍需擲一顆。",
     "feedbacktextOccur": "你及時退出了房間，考慮等濃煙消散了再做打算",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [
+      {
+        "type": "persistent_modifier",
+        "appliesTo": "roomAndNeighbors",
+        "effects": [
+          {
+            "hookType": "onBeforeRoll",
+            "delta": -1
+          }
+        ]
+      },
+      {
+        "type": "move_to_previous_room"
+      }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_030",
@@ -410,7 +432,11 @@
     "description": "你才剛踏進房間，一陣毫無預兆的狂風突然從深處猛烈襲來。桌上的紙張與雜物瞬間被捲上半空，老舊門窗也被吹得劇烈震動。你只能壓低身體勉強站穩，刺骨強風卻持續推著你向後退去。",
     "text": "將角色移動至前一個房間。",
     "feedbacktextOccur": "你被迫退出了房間，考慮等到風停了再做打算",
-    "effects": [],
+    "effects": [
+      {
+        "type": "move_to_previous_room"
+      }
+    ],
     "needsCustomLogic": false
   },
   {

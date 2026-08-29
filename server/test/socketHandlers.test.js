@@ -1679,6 +1679,125 @@ const EVENT_001_DICE_CHECK = {
   }],
 };
 
+test('game:move into event_004 (突發故障) zeros action points and moves the player back to their previous room', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_004',
+        name: '突發故障',
+        effects: [
+          { type: 'action_points', setTo: 0 },
+          { type: 'move_to_previous_room' },
+        ],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const before = getPlayer(gameState, currentPlayerId);
+  const startFloor = before.floor;
+  const startX = before.x;
+  const startY = before.y;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+
+  const after = getPlayer(gameState, currentPlayerId);
+  expect(after.actionPoints).toBe(0);
+  expect(after.floor).toBe(startFloor);
+  expect(after.x).toBe(startX);
+  expect(after.y).toBe(startY);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into event_035 (狂風襲來) moves the player back to their previous room', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_035',
+        name: '狂風襲來',
+        effects: [{ type: 'move_to_previous_room' }],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const before = getPlayer(gameState, currentPlayerId);
+  const startFloor = before.floor;
+  const startX = before.x;
+  const startY = before.y;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+
+  const after = getPlayer(gameState, currentPlayerId);
+  expect(after.floor).toBe(startFloor);
+  expect(after.x).toBe(startX);
+  expect(after.y).toBe(startY);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move into event_029 (濃煙密布) moves the player back and leaves a dice-penalty modifier on the room they left', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_029',
+        name: '濃煙密布',
+        effects: [
+          {
+            type: 'persistent_modifier',
+            appliesTo: 'roomAndNeighbors',
+            effects: [{ hookType: 'onBeforeRoll', delta: -1 }],
+          },
+          { type: 'move_to_previous_room' },
+        ],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const before = getPlayer(gameState, currentPlayerId);
+  const startFloor = before.floor;
+  const startX = before.x;
+  const startY = before.y;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+
+  const after = getPlayer(gameState, currentPlayerId);
+  expect(after.floor).toBe(startFloor);
+  expect(after.x).toBe(startX);
+  expect(after.y).toBe(startY);
+
+  // The room the player just left (room_new, where event_029 was drawn) should carry
+  // the smoke marker -- found by scanning the board for the placed room_new instance.
+  const leftRoom = Array.from(gameState.board[startFloor].values()).find((r) => r.roomId === 'room_new');
+  expect(leftRoom.modifiers).toHaveLength(1);
+  expect(leftRoom.modifiers[0].effects).toEqual([{ hookType: 'onBeforeRoll', delta: -1 }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:cardDrawn reports hasCheck:true when the drawn card has a dice_check effect', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
