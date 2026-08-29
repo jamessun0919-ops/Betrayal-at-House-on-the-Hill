@@ -236,8 +236,33 @@
     "description": "頭頂忽然傳來金屬斷裂的刺耳聲響。懸掛多年的巨大吊燈猛然墜落，在你身旁重重砸碎。玻璃與金屬碎片四處飛濺，你狼狽地閃向一旁，只差一步便會被壓在下面。",
     "text": "以速度進行考驗。骰數大於等於４：無事發生；骰數０到３：速度下降",
     "feedbacktextDice": {"4+":"你驚險閃過了砸落的物品，雖然飛濺的碎片在你身上划出了一些傷口，但是沒有大礙（無事發生）","0-3":"你閃避不及，被壓傷了腿（速度下降一個級別）"},
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [
+      {
+        "type": "dice_check",
+        "stat": "speed",
+        "tiers": [
+          {
+            "min": 4,
+            "max": 8,
+            "pass": true,
+            "effects": []
+          },
+          {
+            "min": 0,
+            "max": 3,
+            "pass": false,
+            "effects": [
+              {
+                "type": "stat_change",
+                "stat": "speed",
+                "delta": -1
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_022",
@@ -310,8 +335,14 @@
     "description": "在門邊發現一張被揉皺的紙條，上面以顫抖字跡寫著前人的警告。內容提到附近某個房間，以及潛藏其中的致命危險。紙張上的墨跡早已乾涸，但最後一句話卻格外清楚——「千萬別開那扇門。」",
     "text": "知識提高一個級別。",
     "feedbacktextOccur": "紙條上的訊息，讓你對成功離開這座古堡又多了幾分把握（知識提升一個級別）",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [
+      {
+        "type": "stat_change",
+        "stat": "knowledge",
+        "delta": 1
+      }
+    ],
+    "needsCustomLogic": false
   },
   {
     "id": "event_028",
