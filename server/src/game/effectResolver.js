@@ -45,9 +45,10 @@ function handleStatChange(gameState, playerId, effect) {
     } else {
       throw new Error('INVALID_SET_TO_LEVEL');
     }
-    const delta = targetIndex - statTrack.currentIndex;
+    const rawDelta = targetIndex - statTrack.currentIndex;
+    const delta = rawDelta < 0 ? rawDelta - statTrack.overflow : rawDelta;
     changeStat(player, effect.stat, delta, gameState.hauntStarted);
-    if (effect.revertAtNextTurnStart) {
+    if (effect.revertAtNextTurnStart && delta !== 0) {
       player.pendingStatReverts.push({ stat: effect.stat, delta: -delta });
     }
   } else {
@@ -111,7 +112,7 @@ function handleRemoveImprint(gameState, promptState, playerId, effect, context) 
   const cardDef = catalog.find((c) => c.id === chosenId);
   removeItem(player, chosenId);
   for (const cardEffect of cardDef.effects || []) {
-    if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase) {
+    if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase && !cardEffect.setToLevel) {
       changeStat(player, cardEffect.stat, -cardEffect.delta, gameState.hauntStarted);
     }
   }

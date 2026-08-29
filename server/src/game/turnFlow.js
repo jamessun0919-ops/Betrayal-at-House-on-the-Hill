@@ -629,6 +629,10 @@ function advanceTurn(gameState) {
   const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
   const nextPlayer = getPlayer(gameState, nextPlayerId);
   resetActionPoints(nextPlayer);
+  // Deliberately AFTER resetActionPoints: resetActionPoints reads the stat value
+  // (e.g. speed) BEFORE it gets reverted here, so a temporary buff like item_038's
+  // speed boost still grants its extra action points on the very turn it wears off.
+  // Reordering this would make that half of the card's effect worthless.
   for (const revert of nextPlayer.pendingStatReverts) {
     changeStat(nextPlayer, revert.stat, revert.delta, gameState.hauntStarted);
   }

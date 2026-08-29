@@ -64,6 +64,23 @@ test('resolveEffects stat_change setToLevel:"min" sets the stat to skullIndex+1 
   expect(gameState.players.get('p1').stats.might.currentIndex).toBe(1); // skullIndex 0 + 1
 });
 
+test('resolveEffects stat_change setToLevel:"min" correctly reaches the floor even when the stat has accumulated overflow', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', delta: 5 }, // baseIndex 2 -> room 2 to reach maxIndex 4 -> index 4, overflow 3
+  ]);
+  expect(player.stats.might.currentIndex).toBe(4);
+  expect(player.stats.might.overflow).toBe(3);
+
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'stat_change', stat: 'might', setToLevel: 'min', revertAtNextTurnStart: true },
+  ]);
+  expect(player.stats.might.currentIndex).toBe(1); // skullIndex 0 + 1, the actual floor
+  expect(player.stats.might.overflow).toBe(0); // overflow fully drained, not left dangling
+  expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: 6 }]); // reverse of the -6 actually applied
+});
+
 test('resolveEffects stat_change setToLevel:"max" sets the stat to the last track index', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
@@ -1349,4 +1366,14 @@ test('every dice_check tier in data/cards and data/rooms has an explicit boolean
   for (const tier of tiers) {
     expect(typeof tier.pass).toBe('boolean');
   }
+});
+
+test('item_038 in data/cards/item-cards.json has the expected setToLevel/revertAtNextTurnStart effects', () => {
+  const itemCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/item-cards.json'), 'utf8'));
+  const item038 = itemCards.find((c) => c.id === 'item_038');
+  expect(item038).toBeDefined();
+  expect(item038.effects).toEqual([
+    { type: 'stat_change', stat: 'might', setToLevel: 'min', revertAtNextTurnStart: true },
+    { type: 'stat_change', stat: 'speed', setToLevel: 'max', revertAtNextTurnStart: true },
+  ]);
 });

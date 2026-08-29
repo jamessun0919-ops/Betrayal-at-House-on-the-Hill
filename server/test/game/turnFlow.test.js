@@ -481,6 +481,7 @@ test('advanceTurn applies the next player\'s pending stat reverts and clears the
   expect(player2.stats.might.currentIndex).toBe(2); // 1 + 1 reverted -> back to baseIndex
   expect(player2.stats.speed.currentIndex).toBe(2); // 4 - 2 reverted -> back to baseIndex
   expect(player2.pendingStatReverts).toEqual([]);
+  expect(player2.actionPoints).toBe(6); // resetActionPoints ran BEFORE the revert, using the still-boosted speed (track[4] = 6, not the reverted track[2] = 4) -- proves the intentional ordering
 });
 
 test('advanceTurn does not touch a player whose pendingStatReverts is empty', () => {
