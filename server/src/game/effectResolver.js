@@ -221,6 +221,16 @@ function handleMoveToRoom(gameState, playerId, effect) {
   throw new Error('TARGET_ROOM_NOT_FOUND');
 }
 
+function handleMoveToPreviousRoom(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  if (!player.previousPosition) {
+    return { pending: false, appliedCount: 0 };
+  }
+  const { floor, x, y } = player.previousPosition;
+  const enteredNewRoom = movePlayerTo(player, floor, x, y);
+  return { pending: false, enteredNewRoom };
+}
+
 function handleToggleActive(gameState, promptState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   const item = player.inventory.find((i) => i.id === effect.itemId);
@@ -448,6 +458,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   fall_to_basement: (gameState, promptState, playerId) => handleFallToBasement(gameState, playerId),
   reveal_player_locations: (gameState, promptState, playerId) => handleRevealPlayerLocations(gameState, playerId),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
+  move_to_previous_room: (gameState, promptState, playerId) => handleMoveToPreviousRoom(gameState, playerId),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),

@@ -575,6 +575,33 @@ test('resolveEffects draw_card throws UNKNOWN_DECK_TYPE for an unrecognized deck
   ).toThrow('UNKNOWN_DECK_TYPE');
 });
 
+test('resolveEffects move_to_previous_room moves the player back to their previous position', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.previousPosition = { floor: 'ground', x: 0, y: 0 };
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_previous_room' },
+  ]);
+  expect(player.floor).toBe('ground');
+  expect(player.x).toBe(0);
+  expect(player.y).toBe(0);
+});
+
+test('resolveEffects move_to_previous_room does nothing when there is no previous position', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const startFloor = player.floor;
+  const startX = player.x;
+  const startY = player.y;
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_previous_room' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(player.floor).toBe(startFloor);
+  expect(player.x).toBe(startX);
+  expect(player.y).toBe(startY);
+});
+
 test('resolveEffects persistent_modifier attaches to the player by default', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
