@@ -629,6 +629,10 @@ function advanceTurn(gameState) {
   const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
   const nextPlayer = getPlayer(gameState, nextPlayerId);
   resetActionPoints(nextPlayer);
+  for (const revert of nextPlayer.pendingStatReverts) {
+    changeStat(nextPlayer, revert.stat, revert.delta, gameState.hauntStarted);
+  }
+  nextPlayer.pendingStatReverts = [];
   return nextPlayerId;
 }
 

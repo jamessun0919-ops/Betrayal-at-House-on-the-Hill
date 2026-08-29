@@ -469,6 +469,41 @@ test('advanceTurn resets the next player action points to their speed stat value
   expect(player2.actionPoints).toBe(4);
 });
 
+test('advanceTurn applies the next player\'s pending stat reverts and clears them', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  player2.stats.might.currentIndex = 1; // was dropped to min (skullIndex 0 + 1)
+  player2.stats.speed.currentIndex = 4; // was raised to max (track.length 5 - 1)
+  player2.pendingStatReverts = [{ stat: 'might', delta: 1 }, { stat: 'speed', delta: -2 }];
+  advanceTurn(gameState);
+  expect(player2.stats.might.currentIndex).toBe(2); // 1 + 1 reverted -> back to baseIndex
+  expect(player2.stats.speed.currentIndex).toBe(2); // 4 - 2 reverted -> back to baseIndex
+  expect(player2.pendingStatReverts).toEqual([]);
+});
+
+test('advanceTurn does not touch a player whose pendingStatReverts is empty', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  advanceTurn(gameState);
+  expect(player2.stats.might.currentIndex).toBe(2); // unchanged (baseIndex)
+  expect(player2.pendingStatReverts).toEqual([]);
+});
+
+test('advanceTurn does not apply the outgoing player\'s own pendingStatReverts (only the incoming player\'s)', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.turnOrder = ['p1', 'p2'];
+  gameState.currentPlayerIndex = 0;
+  player.pendingStatReverts = [{ stat: 'might', delta: 5 }]; // p1 (outgoing) has one queued
+  advanceTurn(gameState);
+  expect(player.stats.might.currentIndex).toBe(2); // untouched -- not p1's turn yet
+  expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: 5 }]); // still queued, not cleared
+});
+
 test('endTurn advances the turn even when the current player still has unspent actionPoints', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   gameState.turnOrder = ['p1', 'p2'];
