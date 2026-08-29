@@ -602,6 +602,62 @@ test('resolveEffects move_to_previous_room does nothing when there is no previou
   expect(player.y).toBe(startY);
 });
 
+test('resolveEffects move_to_random_neighbor_room moves to the only door-connected neighbor and sets enteredFromSide to the opposite side', () => {
+  const gameState = makeGameStateWithPlayer();
+  // room_lobby_a (player's start, 0,1) has doors north/east/west (see boardGenerator.js
+  // createBoard). Only north (0,0, room_lobby_b) is an already-placed, door-connected
+  // neighbor -- east/west lead to unplaced grid positions. With a single candidate, the
+  // outcome is deterministic regardless of rng.
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_random_neighbor_room' },
+  ]);
+  const player = gameState.players.get('p1');
+  expect(player.floor).toBe('ground');
+  expect(player.x).toBe(0);
+  expect(player.y).toBe(0);
+  expect(player.enteredFromSide).toBe('south'); // opposite of the north direction traveled
+});
+
+test('resolveEffects move_to_random_neighbor_room does nothing when there is no door-connected, already-placed neighbor', () => {
+  const gameState = makeGameStateWithPlayer();
+  gameState.board.ground.get('0,1').doorSides = []; // strip all doors so no direction can ever qualify
+  const player = gameState.players.get('p1');
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_random_neighbor_room' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(player.x).toBe(0);
+  expect(player.y).toBe(1);
+});
+
+test('resolveEffects move_to_random_neighbor_room picks different door-connected neighbors depending on rng', () => {
+  function setupWithDecoy() {
+    const gameState = makeGameStateWithPlayer();
+    // Manually place a SECOND door-connected neighbor to the east, so there are two
+    // genuine candidates (north: room_lobby_b, east: this decoy) to prove the choice
+    // actually varies with rng rather than there only ever being one option.
+    gameState.board.ground.set('1,1', { roomId: 'room_x', x: 1, y: 1, doorSides: ['west'], droppedItems: [], item: null });
+    return gameState;
+  }
+
+  const gameStateLow = setupWithDecoy();
+  const rngLow = jest.spyOn(Math, 'random').mockReturnValue(0);
+  resolveEffects(gameStateLow, createPromptState(), 'p1', [{ type: 'move_to_random_neighbor_room' }]);
+  rngLow.mockRestore();
+  const playerLow = gameStateLow.players.get('p1');
+
+  const gameStateHigh = setupWithDecoy();
+  const rngHigh = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  resolveEffects(gameStateHigh, createPromptState(), 'p1', [{ type: 'move_to_random_neighbor_room' }]);
+  rngHigh.mockRestore();
+  const playerHigh = gameStateHigh.players.get('p1');
+
+  const lowDestination = [playerLow.x, playerLow.y];
+  const highDestination = [playerHigh.x, playerHigh.y];
+  expect(lowDestination).not.toEqual(highDestination);
+  expect([lowDestination, highDestination]).toEqual(expect.arrayContaining([[0, 0], [1, 1]]));
+});
+
 test('resolveEffects persistent_modifier attaches to the player by default', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [

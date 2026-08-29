@@ -231,6 +231,23 @@ function handleMoveToPreviousRoom(gameState, playerId) {
   return { pending: false, enteredNewRoom };
 }
 
+function handleMoveToRandomNeighborRoom(gameState, playerId) {
+  const player = requirePlayer(gameState, playerId);
+  const candidates = [];
+  for (const side of SIDES) {
+    if (canMoveBetween(gameState.board, player.floor, { x: player.x, y: player.y }, side)) {
+      candidates.push(side);
+    }
+  }
+  if (candidates.length === 0) {
+    return { pending: false, appliedCount: 0 };
+  }
+  const chosenSide = candidates[Math.floor(Math.random() * candidates.length)];
+  const delta = DIRECTION_DELTA[chosenSide];
+  const enteredNewRoom = movePlayerTo(player, player.floor, player.x + delta.dx, player.y + delta.dy, OPPOSITE_SIDE[chosenSide]);
+  return { pending: false, enteredNewRoom };
+}
+
 function handleToggleActive(gameState, promptState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   const item = player.inventory.find((i) => i.id === effect.itemId);
@@ -472,6 +489,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   reveal_player_locations: (gameState, promptState, playerId) => handleRevealPlayerLocations(gameState, playerId),
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   move_to_previous_room: (gameState, promptState, playerId) => handleMoveToPreviousRoom(gameState, playerId),
+  move_to_random_neighbor_room: (gameState, promptState, playerId) => handleMoveToRandomNeighborRoom(gameState, playerId),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
