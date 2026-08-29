@@ -168,14 +168,14 @@ test('resolveEffects random_effect executes the effects of the option rng lands 
       options: [
         { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
         { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
-        { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
       ],
     },
   ]);
   rngSpy.mockRestore();
   expect(player.stats.might.currentIndex).toBe(2); // unchanged (baseIndex)
   expect(player.stats.speed.currentIndex).toBe(2); // unchanged (baseIndex)
-  expect(player.stats.knowledge.currentIndex).toBe(0); // baseIndex 1 - 1, this option fired
+  expect(player.stats.sanity.currentIndex).toBe(1); // baseIndex 2 - 1, this option fired
 });
 
 test('resolveEffects random_effect picks a different option with a different rng value', () => {
