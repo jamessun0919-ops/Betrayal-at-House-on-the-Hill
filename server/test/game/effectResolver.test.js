@@ -629,6 +629,41 @@ test('resolveEffects persistent_modifier attaches to the room the player current
   expect(room.modifiers).toHaveLength(1);
 });
 
+test('resolveEffects persistent_modifier appliesTo:"roomAndNeighbors" attaches to the current room and its door-connected neighbors, excluding non-door-connected or unplaced ones', () => {
+  const gameState = makeGameStateWithPlayer();
+  // Player starts at room_lobby_a (0,1), doors north/east/west (see boardGenerator.js
+  // createBoard). North (0,0) is room_lobby_b, already door-connected (it has a south
+  // door facing back). Manually place a decoy room to the east (1,1) WITHOUT a matching
+  // west door, to prove a grid-adjacent-but-not-door-connected room is excluded even
+  // though the current room has a door facing that direction. West (-1,1) is left
+  // unplaced entirely, to prove an unplaced neighbor doesn't cause an error.
+  gameState.board.ground.set('1,1', { roomId: 'room_x', x: 1, y: 1, doorSides: ['north'], droppedItems: [], item: null });
+
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'persistent_modifier',
+      appliesTo: 'roomAndNeighbors',
+      effects: [{ hookType: 'onBeforeRoll', delta: -1 }],
+    },
+  ]);
+
+  const currentRoom = gameState.board.ground.get('0,1');
+  const doorConnectedNeighbor = gameState.board.ground.get('0,0'); // room_lobby_b
+  const nonDoorConnectedDecoy = gameState.board.ground.get('1,1');
+  expect(currentRoom.modifiers).toHaveLength(1);
+  expect(doorConnectedNeighbor.modifiers).toHaveLength(1);
+  expect(nonDoorConnectedDecoy.modifiers).toBeUndefined(); // never attached to -- attachModifier only initializes .modifiers on first use
+});
+
+test('resolveEffects persistent_modifier throws INVALID_MODIFIER_APPLIES_TO for an unrecognized appliesTo value', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'persistent_modifier', appliesTo: 'bogus', effects: [{ hookType: 'onBeforeRoll', delta: -1 }] },
+    ])
+  ).toThrow('INVALID_MODIFIER_APPLIES_TO');
+});
+
 test('resolveEffects throws INVALID_EFFECTS_LIST for a non-array effects argument', () => {
   const gameState = makeGameStateWithPlayer();
   expect(() => resolveEffects(gameState, createPromptState(), 'p1', null)).toThrow('INVALID_EFFECTS_LIST');

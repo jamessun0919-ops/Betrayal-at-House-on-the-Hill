@@ -1,7 +1,7 @@
 const { getPlayer } = require('./gameState');
 const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
-const { coordKey, DIRECTION_DELTA } = require('./boardGenerator');
+const { coordKey, DIRECTION_DELTA, canMoveBetween } = require('./boardGenerator');
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
 const { dropToBasement } = require('./collapseFall');
 const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
@@ -280,11 +280,24 @@ function handleSwitchControl(gameState, playerId, effect) {
 
 function handlePersistentModifier(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
-  if (effect.appliesTo !== 'player' && effect.appliesTo !== 'room') {
+  if (effect.appliesTo !== 'player' && effect.appliesTo !== 'room' && effect.appliesTo !== 'roomAndNeighbors') {
     throw new Error('INVALID_MODIFIER_APPLIES_TO');
   }
-  const entity = effect.appliesTo === 'room' ? getRoomForPlayer(gameState, player) : player;
-  attachModifier(entity, { effects: effect.effects, removeWhen: effect.removeWhen });
+  if (effect.appliesTo === 'player') {
+    attachModifier(player, { effects: effect.effects, removeWhen: effect.removeWhen });
+    return { pending: false };
+  }
+  const room = getRoomForPlayer(gameState, player);
+  attachModifier(room, { effects: effect.effects, removeWhen: effect.removeWhen });
+  if (effect.appliesTo === 'roomAndNeighbors') {
+    for (const side of SIDES) {
+      if (canMoveBetween(gameState.board, player.floor, { x: player.x, y: player.y }, side)) {
+        const delta = DIRECTION_DELTA[side];
+        const neighbor = gameState.board[player.floor].get(coordKey(player.x + delta.dx, player.y + delta.dy));
+        attachModifier(neighbor, { effects: effect.effects, removeWhen: effect.removeWhen });
+      }
+    }
+  }
   return { pending: false };
 }
 
