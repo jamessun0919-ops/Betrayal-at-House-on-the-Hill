@@ -518,7 +518,7 @@
     "name": "一疊紙牌",
     "description": "如果你有某個漫畫角色的超能力，應該可以把紙牌當成武器。如果沒有，或者可以試著拿來搭訕",
     "text": "使用後不觸發任何效果，彈窗文字隨機顯示以下撲克牌花色：紅心七、黑桃二、梅花三、鬼牌、黑桃Ａ、黑桃Ｊ。",
-    "feedbacktextOccur": "抽到了ｏｏｏ",
+    "feedbacktextOccur": ["抽到了紅心七","抽到了黑桃二","抽到了梅花三","抽到了鬼牌","抽到了黑桃Ａ","抽到了黑桃Ｊ"],
     "effects": [],
     "category": "reusable",
     "canTargetOthers": false,
