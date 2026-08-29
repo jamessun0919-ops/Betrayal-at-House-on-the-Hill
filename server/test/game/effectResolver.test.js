@@ -1548,6 +1548,25 @@ test('item_038 in data/cards/item-cards.json has the expected setToLevel/revertA
   ]);
 });
 
+test('item_044 in data/cards/item-cards.json has the expected random_effect options for items 1-6', () => {
+  const itemCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/item-cards.json'), 'utf8'));
+  const item044 = itemCards.find((c) => c.id === 'item_044');
+  expect(item044).toBeDefined();
+  expect(item044.effects).toEqual([
+    {
+      type: 'random_effect',
+      options: [
+        { effects: [{ type: 'move_to_random_neighbor_room' }] },
+        { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+        { effects: [{ type: 'action_points', setTo: 0 }] },
+      ],
+    },
+  ]);
+});
+
 test('event_004/event_029/event_035 in data/cards/event-cards.json have the expected return-to-previous-room effects', () => {
   const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
 

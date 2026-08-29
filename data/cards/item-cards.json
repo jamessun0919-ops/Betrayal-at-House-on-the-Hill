@@ -564,7 +564,19 @@
     "description": "一隻厚重的金屬右手手套，手背與五指節鑲嵌著六顆不同顏色的寶石",
     "text": "使用後隨機出現以下一個效果：1.移動到隨機一個鄰房2.意志降低一個級別3.知識降低一個級別4.力量降低一個級別5.速度降低一個級別6.行動力歸零7.消滅房間內其他所有角色",
     "feedbacktextDice": {"1":"藍色寶石閃了一下，你被移動到了隔壁房間","2":"橙色寶石閃了一下，你心中充滿了惡念","3":"黃色寶石閃了一下，你感覺遺忘了很多事情","4":"紫色寶石閃了一下，你感覺手套吸走了你的力量","5":"綠色寶石閃了一下，你感覺自己變遲鈍了","6":"紅色寶石閃了一下，你無法動彈了","7":"六顆寶石一起亮起，你不自覺彈了一下手指"},
-    "effects": [],
+    "effects": [
+      {
+        "type": "random_effect",
+        "options": [
+          { "effects": [{ "type": "move_to_random_neighbor_room" }] },
+          { "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] },
+          { "effects": [{ "type": "stat_change", "stat": "knowledge", "delta": -1 }] },
+          { "effects": [{ "type": "stat_change", "stat": "might", "delta": -1 }] },
+          { "effects": [{ "type": "stat_change", "stat": "speed", "delta": -1 }] },
+          { "effects": [{ "type": "action_points", "setTo": 0 }] }
+        ]
+      }
+    ],
     "category": "reusable",
     "canTargetOthers": false,
     "needsCustomLogic": false

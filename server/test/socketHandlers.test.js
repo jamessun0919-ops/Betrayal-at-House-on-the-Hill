@@ -2754,6 +2754,94 @@ test('game:selectAction item: uses a held consumable item on self and removes it
   httpServer.close();
 });
 
+test('game:selectAction item_044 with rng landing on option 6 (行動力歸零): resets action points to 0', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_044',
+        name: '有限手套',
+        effects: [{
+          type: 'random_effect',
+          options: [
+            { effects: [{ type: 'move_to_random_neighbor_room' }] },
+            { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+            { effects: [{ type: 'action_points', setTo: 0 }] },
+          ],
+        }],
+        category: 'reusable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_044' });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 0.99 * 6 options -> index 5 (action_points setTo 0)
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_044' }, resolve));
+  await effectResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(0);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item_044 with rng landing on option 1 (移動到隨機一個鄰房): moves the player', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_044',
+        name: '有限手套',
+        effects: [{
+          type: 'random_effect',
+          options: [
+            { effects: [{ type: 'move_to_random_neighbor_room' }] },
+            { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+            { effects: [{ type: 'action_points', setTo: 0 }] },
+          ],
+        }],
+        category: 'reusable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_044' });
+  const before = getPlayer(gameState, currentPlayerId);
+  const startFloor = before.floor;
+  const startX = before.x;
+  const startY = before.y;
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // 0 * 6 options -> index 0 (move_to_random_neighbor_room), then its own rng call picks the first door-connected candidate
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_044' }, resolve));
+  await effectResolvedPromise;
+  rngSpy.mockRestore();
+
+  const after = getPlayer(gameState, currentPlayerId);
+  const moved = after.floor !== startFloor || after.x !== startX || after.y !== startY;
+  expect(moved).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item_038 sets might to the non-lethal floor and speed to max, reverting both at the start of the user\'s next turn', async () => {
   const content = makeContent({
     cards: {
