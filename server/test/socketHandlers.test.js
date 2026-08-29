@@ -2635,6 +2635,53 @@ test('game:selectAction item: uses a held consumable item on self and removes it
   httpServer.close();
 });
 
+test('game:selectAction item_038 sets might to the non-lethal floor and speed to max, reverting both at the start of the user\'s next turn', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_038',
+        name: '可疑藥丸',
+        effects: [
+          { type: 'stat_change', stat: 'might', setToLevel: 'min', revertAtNextTurnStart: true },
+          { type: 'stat_change', stat: 'speed', setToLevel: 'max', revertAtNextTurnStart: true },
+        ],
+        category: 'consumable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_038' });
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_038' }, resolve));
+  await effectResolvedPromise;
+
+  let me = getPlayer(gameState, currentPlayerId);
+  expect(me.stats.might.currentIndex).toBe(1); // skullIndex 0 + 1
+  expect(me.stats.speed.currentIndex).toBe(4); // track.length 5 - 1
+  expect(me.inventory).toEqual([]); // consumed
+
+  // The user ends their own turn -- now it's the other player's turn. Not reverted yet.
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
+  me = getPlayer(gameState, currentPlayerId);
+  expect(me.stats.might.currentIndex).toBe(1);
+  expect(me.stats.speed.currentIndex).toBe(4);
+
+  // The other player ends their turn -- it cycles back to the item_038 user. Reverted now.
+  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  me = getPlayer(gameState, currentPlayerId);
+  expect(me.stats.might.currentIndex).toBe(2); // baseIndex, reverted
+  expect(me.stats.speed.currentIndex).toBe(2); // baseIndex, reverted
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item: a dice_check effect can see the player\'s itemCatalog-eligible held items via context (regression guard for context threading)', async () => {
   // This test doesn't assert the full rollChoice flow (Task 7's job) -- it
   // only proves item-catalog data actually reaches handleDiceCheck through

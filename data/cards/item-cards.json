@@ -495,7 +495,10 @@
     "description": "藥丸上的編號隱約寫著APTX4869",
     "text": "使用後，力量降到最低級別(不致死的級別１)，速度提升到最高級別，到下一個回合開始時恢復。",
     "feedbacktextOccur": "你感覺身體發出高熱，視線漸漸模糊，身上的衣物變得寬鬆",
-    "effects": [],
+    "effects": [
+      { "type": "stat_change", "stat": "might", "setToLevel": "min", "revertAtNextTurnStart": true },
+      { "type": "stat_change", "stat": "speed", "setToLevel": "max", "revertAtNextTurnStart": true }
+    ],
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
