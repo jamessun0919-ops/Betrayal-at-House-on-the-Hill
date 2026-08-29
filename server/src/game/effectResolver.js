@@ -248,6 +248,14 @@ function handleMoveToRandomNeighborRoom(gameState, playerId) {
   return { pending: false, enteredNewRoom };
 }
 
+function handleRandomEffect(gameState, promptState, playerId, effect, context) {
+  if (!Array.isArray(effect.options) || effect.options.length === 0) {
+    throw new Error('INVALID_RANDOM_EFFECT_OPTIONS');
+  }
+  const index = Math.floor(Math.random() * effect.options.length);
+  return resolveEffects(gameState, promptState, playerId, effect.options[index].effects, context);
+}
+
 function handleToggleActive(gameState, promptState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
   const item = player.inventory.find((i) => i.id === effect.itemId);
@@ -490,6 +498,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   move_to_room: (gameState, promptState, playerId, effect) => handleMoveToRoom(gameState, playerId, effect),
   move_to_previous_room: (gameState, promptState, playerId) => handleMoveToPreviousRoom(gameState, playerId),
   move_to_random_neighbor_room: (gameState, promptState, playerId) => handleMoveToRandomNeighborRoom(gameState, playerId),
+  random_effect: (gameState, promptState, playerId, effect, context) => handleRandomEffect(gameState, promptState, playerId, effect, context),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
   switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),

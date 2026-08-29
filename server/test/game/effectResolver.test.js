@@ -658,6 +658,58 @@ test('resolveEffects move_to_random_neighbor_room picks different door-connected
   expect([lowDestination, highDestination]).toEqual(expect.arrayContaining([[0, 0], [1, 1]]));
 });
 
+test('resolveEffects random_effect executes the effects of the option rng lands on', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99); // 0.99 * 3 options -> index 2 (the last option)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'random_effect',
+      options: [
+        { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'knowledge', delta: -1 }] },
+      ],
+    },
+  ]);
+  rngSpy.mockRestore();
+  expect(player.stats.might.currentIndex).toBe(2); // unchanged (baseIndex)
+  expect(player.stats.speed.currentIndex).toBe(2); // unchanged (baseIndex)
+  expect(player.stats.knowledge.currentIndex).toBe(0); // baseIndex 1 - 1, this option fired
+});
+
+test('resolveEffects random_effect picks a different option with a different rng value', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // 0 * 2 options -> index 0 (the first option)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'random_effect',
+      options: [
+        { effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+        { effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
+      ],
+    },
+  ]);
+  rngSpy.mockRestore();
+  expect(player.stats.might.currentIndex).toBe(1); // baseIndex 2 - 1, this option fired
+  expect(player.stats.speed.currentIndex).toBe(2); // unchanged
+});
+
+test('resolveEffects random_effect throws INVALID_RANDOM_EFFECT_OPTIONS for an empty options array', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'random_effect', options: [] }])
+  ).toThrow('INVALID_RANDOM_EFFECT_OPTIONS');
+});
+
+test('resolveEffects random_effect throws INVALID_RANDOM_EFFECT_OPTIONS when options is missing', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'random_effect' }])
+  ).toThrow('INVALID_RANDOM_EFFECT_OPTIONS');
+});
+
 test('resolveEffects persistent_modifier attaches to the player by default', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
