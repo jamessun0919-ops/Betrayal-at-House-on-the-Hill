@@ -1330,3 +1330,26 @@
 **開發者交代備忘事項**：
 - 開發者在 main 上有一筆進行中、尚未 commit 的武器屬性編輯（item-cards.json），本階段結束時仍未 commit，內容原封不動保留，下次開工先確認狀態
 - 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server
+
+## 2026-08-29 第 2 次工作階段
+
+**當日工作內容**：
+- 開場先幫開發者 commit 前一階段的武器屬性編輯（item_001/011/012/018/019/020/035/041/043 的 attackStat/attackDice、item_999→item_045 重命名）
+- 全面掃描 item/event/omen 三份卡片檔案（needsCustomLogic:true 或 effects:[]），排除 M3 傷害/攻擊範圍後分類回報：B類（卡面文字沒寫清楚，event_002/003/008/019）、C類（機制清楚可規劃，event_013/021/026/027/031/033/item_040）
+- 開發者補完 B類 4 張卡文字後幫忙 commit，查證發現這 4 張的失敗分支其實都是「受到一點肉體/精神傷害」——比照既有 event_011/012 慣例，整張卡仍屬 M3 範圍，文字先備妥即可，這次不實作
+- event_021（墜落吊燈）／event_027（警告筆記）純 dice_check+stat_change，不需要新機制，直接補完並合併，不走完整 brainstorming
+- 走完整流程完成「回到前一個房間」機制（event_004/029/035）：新增 player.previousPosition（movePlayerTo 統一入口記錄）、move_to_previous_room 效果、persistent_modifier 新增 appliesTo:"roomAndNeighbors"（重用 canMoveBetween，event_029 濃煙標記用）。全分支最終審查抓到 2 個 Important：①崩塌摔落也會覆寫 previousPosition，摔落後抽到這三張卡等於免費爬回洞口——開發者確認接受，只補文件不改程式碼；②三張卡真實資料沒測試覆蓋，比照 item_038 先例補上。641→652 測試全綠，合併進 main
+- 走完整流程完成 item_044（有限手套）1-6項：新增 random_effect（不擲骰均等機率隨機挑一組效果執行）、move_to_random_neighbor_room（重用 canMoveBetween）。全分支最終審查抓到 2 個 Important：①random_effect 不產生 dice_check 結果，item_044 寫好的 6 段回饋文字完全用不到——修法把選中的 option index 一路帶回、比照 item_036 revealText 模式串成 randomEffectText；②隨機到全新房間時不會跳房間介紹彈窗——game:roomEntered 廣播條件從「認 move_to_room 效果類型」改成「認 enteredNewRoom 有沒有值」。開發者確認兩項都修，652→665 測試全綠，合併進 main
+- 過程中一次工具狀態異常：worktree 內 Bash/PowerShell 突然全部拒絕執行（回報 cwd 跑掉），用 EnterWorktree 帶 path 參數重新進入後恢復，無任何內容遺失；merge 後 git worktree remove 一度被 lock 擋下，確認內容與 main 一致後用 git worktree unlock 解除
+
+**完成項目**：
+- event_021／event_027——直接補完並合併
+- 「回到前一個房間」機制（event_004/029/035）——完整流程完成並合併，含全分支審查抓到並修復的 2 個 Important，652/652 測試全綠
+- item_044（有限手套）1-6項隨機效果機制——完整流程完成並合併，含全分支審查抓到並修復的 2 個 Important，665/665 測試全綠
+- Handover 項目 11 大幅更新：剩 item_044 第7項（留M3）、event_002/003/008/019（文字備妥，M3範圍）、event_013/026/031/033、item_040（機制待實作，文字已備妥）
+
+**遇到瓶頸**：
+- worktree 內 Bash/PowerShell 工具狀態異常（cwd 追蹤跑掉）與 git worktree lock 擋下 remove，皆已排查並記錄復原方式進 Handover，非資料遺失類事故
+
+**開發者交代備忘事項**：
+- 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server
