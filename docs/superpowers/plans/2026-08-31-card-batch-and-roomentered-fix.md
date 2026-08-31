@@ -134,10 +134,10 @@ Expected: FAIL（`roomEnteredEvents` 只收到1個——進 `room_new` 本身那
 Run: `cd server && npx jest test/socketHandlers.test.js -t "event-card path previously had no such broadcast"`
 Expected: PASS
 
-- [ ] **Step 7: 執行既有相關回歸測試，確認搬移沒有改變任何既有行為**
+- [ ] **Step 7: 執行既有相關回歸測試，確認廣播內容一致（但注意：發射順序已改變）**
 
 Run: `cd server && npx jest test/socketHandlers.test.js -t "roomEntered"`
-Expected: 全數 PASS，特別確認以下三個既有測試沒有被搬移動作影響：
+Expected: 全數 PASS。注意：搬移改變了 `game:roomEntered` 相對於 `game:itemUseResolved` 的發射順序（現在在前，之前在後），接收者/payload 本身未變。這是刻意的設計（開發者已於 2026-08-31 審核並接受）。特別確認以下三個既有測試沒有被搬移動作的其他面向影響：
 - `game:selectAction room_action with actionIndex selecting teleport: jumping down an already-collapsed room broadcasts game:roomEntered for the basement room`
 - `game:selectAction room_action resolving a move_to_room effect (e.g. stairs) broadcasts game:roomEntered for the target room`
 - `game:selectAction item_044 with rng landing on option 1: broadcasts game:roomEntered when the random neighbor is a room the player has never visited`

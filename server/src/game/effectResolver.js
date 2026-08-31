@@ -577,6 +577,10 @@ function resolveEffects(gameState, promptState, playerId, effects, context = {})
       throw new Error('UNSUPPORTED_EFFECT_TYPE');
     }
     const result = handler(gameState, promptState, playerId, effect, context);
+    // Early return on pending discards any accumulated enteredNewRoom (or other fields) from
+    // earlier effects in the same array. If a future card puts a move effect before a
+    // pending-capable effect (choice/dice_check) in the same effects list, the move's
+    // room-intro broadcast would be silently lost. No current card has this shape (verified 2026-08-31).
     if (result && result.pending) {
       return result;
     }
