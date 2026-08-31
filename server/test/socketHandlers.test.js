@@ -5304,3 +5304,51 @@ test('a timed-out inventory choice auto-leaves the triggering item and does not 
   clientB.close();
   httpServer.close();
 }, 5000);
+
+test('game:move into event_031 (紅藍藥丸) opens a red/blue/give-up choice, and give_up still triggers the 50/50 sanity swing', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_031',
+        name: '紅藍藥丸',
+        effects: [{
+          type: 'choice',
+          description: '紅色藥丸還是藍色藥丸？',
+          timeoutMs: 20000,
+          defaultOptionId: 'give_up',
+          options: [
+            { optionId: 'red', label: '紅色', effects: [{ type: 'random_effect', options: [{ effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] }, { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] }] }] },
+            { optionId: 'blue', label: '藍色', effects: [{ type: 'random_effect', options: [{ effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] }, { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] }] }] },
+            { optionId: 'give_up', label: '放棄', effects: [{ type: 'random_effect', options: [{ effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] }, { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] }] }] },
+          ],
+        }],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  const pendingChoice = await pendingChoicePromise;
+  expect(pendingChoice.options.map((o) => o.optionId)).toEqual(['red', 'blue', 'give_up']);
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0); // random_effect index 0 -> sanity +1
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const updatePromise = new Promise((resolve) => currentClient.once('game:stateUpdate', resolve));
+  await new Promise((resolve) => {
+    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'give_up' }, resolve);
+  });
+  await effectResolvedPromise;
+  const update = await updatePromise;
+  rngSpy.mockRestore();
+
+  const me = update.players.find((p) => p.playerId === currentPlayerId);
+  expect(me.stats.sanity.currentIndex).toBe(me.stats.sanity.baseIndex + 1); // give_up still triggered the 50/50, landed on +1
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});

@@ -401,8 +401,18 @@
     "name": "紅藍藥丸",
     "description": "你踏進房間，一張孤零零的桌子擺在正中央，上面並排放著一顆鮮紅色藥丸與一顆深藍色藥丸。兩者沒有任何標示，旁邊也找不到藥瓶或說明。究竟是治療傷勢的藥物，還是致命的毒藥，恐怕只有吞下去才能知道。",
     "text": "跳出彈窗供玩家選擇：紅色／藍色／放棄。觸發隨機事件擇一：意志提升一個級別／意志降低一個級別。事件後果與玩家選擇無關",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{
+      "type": "choice",
+      "description": "紅色藥丸還是藍色藥丸？",
+      "timeoutMs": 20000,
+      "defaultOptionId": "give_up",
+      "options": [
+        { "optionId": "red", "label": "紅色", "effects": [{ "type": "random_effect", "options": [{ "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }] }, { "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] }] }] },
+        { "optionId": "blue", "label": "藍色", "effects": [{ "type": "random_effect", "options": [{ "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }] }, { "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] }] }] },
+        { "optionId": "give_up", "label": "放棄", "effects": [{ "type": "random_effect", "options": [{ "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }] }, { "effects": [{ "type": "stat_change", "stat": "sanity", "delta": -1 }] }] }] }
+      ]
+    }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_032",

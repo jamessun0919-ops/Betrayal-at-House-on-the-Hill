@@ -1794,3 +1794,28 @@ test('event_033 in data/cards/event-cards.json has the expected move_to_random_o
   expect(event033.effects).toEqual([{ type: 'move_to_random_other_player_room' }]);
   expect(event033.needsCustomLogic).toBe(false);
 });
+
+test('event_031 in data/cards/event-cards.json has the expected choice+random_effect data (give_up also triggers the 50/50)', () => {
+  const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
+  const event031 = eventCards.find((c) => c.id === 'event_031');
+  expect(event031).toBeDefined();
+  const fiftyFifty = {
+    type: 'random_effect',
+    options: [
+      { effects: [{ type: 'stat_change', stat: 'sanity', delta: 1 }] },
+      { effects: [{ type: 'stat_change', stat: 'sanity', delta: -1 }] },
+    ],
+  };
+  expect(event031.effects).toEqual([{
+    type: 'choice',
+    description: '紅色藥丸還是藍色藥丸？',
+    timeoutMs: 20000,
+    defaultOptionId: 'give_up',
+    options: [
+      { optionId: 'red', label: '紅色', effects: [fiftyFifty] },
+      { optionId: 'blue', label: '藍色', effects: [fiftyFifty] },
+      { optionId: 'give_up', label: '放棄', effects: [fiftyFifty] },
+    ],
+  }]);
+  expect(event031.needsCustomLogic).toBe(false);
+});
