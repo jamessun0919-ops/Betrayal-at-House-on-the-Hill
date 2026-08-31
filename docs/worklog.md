@@ -1353,3 +1353,25 @@
 
 **開發者交代備忘事項**：
 - 收工前確認系統無殘留 node 行程；本階段沒有啟動 preview/dev server
+
+## 2026-08-31 第 1 次工作階段
+
+**當日工作內容**：
+- 開場讀取交接文檔，確認 main 狀態跟上次收工一致
+- 查證 Handover 項目 11 剩餘 5 張卡（event_013/026/031/033、item_040）的實際卡片資料與既有效果解析器/廣播機制，走完整 brainstorming（AskUserQuestion 確認 4 個開放問題：event_013 隨機物品範圍、event_031 放棄選項後果、roomEntered 缺口修法範圍、執行方式）→設計文件→實作計畫→subagent-driven-development 全流程
+- 新增 3 個效果類型：restore_or_advance（event_026，重用既有 isBelowBase helper）、lose_random_item（event_013，只在 itemCatalog 範圍內隨機選物，順便把 lose_item 的目的地路由邏輯抽成共用函式 routeLostItemToDestination）、move_to_random_other_player_room（event_033）；event_031 重用既有 choice+random_effect（放棄選項效果跟紅/藍完全相同，開發者已確認）；item_040 重用 item_044 的 random_effect，擴充 buildRandomEffectText 支援陣列型 feedbacktextOccur
+- 規劃階段查出既有架構缺口：game:roomEntered 廣播只在「使用道具」路徑，事件卡抽卡路徑完全沒有，event_033 傳送到全新房間會靜默移動不跳彈窗——列為 Task 1 一併修正，把廣播集中到所有路徑共用的 handleEffectResolveResult
+- 6 個任務 Subagent-Driven 依序完成，各自審查通過（0 Critical/Important），666→686 測試全綠
+- 全分支最終審查（Opus）抓到 1 個 Important：roomEntered 集中化改變了「使用道具」情境下的彈窗送出順序（item_044 移動類選項從「先道具文字→後房間介紹」變成「先房間介紹→後道具文字」）——architecturally 無法在不推翻集中化前提下還原，非程式錯誤。跟開發者確認後選擇接受新順序，只補程式碼註解＋修正設計文件不精確敘述，不改邏輯。另有 3 個 Minor 逐項查證後確認不阻擋合併，直接關閉
+- 合併回 main（本機），worktree/分支已清理
+
+**完成項目**：
+- event_013／event_026／event_031／event_033／item_040——完整流程完成並合併，686/686 測試全綠
+- game:roomEntered 廣播架構缺口一併修正（集中到 handleEffectResolveResult）
+- Handover 項目 11 完成，只剩 M3 傷害範圍缺口（item_044 第7項、event_002/003/008/019）與已確認的裝飾卡（item_045）
+
+**遇到瓶頸**：
+- worktree 資料夾又一次刪不掉，這次根因是本次工作階段自己跑的 jest 測試留下 2 個沒清乾淨的 worker 行程（node.exe），taskkill 關閉後 git worktree remove 立刻正常，已記錄進 Handover 除錯注意事項（延續 M2D1 vite dev server 那次教訓，這次是第二種殘留行程類型）
+
+**開發者交代備忘事項**：
+- 收工前確認系統無殘留 node 行程；本階段唯一啟動過的行程是 worktree 內的 jest 測試（已隨上述排查清空）
