@@ -30,9 +30,12 @@
 },
   { "id": "omen_004", "name": "獵犬",
     "description":"踏入房間後，眼前忽然浮現昔日的溫馨景象。一名孩童笑著將木棍拋向遠處，獵犬興奮地追趕，叼回後又繞著主人不停搖尾。清脆笑聲迴盪在房間裡；然而木棍再次落地時，孩童與獵犬卻一同消失。你的手臂上出現了一個「獵犬」的印記",
-    "text": "持有「獵犬」時，玩家的力量及意志上升一個級別，如果失去「木雕」，意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取或遺留物品。", 
-    "effects": [{ "type": "switch_control", 
-    "summonType": "spiritDog", "actionPoints": 6 }], 
+    "text": "持有「獵犬」時，玩家的力量及意志上升一個級別，如果失去「獵犬」，意志及力量下降一個級別。玩家的回合中可差遣犬靈前往其他房間拾取或遺留物品。",
+    "effects": [
+      { "type": "stat_change", "stat": "might", "delta": 1 },
+      { "type": "stat_change", "stat": "sanity", "delta": 1 },
+      { "type": "switch_control", "summonType": "spiritDog", "actionPoints": 6 }
+    ],
     "activatedOnUse": true, 
     "category": "imprint", 
     "needsCustomLogic": false 
@@ -40,9 +43,9 @@
   { "id": "omen_005", "name": "鬼牌", 
     "description":"踏入房間後，一幅景象逐漸浮現。魔術師彈射出撲克牌，飛舞的紙牌在半空中忽而化作白鴿振翅而過，忽而變成兔子躍入另一人手中。時而從指尖高速彈出，時而在手背與桌緣間靈巧彈跳，又旋轉著飛向下一人。撲克牌始終不曾落地，在半空劃出一道道令人眼花撩亂的軌跡。你的手臂上出現了一個「鬼牌」的印記",
     "text": "持有「鬼牌」時，玩家的速度和知識上升一個級別．如果失去「鬼牌」，速度和知識下降一個級別。", 
-    "effects": [{ "type": "stat_change", "stat": "sanity", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }], 
-    "category": "imprint", 
-    "needsCustomLogic": false 
+    "effects": [{ "type": "stat_change", "stat": "speed", "delta": 1 }, { "type": "stat_change", "stat": "knowledge", "delta": 1 }],
+    "category": "imprint",
+    "needsCustomLogic": false
   },
   { "id": "omen_006", "name": "陀螺",
     "description":"踏入房間後，幻象如夢境般接連變換：旅館走廊突然失去重力，人影在牆壁與天花板翻滾打鬥；繁華街道上，一列火車毫無預兆地疾馳而過；轉眼又化為雪地中的激烈槍戰。所有景象驟然消失，最後只剩一枚陀螺，在桌面上不停旋轉。你的手臂上出現了一個「陀螺」的印記",

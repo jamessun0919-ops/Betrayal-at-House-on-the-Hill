@@ -1819,3 +1819,30 @@ test('event_031 in data/cards/event-cards.json has the expected choice+random_ef
   }]);
   expect(event031.needsCustomLogic).toBe(false);
 });
+
+test('omen_004 (獵犬) in data/cards/omen-cards.json has the passive might/sanity bonus alongside switch_control', () => {
+  const omenCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/omen-cards.json'), 'utf8'));
+  const omen004 = omenCards.find((c) => c.id === 'omen_004');
+  expect(omen004).toBeDefined();
+  // The card's own text grants might+1/sanity+1 while held (reversed automatically by
+  // remove_imprint) on top of the active summon-control ability -- both design docs that
+  // touched this card (2026-08-09 summon design, 2026-08-26 imprint design) only wired the
+  // switch_control half, leaving the passive stat bonus unimplemented until this fix.
+  expect(omen004.effects).toEqual([
+    { type: 'stat_change', stat: 'might', delta: 1 },
+    { type: 'stat_change', stat: 'sanity', delta: 1 },
+    { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
+  ]);
+});
+
+test('omen_005 (鬼牌) in data/cards/omen-cards.json grants speed, not sanity, matching its own card text', () => {
+  const omenCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/omen-cards.json'), 'utf8'));
+  const omen005 = omenCards.find((c) => c.id === 'omen_005');
+  expect(omen005).toBeDefined();
+  // Card text: "速度和知識上升一個級別" (speed and knowledge up one level) -- the effects
+  // array previously granted sanity instead of speed, a data-entry mismatch.
+  expect(omen005.effects).toEqual([
+    { type: 'stat_change', stat: 'speed', delta: 1 },
+    { type: 'stat_change', stat: 'knowledge', delta: 1 },
+  ]);
+});
