@@ -1751,6 +1751,47 @@ test('game:move into event_035 (狂風襲來) moves the player back to their pre
   httpServer.close();
 });
 
+test('game:move into an event card whose effects move the player again broadcasts a second game:roomEntered for that move (event-card path previously had no such broadcast)', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_test_teleport',
+        name: '測試傳送',
+        effects: [{ type: 'move_to_room', targetRoomId: 'room_teleport_target' }],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  // move_to_room only scans the board for an already-placed room with this id -- it
+  // does not create one, so this must be placed manually before the event fires.
+  gameState.board.ground.set('5,5', { roomId: 'room_teleport_target', x: 5, y: 5, doorSides: [], droppedItems: [], item: null });
+
+  // Entering room_new itself (the event-card-drawing room, freshly placed east of
+  // spawn) already broadcasts its OWN game:roomEntered before the event card is even
+  // drawn -- a plain .once() listener would catch that first broadcast, not the one
+  // this test is actually checking for. Collect every broadcast instead and wait for
+  // game:effectResolved (always emitted once the card's effects finish resolving)
+  // before asserting, so both broadcasts are captured deterministically.
+  const roomEnteredEvents = [];
+  currentClient.on('game:roomEntered', (payload) => roomEnteredEvents.push(payload));
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+  currentClient.off('game:roomEntered');
+
+  expect(roomEnteredEvents).toHaveLength(2); // [0]: entering room_new, [1]: the event card's own move_to_room
+  expect(roomEnteredEvents[1].roomId).toBe('room_teleport_target');
+  expect(roomEnteredEvents[1].enteredNewRoom).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into event_029 (濃煙密布) moves the player back and leaves a dice-penalty modifier on the room they left', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],

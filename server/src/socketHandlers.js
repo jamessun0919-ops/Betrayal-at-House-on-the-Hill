@@ -378,11 +378,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
                 io.to(roomCode).emit('game:itemUseResolved', targetPayload);
               }
             }
-            if (!effectResult.pending && effectResult.enteredNewRoom !== undefined) {
-              const movedPlayer = getPlayer(gameState, targetForEffects);
-              const enteredRoom = gameState.board[movedPlayer.floor].get(coordKey(movedPlayer.x, movedPlayer.y));
-              io.to(roomCode).emit('game:roomEntered', { playerId: targetForEffects, roomId: enteredRoom.roomId, enteredNewRoom: effectResult.enteredNewRoom });
-            }
             if (outcome.drawnCards) {
               socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
             }
@@ -1108,6 +1103,10 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
   }
   resolverEntry.pendingChoice = null;
   const player = getPlayer(gameState, playerId);
+  if (effectResult.enteredNewRoom !== undefined) {
+    const enteredRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
+    io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId, enteredNewRoom: effectResult.enteredNewRoom });
+  }
   if (consumeItemIfApplied && effectResult.appliedCount > 0) {
     try {
       const actingPlayer = getPlayer(gameState, actingPlayerId || playerId);
