@@ -146,7 +146,15 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setMessages((prev) => [...prev, `待處理動作：${JSON.stringify(data)}`]);
     }
     function onCardDrawn(data) {
-      if (data.deckType === 'event' || data.deckType === 'omen') {
+      if (data.deckType === 'omen') {
+        // Omen (imprint) card descriptions already narrate the outcome ("你的手臂上
+        // 出現了...印記") unlike event cards, whose description is pure scene-setting --
+        // omens never get a second eventNoCheck/feedbacktextOccur popup, only the intro.
+        setPendingCheckQueue((prev) => [
+          ...prev,
+          { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+        ]);
+      } else if (data.deckType === 'event') {
         setPendingCheckQueue((prev) => [
           ...prev,
           { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
