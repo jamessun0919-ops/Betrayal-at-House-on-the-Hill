@@ -1722,6 +1722,20 @@ test('item_044 in data/cards/item-cards.json has the expected random_effect opti
   ]);
 });
 
+test('item_040 in data/cards/item-cards.json has the expected random_effect options (6 empty-effect choices)', () => {
+  const itemCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/item-cards.json'), 'utf8'));
+  const item040 = itemCards.find((c) => c.id === 'item_040');
+  expect(item040).toBeDefined();
+  expect(item040.effects).toEqual([{
+    type: 'random_effect',
+    options: [
+      { effects: [] }, { effects: [] }, { effects: [] },
+      { effects: [] }, { effects: [] }, { effects: [] },
+    ],
+  }]);
+  expect(item040.feedbacktextOccur).toHaveLength(6);
+});
+
 test('event_004/event_029/event_035 in data/cards/event-cards.json have the expected return-to-previous-room effects', () => {
   const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
 

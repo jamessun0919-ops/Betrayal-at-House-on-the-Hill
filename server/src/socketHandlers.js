@@ -797,7 +797,13 @@ function buildRandomEffectText(content, sourceId, randomEffectIndex) {
   const card = content.cards.items.find((c) => c.id === sourceId)
     || content.cards.events.find((c) => c.id === sourceId)
     || content.cards.omens.find((c) => c.id === sourceId);
-  if (!card || !card.feedbacktextDice) {
+  if (!card) {
+    return null;
+  }
+  if (Array.isArray(card.feedbacktextOccur)) {
+    return card.feedbacktextOccur[randomEffectIndex] || null;
+  }
+  if (!card.feedbacktextDice) {
     return null;
   }
   return card.feedbacktextDice[String(randomEffectIndex + 1)] || null;

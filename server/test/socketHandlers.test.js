@@ -3049,6 +3049,44 @@ test('game:selectAction item_044 with rng landing on option 6: sends the matchin
   httpServer.close();
 });
 
+test('game:selectAction item_040 with rng landing on index 3: sends the matching feedbacktextOccur array entry as randomEffectText', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_040',
+        name: '一疊紙牌',
+        feedbacktextOccur: ['抽到了紅心七', '抽到了黑桃二', '抽到了梅花三', '抽到了鬼牌', '抽到了黑桃Ａ', '抽到了黑桃Ｊ'],
+        effects: [{
+          type: 'random_effect',
+          options: [
+            { effects: [] }, { effects: [] }, { effects: [] },
+            { effects: [] }, { effects: [] }, { effects: [] },
+          ],
+        }],
+        category: 'reusable',
+        canTargetOthers: false,
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_040' });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.5); // 0.5 * 6 options -> index 3
+  const itemUseResolvedPromise = new Promise((resolve) => currentClient.once('game:itemUseResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_040' }, resolve));
+  const itemUseResolved = await itemUseResolvedPromise;
+  rngSpy.mockRestore();
+
+  expect(itemUseResolved.randomEffectText).toBe('抽到了鬼牌');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction item_044 with rng landing on option 1: broadcasts game:roomEntered when the random neighbor is a room the player has never visited', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
