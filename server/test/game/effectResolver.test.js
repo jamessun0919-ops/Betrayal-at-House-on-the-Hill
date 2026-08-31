@@ -741,6 +741,60 @@ test('resolveEffects move_to_random_neighbor_room picks different door-connected
   expect([lowDestination, highDestination]).toEqual(expect.arrayContaining([[0, 0], [1, 1]]));
 });
 
+test('resolveEffects move_to_random_other_player_room moves the player to another player\'s current position', () => {
+  const gameState = makeGameStateWithPlayer('p1');
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  const p2 = gameState.players.get('p2');
+  p2.floor = 'ground';
+  p2.x = 5;
+  p2.y = 5;
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_random_other_player_room' },
+  ]);
+  const p1 = gameState.players.get('p1');
+  expect(p1.floor).toBe('ground');
+  expect(p1.x).toBe(5);
+  expect(p1.y).toBe(5);
+});
+
+test('resolveEffects move_to_random_other_player_room does nothing when there are no other players', () => {
+  const gameState = makeGameStateWithPlayer('p1');
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'move_to_random_other_player_room' },
+  ]);
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+});
+
+test('resolveEffects move_to_random_other_player_room picks different target players depending on rng', () => {
+  function setup() {
+    const gameState = makeGameStateWithPlayer('p1');
+    addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+    addPlayer(gameState, { playerId: 'p3', name: 'Carol', stats: makeStats() });
+    const p2 = gameState.players.get('p2');
+    p2.x = 5; p2.y = 5;
+    const p3 = gameState.players.get('p3');
+    p3.x = 9; p3.y = 9;
+    return gameState;
+  }
+
+  const gameStateLow = setup();
+  const rngLow = jest.spyOn(Math, 'random').mockReturnValue(0);
+  resolveEffects(gameStateLow, createPromptState(), 'p1', [{ type: 'move_to_random_other_player_room' }]);
+  rngLow.mockRestore();
+  const p1Low = gameStateLow.players.get('p1');
+
+  const gameStateHigh = setup();
+  const rngHigh = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  resolveEffects(gameStateHigh, createPromptState(), 'p1', [{ type: 'move_to_random_other_player_room' }]);
+  rngHigh.mockRestore();
+  const p1High = gameStateHigh.players.get('p1');
+
+  const lowDestination = [p1Low.x, p1Low.y];
+  const highDestination = [p1High.x, p1High.y];
+  expect(lowDestination).not.toEqual(highDestination);
+  expect([lowDestination, highDestination]).toEqual(expect.arrayContaining([[5, 5], [9, 9]]));
+});
+
 test('resolveEffects random_effect executes the effects of the option rng lands on', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
@@ -1717,4 +1771,12 @@ test('event_013 in data/cards/event-cards.json has the expected lose_random_item
   expect(event013).toBeDefined();
   expect(event013.effects).toEqual([{ type: 'lose_random_item', destination: 'deck' }]);
   expect(event013.needsCustomLogic).toBe(false);
+});
+
+test('event_033 in data/cards/event-cards.json has the expected move_to_random_other_player_room effect', () => {
+  const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
+  const event033 = eventCards.find((c) => c.id === 'event_033');
+  expect(event033).toBeDefined();
+  expect(event033.effects).toEqual([{ type: 'move_to_random_other_player_room' }]);
+  expect(event033.needsCustomLogic).toBe(false);
 });

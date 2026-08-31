@@ -418,8 +418,8 @@
     "description": "踏進房間後，空氣中突然迸發耀眼金光，一道橢圓形門框憑空展開，金光沿著邊緣旋轉流動。透過門內扭曲的通道，你竟看見了失散的其他同伴。彼此目光交會的瞬間，傳送門開始劇烈閃爍，彷彿隨時都會關閉。",
     "text": "將角色移動至隨機一個其他角色的相同房間內。",
     "feedbacktextOccur": "你踏入了金色的傳送門，站到了同伴的左手邊",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{ "type": "move_to_random_other_player_room" }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_034",
