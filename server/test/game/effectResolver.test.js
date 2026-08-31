@@ -254,6 +254,62 @@ test('resolveEffects lose_item with destination "room" removes the item and drop
   expect(room.droppedItems).toEqual([{ id: 'item_047' }]);
 });
 
+test('resolveEffects lose_random_item removes a random item that belongs to the item catalog, ignoring anything else held', () => {
+  const gameState = makeGameStateWithPlayer('p1', { items: [] });
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_a' }, { id: 'omen_x' }); // omen_x is NOT in itemCatalog below
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'lose_random_item' },
+  ], { itemCatalog: [{ id: 'item_a', name: 'A' }] });
+  expect(player.inventory).toEqual([{ id: 'omen_x' }]); // only the catalog item was eligible/removed
+});
+
+test('resolveEffects lose_random_item does nothing when the player holds no items from the item catalog', () => {
+  const gameState = makeGameStateWithPlayer('p1');
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_x' });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'lose_random_item' },
+  ], { itemCatalog: [] });
+  expect(result).toEqual({ pending: false, appliedCount: 0 });
+  expect(player.inventory).toEqual([{ id: 'omen_x' }]);
+});
+
+test('resolveEffects lose_random_item with destination "deck" pushes the removed card definition onto the item deck', () => {
+  const gameState = makeGameStateWithPlayer('p1', { items: [] });
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_013_test' });
+  const cardDef = { id: 'item_013_test', name: '測試道具', effects: [] };
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'lose_random_item', destination: 'deck' },
+  ], { itemCatalog: [cardDef] });
+  expect(player.inventory).toEqual([]);
+  expect(gameState.itemDeck.cards).toEqual([cardDef]);
+});
+
+test('resolveEffects lose_random_item picks a different candidate depending on rng', () => {
+  function setup() {
+    const gameState = makeGameStateWithPlayer('p1', { items: [] });
+    const player = gameState.players.get('p1');
+    player.inventory.push({ id: 'item_a' }, { id: 'item_b' });
+    return gameState;
+  }
+  const itemCatalog = [{ id: 'item_a' }, { id: 'item_b' }];
+
+  const gsLow = setup();
+  const rngLow = jest.spyOn(Math, 'random').mockReturnValue(0);
+  resolveEffects(gsLow, createPromptState(), 'p1', [{ type: 'lose_random_item' }], { itemCatalog });
+  rngLow.mockRestore();
+
+  const gsHigh = setup();
+  const rngHigh = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  resolveEffects(gsHigh, createPromptState(), 'p1', [{ type: 'lose_random_item' }], { itemCatalog });
+  rngHigh.mockRestore();
+
+  expect(gsLow.players.get('p1').inventory).toEqual([{ id: 'item_b' }]); // item_a removed
+  expect(gsHigh.players.get('p1').inventory).toEqual([{ id: 'item_a' }]); // item_b removed
+});
+
 test('resolveEffects remove_imprint removes the player\'s only imprint and reverses its stat_change effects', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
@@ -1653,4 +1709,12 @@ test('event_026 in data/cards/event-cards.json has the expected restore_or_advan
     { type: 'restore_or_advance', stat: 'knowledge' },
   ]);
   expect(event026.needsCustomLogic).toBe(false);
+});
+
+test('event_013 in data/cards/event-cards.json has the expected lose_random_item effect', () => {
+  const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
+  const event013 = eventCards.find((c) => c.id === 'event_013');
+  expect(event013).toBeDefined();
+  expect(event013.effects).toEqual([{ type: 'lose_random_item', destination: 'deck' }]);
+  expect(event013.needsCustomLogic).toBe(false);
 });

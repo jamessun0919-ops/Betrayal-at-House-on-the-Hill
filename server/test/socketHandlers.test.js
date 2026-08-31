@@ -1751,6 +1751,39 @@ test('game:move into event_035 (狂風襲來) moves the player back to their pre
   httpServer.close();
 });
 
+test('game:move into event_013 (割破背包) removes a random held item and returns it to the item deck', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_013',
+        name: '割破背包',
+        effects: [{ type: 'lose_random_item', destination: 'deck' }],
+      }],
+      items: [{ id: 'item_test_a', name: '測試道具A', effects: [] }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_test_a' });
+  const deckCountBefore = gameState.itemDeck.cards.length;
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+
+  const after = getPlayer(gameState, currentPlayerId);
+  expect(after.inventory).toEqual([]);
+  expect(gameState.itemDeck.cards.length).toBe(deckCountBefore + 1); // the removed item was pushed back
+  expect(gameState.itemDeck.cards[gameState.itemDeck.cards.length - 1]).toEqual({ id: 'item_test_a', name: '測試道具A', effects: [] });
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into event_026 (透入的陽光) zeros action points and restores/advances sanity and knowledge independently', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],

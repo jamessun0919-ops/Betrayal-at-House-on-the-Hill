@@ -94,19 +94,38 @@ function handleGrantItem(gameState, playerId, effect) {
   return { pending: false, drawnCards: [{ id: effect.itemId }] };
 }
 
-function handleLoseItem(gameState, playerId, effect, context) {
-  const player = requirePlayer(gameState, playerId);
-  removeItem(player, effect.itemId);
-  if (effect.destination === 'deck') {
-    const cardDef = ((context && context.itemCatalog) || []).find((c) => c.id === effect.itemId);
+function routeLostItemToDestination(gameState, player, itemId, destination, itemCatalog) {
+  if (destination === 'deck') {
+    const cardDef = itemCatalog.find((c) => c.id === itemId);
     if (!cardDef) {
       throw new Error('UNKNOWN_ITEM_CARD');
     }
     gameState.itemDeck.cards.push(cardDef);
-  } else if (effect.destination === 'room') {
+  } else if (destination === 'room') {
     const room = getRoomForPlayer(gameState, player);
-    room.droppedItems.push({ id: effect.itemId });
+    room.droppedItems.push({ id: itemId });
   }
+}
+
+function handleLoseItem(gameState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  removeItem(player, effect.itemId);
+  routeLostItemToDestination(gameState, player, effect.itemId, effect.destination, (context && context.itemCatalog) || []);
+  return { pending: false };
+}
+
+function handleLoseRandomItem(gameState, playerId, effect, context) {
+  const player = requirePlayer(gameState, playerId);
+  const itemCatalog = (context && context.itemCatalog) || [];
+  const candidateIds = player.inventory
+    .map((item) => item.id)
+    .filter((id) => itemCatalog.some((c) => c.id === id));
+  if (candidateIds.length === 0) {
+    return { pending: false, appliedCount: 0 };
+  }
+  const chosenId = candidateIds[Math.floor(Math.random() * candidateIds.length)];
+  removeItem(player, chosenId);
+  routeLostItemToDestination(gameState, player, chosenId, effect.destination, itemCatalog);
   return { pending: false };
 }
 
@@ -506,6 +525,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   action_points: (gameState, promptState, playerId, effect) => handleActionPoints(gameState, playerId, effect),
   grant_item: (gameState, promptState, playerId, effect) => handleGrantItem(gameState, playerId, effect),
   lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
+  lose_random_item: (gameState, promptState, playerId, effect, context) => handleLoseRandomItem(gameState, playerId, effect, context),
   remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, promptState, playerId, effect, context),
   random_stat_change: (gameState, promptState, playerId, effect) => handleRandomStatChange(gameState, playerId, effect),
   restore_or_advance: (gameState, promptState, playerId, effect) => handleRestoreOrAdvance(gameState, playerId, effect),

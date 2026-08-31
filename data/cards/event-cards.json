@@ -172,8 +172,8 @@
     "description": "你的背包被一旁突出的鏽蝕鐵片狠狠勾住。伴隨刺耳的撕裂聲，背包側面被劃開一道長長的裂口，幾件物品散落在地。你急忙停下整理，卻發現其中一樣東西早已不知滾進了哪片黑暗。",
     "text": "隨機失去一件物品，該物品放回牌堆中。",
     "feedbacktextOccur": "你怎麼也找不到剛掉在地板上的東西了",
-    "effects": [],
-    "needsCustomLogic": true
+    "effects": [{ "type": "lose_random_item", "destination": "deck" }],
+    "needsCustomLogic": false
   },
   {
     "id": "event_014",
