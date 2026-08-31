@@ -1112,7 +1112,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
   // Centralizing game:roomEntered broadcast here changed emission order: it now fires
   // BEFORE game:itemUseResolved (emitted by caller in game:selectAction), whereas
   // before centralization it fired AFTER. Frontend queues both into same FIFO popup
-  // queue, so this is a real UX ordering change (developed reviewed & accepted 2026-08-31).
+  // queue, so this is a real UX ordering change (developer reviewed & accepted 2026-08-31).
   // Do not "fix" by reordering broadcasts — this is the intended behavior.
   if (effectResult.enteredNewRoom !== undefined) {
     const enteredRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
