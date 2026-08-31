@@ -152,7 +152,7 @@ if (effectResult.enteredNewRoom !== undefined) {
 
 （此處不需要再檢查 `!effectResult.pending`——函式在更早的 `if (effectResult.pending) { ... return }` 已經處理過 pending 分支並提前返回，能執行到這裡代表已確定不是 pending。）
 
-`game:selectAction` 目前重複的一段（`if (!effectResult.pending && effectResult.enteredNewRoom !== undefined) {...}`，用 `targetForEffects` 查房間）整段刪除——`handleEffectResolveResult` 呼叫時傳入的 `playerId` 參數本來就是 `targetForEffects`（呼叫端寫法：`handleEffectResolveResult(..., targetForEffects, ...)`），搬進去後行為完全等價，不會漏廣播也不會重複廣播。
+`game:selectAction` 目前重複的一段（`if (!effectResult.pending && effectResult.enteredNewRoom !== undefined) {...}`，用 `targetForEffects` 查房間）整段刪除——`handleEffectResolveResult` 呼叫時傳入的 `playerId` 參數本來就是 `targetForEffects`（呼叫端寫法：`handleEffectResolveResult(..., targetForEffects, ...)`），搬進去後收件對象與廣播內容完全等價，不會漏廣播也不會重複廣播。**但送出順序會變**：搬進去後 `game:roomEntered` 在 `handleEffectResolveResult` 內部就送出，早於呼叫端在函式回傳後才送的 `game:itemUseResolved`（搬移前順序相反）。前端把兩者塞進同一個彈窗佇列，這代表「使用道具」情境下彈窗順序會改變（例如 `item_044` 移動類選項，從「先道具文字→後房間介紹」變成「先房間介紹→後道具文字」）。這項順序變更已於 2026-08-31 提交給開發者確認並接受，不視為缺陷。
 
 查過 `handleEffectResolveResult` 的全部6個呼叫點（`game:selectAction`、`game:effectPromptRespond`、`applyRoomEndTurnBonus`、`resolveCardDraw`、`handleEffectChoiceTimeout`、`resumeRollChoice`），確認都沒有各自另外處理 `roomEntered`，搬進共用函式不會造成任何路徑重複廣播。
 
