@@ -1,9 +1,10 @@
-import { findRoomInfo } from './mapUtils';
+import { findRoomInfo, getSpecialRoomEntries } from './mapUtils';
 
 const CELL_SIZE = 48;
 
-export default function OverviewMap({ visitedRooms, floor, onFloorChange, boardRooms, roomContent, playerX, playerY }) {
+export default function OverviewMap({ visitedRooms, floor, onFloorChange, boardRooms, board, roomContent, playerX, playerY }) {
   const onThisFloor = visitedRooms.filter((v) => v.floor === floor);
+  const specialRoomEntries = getSpecialRoomEntries(visitedRooms, board, roomContent);
 
   return (
     <div>
@@ -68,6 +69,28 @@ export default function OverviewMap({ visitedRooms, floor, onFloorChange, boardR
           );
         })()
       )}
+      <div>
+        <h4>所在陣營</h4>
+        <p>冒險陣營</p>
+      </div>
+      <div>
+        <h4>勝利條件</h4>
+        <p>未揭露</p>
+      </div>
+      <div>
+        <h4>特殊房間紀錄</h4>
+        {specialRoomEntries.length === 0 ? (
+          <p>尚未發現任何特殊房間效果</p>
+        ) : (
+          <ul>
+            {specialRoomEntries.map(({ roomId, name, effectDescription }) => (
+              <li key={roomId}>
+                <strong>{name}</strong>：{effectDescription}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }

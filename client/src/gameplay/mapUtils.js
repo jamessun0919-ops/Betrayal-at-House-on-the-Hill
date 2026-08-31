@@ -83,4 +83,23 @@ function getRoomActions(roomDefinition, placedRoom) {
   });
 }
 
-export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions };
+// 給「筆記資訊」畫面用：玩家去過、且該房間定義了 effectDescription 的房間清單，
+// 橫跨玩家去過的所有樓層（不只是目前總覽選中的那個樓層），同一間房只列一次。
+function getSpecialRoomEntries(visitedRooms, board, roomContent) {
+  const entries = [];
+  const seenRoomIds = new Set();
+  for (const v of visitedRooms) {
+    const floorRooms = board[v.floor];
+    if (!Array.isArray(floorRooms)) continue;
+    const boardRoom = floorRooms.find((r) => r.x === v.x && r.y === v.y);
+    if (!boardRoom || seenRoomIds.has(boardRoom.roomId)) continue;
+    const info = findRoomInfo(boardRoom.roomId, roomContent);
+    if (info && info.effectDescription) {
+      seenRoomIds.add(boardRoom.roomId);
+      entries.push({ roomId: boardRoom.roomId, name: info.name, effectDescription: info.effectDescription });
+    }
+  }
+  return entries;
+}
+
+export { STAT_LABELS, DIRECTION_DELTA, OPPOSITE_SIDE, getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, getSpecialRoomEntries };

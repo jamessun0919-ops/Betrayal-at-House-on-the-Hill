@@ -425,6 +425,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                         floor={overviewFloor}
                         onFloorChange={setOverviewFloor}
                         boardRooms={boardRooms}
+                        board={gameState.board}
                         roomContent={roomContent}
                         playerX={me.floor === overviewFloor ? me.x : null}
                         playerY={me.floor === overviewFloor ? me.y : null}
@@ -460,7 +461,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 {wrapLabel('房間行動', 2)}
               </button>
               <button style={cornerButtonStyle('top-right')} onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
-                {wrapLabel(mapMode === 'focused' ? '總覽地圖' : '目前房間', 2)}
+                {wrapLabel(mapMode === 'focused' ? '筆記資訊' : '目前房間', 2)}
               </button>
               <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
                 {wrapLabel('襲擊目標', 2)}
