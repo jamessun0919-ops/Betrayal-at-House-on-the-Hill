@@ -334,7 +334,11 @@
     "description": "厚重窗簾間透進一道微弱陽光，在陰暗房間裡留下溫暖的光痕。你站進光線之中，冰冷與壓迫感似乎暫時退去。古堡外的世界重新變得真實，也讓你逐漸找回被恐懼消磨的勇氣。",
     "text": "行動力歸零，如意志、知識或兩者都低於角色初始級別，則恢復到初始級別，高於或等於初始級別的能力則提升一個級別。",
     "feedbacktextOccur": "你撥開窗簾，讓自己沐浴在陽光下，重新恢復了精神，頭腦也更加清楚",
-    "effects": [],
+    "effects": [
+      { "type": "action_points", "setTo": 0 },
+      { "type": "restore_or_advance", "stat": "sanity" },
+      { "type": "restore_or_advance", "stat": "knowledge" }
+    ],
     "needsCustomLogic": false
   },
   {

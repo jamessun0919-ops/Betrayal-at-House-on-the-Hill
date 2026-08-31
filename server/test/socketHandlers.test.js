@@ -1751,6 +1751,43 @@ test('game:move into event_035 (狂風襲來) moves the player back to their pre
   httpServer.close();
 });
 
+test('game:move into event_026 (透入的陽光) zeros action points and restores/advances sanity and knowledge independently', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    cards: {
+      events: [{
+        id: 'event_026',
+        name: '透入的陽光',
+        effects: [
+          { type: 'action_points', setTo: 0 },
+          { type: 'restore_or_advance', stat: 'sanity' },
+          { type: 'restore_or_advance', stat: 'knowledge' },
+        ],
+      }],
+      items: [],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const before = getPlayer(gameState, currentPlayerId);
+  before.stats.sanity.currentIndex = before.stats.sanity.baseIndex - 1; // below base
+  // knowledge left untouched, i.e. already at baseIndex
+
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await effectResolvedPromise;
+
+  const after = getPlayer(gameState, currentPlayerId);
+  expect(after.actionPoints).toBe(0);
+  expect(after.stats.sanity.currentIndex).toBe(after.stats.sanity.baseIndex); // restored, not advanced past base
+  expect(after.stats.knowledge.currentIndex).toBe(after.stats.knowledge.baseIndex + 1); // was at base, advanced
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into an event card whose effects move the player again broadcasts a second game:roomEntered for that move (event-card path previously had no such broadcast)', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],

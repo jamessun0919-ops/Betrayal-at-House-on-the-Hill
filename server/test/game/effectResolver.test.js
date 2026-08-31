@@ -56,6 +56,33 @@ test('resolveEffects does not lower a stat that is already at or above baseIndex
   expect(player.stats.might.currentIndex).toBe(4); // unchanged, restoreToBase only raises
 });
 
+test('resolveEffects restore_or_advance restores the stat to baseIndex when it is currently below base', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.stats.sanity.currentIndex = 0; // dropped below base (baseIndex 2)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'restore_or_advance', stat: 'sanity' },
+  ]);
+  expect(player.stats.sanity.currentIndex).toBe(2); // restored to baseIndex, not advanced further
+});
+
+test('resolveEffects restore_or_advance advances the stat by one level when it is already at baseIndex', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  // sanity.currentIndex starts at baseIndex 2 by default (see makeStats/createPlayer)
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'restore_or_advance', stat: 'sanity' },
+  ]);
+  expect(player.stats.sanity.currentIndex).toBe(3); // baseIndex 2 + 1
+});
+
+test('resolveEffects restore_or_advance throws UNKNOWN_STAT for an unrecognized stat', () => {
+  const gameState = makeGameStateWithPlayer();
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'restore_or_advance', stat: 'luck' }])
+  ).toThrow('UNKNOWN_STAT');
+});
+
 test('resolveEffects stat_change setToLevel:"min" sets the stat to skullIndex+1 (non-lethal floor)', () => {
   const gameState = makeGameStateWithPlayer();
   resolveEffects(gameState, createPromptState(), 'p1', [
@@ -1614,4 +1641,16 @@ test('event_004/event_029/event_035 in data/cards/event-cards.json have the expe
     },
     { type: 'move_to_previous_room' },
   ]);
+});
+
+test('event_026 in data/cards/event-cards.json has the expected restore_or_advance effects', () => {
+  const eventCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/event-cards.json'), 'utf8'));
+  const event026 = eventCards.find((c) => c.id === 'event_026');
+  expect(event026).toBeDefined();
+  expect(event026.effects).toEqual([
+    { type: 'action_points', setTo: 0 },
+    { type: 'restore_or_advance', stat: 'sanity' },
+    { type: 'restore_or_advance', stat: 'knowledge' },
+  ]);
+  expect(event026.needsCustomLogic).toBe(false);
 });

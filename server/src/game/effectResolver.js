@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS } = require('./playerEntity');
+const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS, isBelowBase } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
 const { coordKey, DIRECTION_DELTA, canMoveBetween } = require('./boardGenerator');
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
@@ -61,6 +61,20 @@ function handleRandomStatChange(gameState, playerId, effect) {
   const player = requirePlayer(gameState, playerId);
   const stat = STATS[Math.floor(Math.random() * STATS.length)];
   changeStat(player, stat, effect.delta, gameState.hauntStarted);
+  return { pending: false };
+}
+
+function handleRestoreOrAdvance(gameState, playerId, effect) {
+  const player = requirePlayer(gameState, playerId);
+  const statTrack = player.stats[effect.stat];
+  if (!statTrack) {
+    throw new Error('UNKNOWN_STAT');
+  }
+  if (isBelowBase(player, effect.stat)) {
+    changeStat(player, effect.stat, statTrack.baseIndex - statTrack.currentIndex, gameState.hauntStarted);
+  } else {
+    changeStat(player, effect.stat, 1, gameState.hauntStarted);
+  }
   return { pending: false };
 }
 
@@ -494,6 +508,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   lose_item: (gameState, promptState, playerId, effect, context) => handleLoseItem(gameState, playerId, effect, context),
   remove_imprint: (gameState, promptState, playerId, effect, context) => handleRemoveImprint(gameState, promptState, playerId, effect, context),
   random_stat_change: (gameState, promptState, playerId, effect) => handleRandomStatChange(gameState, playerId, effect),
+  restore_or_advance: (gameState, promptState, playerId, effect) => handleRestoreOrAdvance(gameState, playerId, effect),
   room_gate: (gameState, promptState, playerId, effect, context) => handleRoomGate(gameState, promptState, playerId, effect, context),
   remove_room_doors: (gameState, promptState, playerId, effect) => handleRemoveRoomDoors(gameState, playerId, effect),
   add_room_door: (gameState, promptState, playerId, effect) => handleAddRoomDoor(gameState, playerId),
