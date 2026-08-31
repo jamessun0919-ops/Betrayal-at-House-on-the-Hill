@@ -778,6 +778,93 @@ test('game:move applies a room\'s leaveCheck before allowing the player to move 
   httpServer.close();
 });
 
+test('game:move skips the leaveCheck entirely for a player holding omen_009 in room_pentagram/room_graveyard/room_crypt', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_pentagram', name: '五芒星室', doors: 4, floor: 'ground', leaveCheck: { stat: 'knowledge', min: 4 } },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.floor = 'ground';
+  player.x = 5;
+  player.y = 5;
+  gameState.board.ground.set('5,5', { roomId: 'room_pentagram', x: 5, y: 5, doorSides: ['east'], droppedItems: [], item: null });
+  gameState.board.ground.set('6,5', { roomId: 'room_neighbor', x: 6, y: 5, doorSides: ['west'], droppedItems: [], item: null });
+  player.inventory.push({ id: 'omen_009' });
+
+  // RNG pinned to guarantee a leaveCheck fail if one were actually rolled --
+  // the omen_009 exemption should skip the roll entirely, not just win it.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('move');
+  expect(player.x).toBe(6);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move still applies room_pentagram\'s leaveCheck for a player who does not hold omen_009', async () => {
+  const content = makeContent({
+    rooms: [
+      { id: 'room_pentagram', name: '五芒星室', doors: 4, floor: 'ground', leaveCheck: { stat: 'knowledge', min: 4 } },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.floor = 'ground';
+  player.x = 5;
+  player.y = 5;
+  gameState.board.ground.set('5,5', { roomId: 'room_pentagram', x: 5, y: 5, doorSides: ['east'], droppedItems: [], item: null });
+  gameState.board.ground.set('6,5', { roomId: 'room_neighbor', x: 6, y: 5, doorSides: ['west'], droppedItems: [], item: null });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('leaveCheckFailed');
+  expect(player.x).toBe(5); // unmoved
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move still applies a non-exempt room\'s leaveCheck for a player holding omen_009', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_009' });
+
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+  const result = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  rngSpy.mockRestore();
+
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('leaveCheckFailed'); // room_lobby_a is not in the omen_009 exemption list
+  expect(player.x).toBe(0); // unmoved
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move with a failing leaveCheck broadcasts game:checkResolved to the whole room, not just the mover', async () => {
   const content = makeContent({
     startingRooms: [

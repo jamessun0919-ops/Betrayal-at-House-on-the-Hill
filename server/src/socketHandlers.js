@@ -27,6 +27,19 @@ const DEFAULT_CHARACTER_SELECT_TIMEOUT_MS = 30000;
 
 const DECK_FIELD_BY_TYPE = { item: 'itemDeck', event: 'eventDeck', omen: 'omenDeck' };
 
+// omen_009 (香菸/徽章): holding it exempts the player from the leaveCheck of these
+// three rooms entirely (卡面：「玩家不受五芒星堂、地窖及墓園的影響...不需要進行考驗」).
+// room_crypt (地窖) has no leaveCheck of its own yet (its real mechanic is an
+// M3-blocked "受傷" effect on staying, tracked separately) -- listed here anyway so
+// the exemption applies automatically once that room's own mechanic is built, with
+// no need to revisit this list.
+const OMEN_BADGE_ITEM_ID = 'omen_009';
+const OMEN_BADGE_EXEMPT_ROOM_IDS = ['room_pentagram', 'room_graveyard', 'room_crypt'];
+
+function isExemptFromLeaveCheck(player, roomId) {
+  return OMEN_BADGE_EXEMPT_ROOM_IDS.includes(roomId) && player.inventory.some((item) => item.id === OMEN_BADGE_ITEM_ID);
+}
+
 function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, options = {}) {
   const characterSelectTimeoutMs = options.characterSelectTimeoutMs || DEFAULT_CHARACTER_SELECT_TIMEOUT_MS;
   const characterSelectTimeouts = new Map(); // roomCode -> Timeout handle
@@ -178,7 +191,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         }
         const currentRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
         const currentRoomDefinition = findRoomDefinition(content, currentRoom.roomId);
-        const leaveCheck = currentRoomDefinition ? currentRoomDefinition.leaveCheck : null;
+        const leaveCheck = (currentRoomDefinition && !isExemptFromLeaveCheck(player, currentRoom.roomId)) ? currentRoomDefinition.leaveCheck : null;
         const result = moveToRoom(gameState, playerId, direction, leaveCheck, { itemCatalog: content.cards.items });
 
         if (result.kind === 'leaveCheckPending') {
