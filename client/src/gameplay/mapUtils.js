@@ -92,6 +92,9 @@ function getSpecialRoomEntries(visitedRooms, board, roomContent) {
     const floorRooms = board[v.floor];
     if (!Array.isArray(floorRooms)) continue;
     const boardRoom = floorRooms.find((r) => r.x === v.x && r.y === v.y);
+    // seenRoomIds 是 roomId 層級的保險機制：目前 server（playerEntity.js 的
+    // movePlayerTo）在寫入 visitedRooms 前已經用精確座標去重，所以這裡的重複
+    // 目前不會被實際觸發；保留這道檢查是為了防範未來 server 端去重邏輯改變。
     if (!boardRoom || seenRoomIds.has(boardRoom.roomId)) continue;
     const info = findRoomInfo(boardRoom.roomId, roomContent);
     if (info && info.effectDescription) {
