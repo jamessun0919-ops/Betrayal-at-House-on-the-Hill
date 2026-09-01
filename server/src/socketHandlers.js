@@ -341,7 +341,19 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             if (searchOutcome.found) {
               addItem(currentPlayer, { id: searchOutcome.card.id });
               io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: searchOutcome.card.id, cardName: searchOutcome.card.name, hasCheck: false });
-              openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, [searchOutcome.card.id], inventoryChoiceTimeoutMs);
+              const newlyAcquiredIds = [searchOutcome.card.id];
+              if (searchOutcome.card.triggerOnDraw) {
+                for (const effect of searchOutcome.card.effects) {
+                  if (effect.type !== 'grant_item') {
+                    throw new Error('UNSUPPORTED_DRAW_TRIGGER_EFFECT');
+                  }
+                  addItem(currentPlayer, { id: effect.itemId });
+                  const grantedCard = content.cards.items.find((i) => i.id === effect.itemId);
+                  io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: effect.itemId, cardName: grantedCard ? grantedCard.name : effect.itemId, hasCheck: false });
+                  newlyAcquiredIds.push(effect.itemId);
+                }
+              }
+              openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, newlyAcquiredIds, inventoryChoiceTimeoutMs);
             } else {
               io.to(roomCode).emit('game:searchEmpty', { playerId, roomId: placedRoom.roomId });
             }
