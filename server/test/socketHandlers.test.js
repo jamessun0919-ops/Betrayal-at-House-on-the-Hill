@@ -1084,7 +1084,7 @@ test('game:move that passes a leaveCheck and then opens into the collapsed room 
   httpServer.close();
 });
 
-test('game:move into room_collapsed_room with an eligible interjection item pauses for a roll choice, then game:diceChoiceRespond resolves the fall', async () => {
+test('game:move into room_collapsed_room with an eligible interjection item pauses for a roll choice, then game:diceChoiceRespond resolves it', async () => {
   const content = makeContent({
     rooms: [
       { id: 'room_collapsed_room', doors: 2, floor: 'ground' },
@@ -1112,12 +1112,15 @@ test('game:move into room_collapsed_room with an eligible interjection item paus
   const pending = await pendingPromise;
   const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
   const respondResult = await new Promise((resolve) =>
-    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 0 }, resolve)
+    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005' }, resolve)
   );
   expect(respondResult.error).toBeUndefined();
   await resolvedPromise;
 
-  expect(player.floor).toBe('basement'); // overrideValue 0 < 5, guaranteed fail
+  // item_005's override auto-substitutes the max possible roll (default test
+  // character speed 4 * default face max 2 = 8), which clears
+  // COLLAPSE_CHECK_MIN (5) -- the player stays on the ground floor.
+  expect(player.floor).toBe('ground');
   expect(player.x).toBe(1);
   expect(player.y).toBe(1);
 
@@ -4821,7 +4824,7 @@ function makeOverrideInterjectionContent() {
   });
 }
 
-test('game:diceChoiceRespond with a malformed overrideValue is rejected before the item is consumed, and the roll choice stays open', async () => {
+test('game:diceChoiceRespond with an override interjection item auto-substitutes the max roll -- no overrideValue needed or accepted', async () => {
   const content = makeOverrideInterjectionContent();
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
     await setUpStartedGameWithContent(content);
@@ -4833,29 +4836,17 @@ test('game:diceChoiceRespond with a malformed overrideValue is rejected before t
   await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003' }, resolve));
   const pending = await pendingPromise;
 
-  // Missing overrideValue.
-  const missing = await new Promise((resolve) =>
+  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  const respondResult = await new Promise((resolve) =>
     currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005' }, resolve)
   );
-  expect(missing.error).toBe('INVALID_OVERRIDE_VALUE');
-  // Out-of-range overrideValue.
-  const outOfRange = await new Promise((resolve) =>
-    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 9 }, resolve)
-  );
-  expect(outOfRange.error).toBe('INVALID_OVERRIDE_VALUE');
-
-  // The item survived and the choice is still pending -- nothing was consumed.
-  expect(player.inventory).toEqual([{ id: 'item_003' }, { id: 'item_005' }]);
-  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice).not.toBeNull();
-
-  // A valid retry against the same promptId still resolves normally.
-  const effectResolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
-  const retry = await new Promise((resolve) =>
-    currentClient.emit('game:diceChoiceRespond', { promptId: pending.promptId, optionId: 'item_005', overrideValue: 6 }, resolve)
-  );
-  expect(retry.error).toBeUndefined();
+  expect(respondResult.error).toBeUndefined();
   await effectResolvedPromise;
-  expect(player.inventory).toEqual([{ id: 'item_003' }]); // consumed only on the valid response
+
+  // item_003's dice_check has one wide 0-8 tier, so any roll matches it --
+  // this test's point is that the response succeeds and the item is consumed
+  // without the client ever sending an overrideValue.
+  expect(player.inventory).toEqual([{ id: 'item_003' }]);
   expect(getResolver(effectResolverManager, roomCode).pendingRollChoice).toBeNull();
 
   clientA.close();

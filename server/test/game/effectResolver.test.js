@@ -1106,7 +1106,7 @@ test('resolveEffects dice_check resumed with a chosen bonusDice item applies its
   expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
 });
 
-test('resolveEffects dice_check resumed with a chosen override item returns the override value directly and removes the consumable item', () => {
+test('resolveEffects dice_check resumed with a chosen override item auto-substitutes the max possible roll and removes the consumable item', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
   player.inventory.push({ id: 'item_005' });
@@ -1114,7 +1114,7 @@ test('resolveEffects dice_check resumed with a chosen override item returns the 
   const result = resolveEffects(gameState, createPromptState(), 'p1', [
     {
       type: 'dice_check',
-      diceCount: 2,
+      diceCount: 3,
       tiers: [
         { min: 5, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
         { min: 0, max: 4, effects: [] },
@@ -1122,10 +1122,10 @@ test('resolveEffects dice_check resumed with a chosen override item returns the 
     },
   ], {
     rng: () => { throw new Error('should not roll when overriding'); },
-    interjectionChoice: { itemId: 'item_005', diceInterjection, overrideValue: 6 },
+    interjectionChoice: { itemId: 'item_005', diceInterjection },
   });
   expect(result.pending).toBe(false);
-  expect(player.stats.might.currentIndex).toBe(3); // override 6 -> matched the 5-8 tier
+  expect(player.stats.might.currentIndex).toBe(3); // auto max: 3 dice * face max 2 = 6 -> matched the 5-8 tier
   expect(player.inventory).toEqual([]); // consumable item removed
 });
 

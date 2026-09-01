@@ -526,20 +526,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!resolverEntry || !resolverEntry.pendingRollChoice) {
           return ack({ error: 'NO_ACTIVE_ROLL_CHOICE' });
         }
-        const { promptId, optionId, overrideValue } = payload || {};
+        const { promptId, optionId } = payload || {};
         const { playerId: choicePlayerId, options, resumeKind, resumeContext } = resolverEntry.pendingRollChoice;
-
-        // Validate BEFORE consuming the prompt (respondToPrompt below) so a
-        // malformed response doesn't destroy the item or drop the pending
-        // choice -- the player can simply retry with a valid overrideValue.
-        if (optionId !== '__skip__') {
-          const candidateOption = options.find((o) => o.itemId === optionId);
-          if (candidateOption && candidateOption.diceInterjection.override) {
-            if (!Number.isInteger(overrideValue) || overrideValue < 0 || overrideValue > 8) {
-              return ack({ error: 'INVALID_OVERRIDE_VALUE' });
-            }
-          }
-        }
 
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearRollChoiceTimeout(roomCode, rollChoiceTimeouts);
@@ -548,7 +536,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 
         const chosenOption = optionId === '__skip__' ? null : options.find((o) => o.itemId === optionId);
         const interjectionChoice = chosenOption
-          ? { itemId: chosenOption.itemId, diceInterjection: chosenOption.diceInterjection, overrideValue }
+          ? { itemId: chosenOption.itemId, diceInterjection: chosenOption.diceInterjection }
           : null;
 
         const outcome = resumeRollChoice(io, effectResolverManager, gameState, roomCode, choicePlayerId, resumeKind, resumeContext, interjectionChoice, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, socket);

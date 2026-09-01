@@ -105,27 +105,25 @@ test('findInterjectionOptions throws INVALID_ITEM_CATALOG when itemCatalog is no
 
 test('resolveFinalRoll with no chosen interjection rolls baseCount dice, clamped to [1,8]', () => {
   const rng = () => 0.99; // every die -> face 2
-  expect(resolveFinalRoll(3, null, undefined, rng)).toBe(6); // 3 dice * 2
-  expect(resolveFinalRoll(0, null, undefined, rng)).toBe(2); // clamped up to 1 die
-  expect(resolveFinalRoll(10, null, undefined, rng)).toBe(16); // clamped down to 8 dice
+  expect(resolveFinalRoll(3, null, rng)).toBe(6); // 3 dice * 2
+  expect(resolveFinalRoll(0, null, rng)).toBe(2); // clamped up to 1 die
+  expect(resolveFinalRoll(10, null, rng)).toBe(16); // clamped down to 8 dice
 });
 
 test('resolveFinalRoll with a bonusDice interjection adds to the dice count before rolling', () => {
   const rng = () => 0.99; // every die -> face 2
   const di = { bonusDice: 2 };
-  expect(resolveFinalRoll(3, di, undefined, rng)).toBe(10); // (3+2) dice * 2
+  expect(resolveFinalRoll(3, di, rng)).toBe(10); // (3+2) dice * 2
 });
 
-test('resolveFinalRoll with an override interjection returns the override value directly, ignoring rng', () => {
+test('resolveFinalRoll with an override interjection auto-substitutes the max possible roll for the default dice faces, ignoring rng', () => {
   const rng = () => { throw new Error('should not be called'); };
   const di = { override: true };
-  expect(resolveFinalRoll(3, di, 5, rng)).toBe(5);
+  expect(resolveFinalRoll(3, di, rng)).toBe(6); // 3 dice * default max face (2)
 });
 
-test('resolveFinalRoll throws INVALID_OVERRIDE_VALUE for an out-of-range or non-integer override value', () => {
-  const di = { override: true };
-  expect(() => resolveFinalRoll(3, di, 9, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
-  expect(() => resolveFinalRoll(3, di, -1, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
-  expect(() => resolveFinalRoll(3, di, 2.5, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
-  expect(() => resolveFinalRoll(3, di, undefined, () => 0)).toThrow('INVALID_OVERRIDE_VALUE');
+test('resolveFinalRoll with an override interjection uses the item\'s own customFaces max, if present', () => {
+  const rng = () => { throw new Error('should not be called'); };
+  const di = { override: true, customFaces: [3, 3, 4, 4, 5, 5] };
+  expect(resolveFinalRoll(2, di, rng)).toBe(10); // 2 dice * custom max face (5)
 });
