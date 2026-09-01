@@ -1427,3 +1427,26 @@
 
 **開發者交代備忘事項**：
 - 收工前確認系統無殘留 node 行程；本階段所有 worktree/分支均已清理
+
+## 2026-09-01 第 2 次工作階段
+
+**當日工作內容**：
+- 完成角色 icon 六格定位機制：走完整 brainstorming（含視覺化畫面比較同門兩人排列方式）→設計文件→實作計畫→Subagent-Driven 執行→全分支審查，1人/2人維持既有邏輯不變，3人以上改成固定2×3格線置中（依 characterId 排序）。全分支審查 0 Critical/Important，合併進 main
+- 完成武器搜索連帶彈藥機制：item_001/020 搜到時連帶給彈藥。全分支審查抓到2個Important（皆為設計沒考慮到的情境）：連帶效果塞進 effects 欄位讓「使用道具」通用路徑可以無限刷彈藥；連帶機制只接了搜索一條路徑，其他3條入背包路徑（含角色開場道具）都漏接。跟開發者確認後兩者都現在修，改成獨立 companionItemId 欄位並接進全部4條路徑，修正+複審皆通過，701/701測試全綠
+- 討論 NPC 操控機制（M2項目8）：查證發現 Handover 舊記錄的「除錯頁面最小按鈕」已失真，client完全沒有相關程式碼。走完整 brainstorming，開發者決定整個取代現有 switch_control 附身機制，改成「NPC是結構上等同玩家的實體」新模型。開發者明確要求回合順序插入與NPC回合操控權授權（查證中新發現的既有機制調整點）保留不定案，等回合制討論一起處理。設計文件記錄已確認部分，新增 npcs.json 資料檔，未進入 writing-plans，未實作
+- 過程中處理 Subagent-Driven 執行插曲：implementer 兩度誤用背景測試指令卡住（subagent 收不到背景通知，環境已知限制），用 SendMessage 續傳+要求同步指令排除；過程中agent自己誤派一次重複dispatch，已用TaskStop即時攔截無資料遺失
+- 收工前清理兩個跟本次session無關的殘留worktree目錄（weapon-draw-companion-item因殘留jest worker行程刪不掉、card-batch-and-roomentered-fix是8/31留下的孤兒目錄），開發者確認後一併清除
+
+**完成項目**：
+- 角色icon六格定位機制——完整流程完成並合併，0 Critical/Important
+- 武器搜索連帶彈藥機制——完成並合併，含全分支審查抓到並修正的2個Important，701/701測試全綠
+- NPC操控機制設計文件（部分，B/C保留待定）+ npcs.json資料檔
+- Handover M2待辦清單更新：項目2a（武器複雜機制分類）、3（icon定位，已完成）重新整理；項目8（NPC操控UI）更新為部分設計；項目14（回合制討論）新增NPC回合整合的附帶登記
+
+**遇到瓶頸**：
+- Subagent背景測試指令卡住implementer兩次，已排除並記錄進Handover除錯注意事項
+- agent自己誤派一次重複dispatch（isolation:"worktree"參數誤用），已用TaskStop即時攔截
+
+**開發者交代備忘事項**：
+- NPC操控機制的回合順序插入與操控權授權，等開發者提出回合制討論時要一併處理，agent已記錄提醒
+- 收工前確認系統無殘留node行程；本階段所有worktree/分支均已清理，另清除2個跟本階段無關的殘留worktree目錄（開發者確認後清除）
