@@ -119,7 +119,6 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   // item to the tail while the front item is still showing doesn't remount
   // and reset the in-progress check's phase.
   const nextCheckQueueId = useRef(0);
-  const [overrideInput, setOverrideInput] = useState('0');
 
   useEffect(() => {
     function onPrompt(data) {
@@ -219,6 +218,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       ]);
     }
     function onEffectPendingChoice(data) {
+      if (data.playerId !== playerId) return;
       setPendingEffectChoice(data);
     }
     function onEffectResolved(data) {
@@ -226,6 +226,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
       setPendingEffectChoice(null);
     }
     function onDiceChoicePending(data) {
+      if (data.playerId !== playerId) return;
       setPendingRollChoice(data);
     }
     function onInventoryChoicePending(data) {
@@ -323,9 +324,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     });
   }
 
-  function handleRollChoiceRespond(optionId, overrideValue) {
+  function handleRollChoiceRespond(optionId) {
     if (!pendingRollChoice) return;
-    socket.emit('game:diceChoiceRespond', { promptId: pendingRollChoice.promptId, optionId, overrideValue }, (res) => {
+    socket.emit('game:diceChoiceRespond', { promptId: pendingRollChoice.promptId, optionId }, (res) => {
       if (res && res.error) {
         console.error('[game:diceChoiceRespond]', res.error);
         setActionError(res.error);
@@ -544,29 +545,18 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 <div>
                   <p>擲骰道具介入：要不要使用道具？</p>
                   <ul>
-                    {pendingRollChoice.options.map((o) => (
-                      <li key={o.itemId}>
-                        {o.name}
-                        {o.diceInterjection.override ? (
-                          <>
-                            <input
-                              type="number"
-                              min="0"
-                              max="8"
-                              value={overrideInput}
-                              onChange={(e) => setOverrideInput(e.target.value)}
-                            />
-                            <button onClick={() => handleRollChoiceRespond(o.itemId, Number(overrideInput))}>
-                              使用
-                            </button>
-                          </>
-                        ) : (
-                          <button onClick={() => handleRollChoiceRespond(o.itemId, undefined)}>使用</button>
-                        )}
-                      </li>
-                    ))}
+                    {pendingRollChoice.options.map((o) => {
+                      const cardInfo = findCardInfo(o.itemId, cardContent);
+                      return (
+                        <li key={o.itemId}>
+                          <strong>{o.name}</strong>
+                          {cardInfo && cardInfo.diceInterjectionText && <p>{cardInfo.diceInterjectionText}</p>}
+                          <button onClick={() => handleRollChoiceRespond(o.itemId)}>使用</button>
+                        </li>
+                      );
+                    })}
                   </ul>
-                  <button onClick={() => handleRollChoiceRespond('__skip__', undefined)}>不使用道具</button>
+                  <button onClick={() => handleRollChoiceRespond('__skip__')}>不使用道具</button>
                 </div>
               )}
               {pendingInventoryChoice && (
