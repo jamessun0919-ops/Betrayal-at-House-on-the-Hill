@@ -136,6 +136,27 @@ function badgeStyle(enteredFromSide, index, total) {
   }
 }
 
+// When a room has 3+ occupants, every individual enteredFromSide is ignored
+// in favor of a fixed 2x3 grid, centered in the room (top-left to
+// bottom-right, filled in characterId order -- see the 2026-09-01 design
+// doc). Room occupancy is capped at 6 (the game's total character roster
+// size), so these 6 slots never overflow.
+const GRID_COLUMNS_PERCENT = [20, 50, 80];
+const GRID_ROWS_PERCENT = [30, 70];
+
+function gridBadgeStyle(slotIndex) {
+  const col = slotIndex % 3;
+  const row = Math.floor(slotIndex / 3);
+  const size = { width: 'calc(var(--peek-size) * 0.75)', height: 'calc(var(--peek-size) * 0.75)' };
+  return {
+    position: 'absolute',
+    left: `${GRID_COLUMNS_PERCENT[col]}%`,
+    top: `${GRID_ROWS_PERCENT[row]}%`,
+    transform: 'translate(-50%, -50%)',
+    ...size,
+  };
+}
+
 function NeighborPeek({ direction, neighborRoom, roomContent }) {
   const info = findRoomInfo(neighborRoom.roomId, roomContent);
   const style = peekStyle(direction);
@@ -292,7 +313,10 @@ export default function FocusedRoomView({
           </button>
         )}
       </div>
-      {roomsInSameSpot.map((p, i) => {
+      {(roomsInSameSpot.length >= 3
+        ? [...roomsInSameSpot].sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
+        : roomsInSameSpot
+      ).map((p, i) => {
         const colorIndex = allPlayers.findIndex((ap) => ap.playerId === p.playerId);
         return (
           <PlayerBadge
@@ -300,7 +324,7 @@ export default function FocusedRoomView({
             name={p.name}
             colorIndex={colorIndex === -1 ? i : colorIndex}
             iconSrc={findCharacterIcon(p.characterId, characterContent)}
-            style={badgeStyle(p.enteredFromSide, i, roomsInSameSpot.length)}
+            style={roomsInSameSpot.length >= 3 ? gridBadgeStyle(i) : badgeStyle(p.enteredFromSide, i, roomsInSameSpot.length)}
           />
         );
       })}
