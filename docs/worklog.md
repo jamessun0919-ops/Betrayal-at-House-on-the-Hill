@@ -1400,3 +1400,30 @@
 
 **開發者交代備忘事項**：
 - 收工前確認系統無殘留 node 行程；本階段啟動過的 dev server（notes-panel worktree 內手動啟動的 server/client）皆已關閉
+
+## 2026-09-01 第 1 次工作階段
+
+**當日工作內容**：
+- 開場讀取 Handover，應開發者要求列出 M2 階段剩餘 5 項未完成事項（武器複雜機制轉寫、eventIntro/eventNoCheck廣播範圍收斂、角色icon定位、操控實體切換UI、擲骰道具介入畫面）
+- 討論項目「eventIntro/eventNoCheck 廣播範圍收斂」：查證發現 roomIntro/itemUseResolved 其實已經正確過濾，真正沒過濾的只有 event/omen 抽卡彈窗。跟開發者確認訊息欄維持現狀、itemUseResolved 雙方都看得到維持現狀、過濾方式沿用前端過濾（3輪 AskUserQuestion 皆選推薦選項）後直接動手：DebugGameScreen.jsx 加上 playerId 過濾，commit 完成
+- 開發者提出新議題：回合制改為「各自回合同時行動」＋互動堆疊機制，確認先登記進 Handover 項目14（僅備忘，未 brainstorm，範圍會動 turnFlow.js 核心假設）
+- 討論項目「擲骰道具介入畫面」：查證現有 5 張道具卡（item_005/006/010/048/049）伺服器邏輯其實已完整，缺口在前端呈現。開發者要求先在這 5 張卡加上新欄位 `diceInterjectionText`（值先設 null），由開發者自己填入要顯示給玩家的文字；開發者填完後請 agent 確認語法與遺漏，5 張都正確無誤
+- 開發者要求細談設計，agent 提出三個 Section（範圍收斂/diceInterjectionText顯示/override類道具呈現）；查證 override 機制發現 item_005（天使羽毛）卡面「必定通過」實際上要靠玩家自己填數字才能通過，跟開發者確認方向後改為伺服器自動代入最高點數
+- 走 writing-plans 直接產出實作計畫（2 任務：Task1伺服器override自動代入最高點數、Task2前端彈窗範圍收斂+diceInterjectionText顯示），開發者選擇 Subagent-Driven 執行
+- Task 1 implementer 意外因 isolation:"worktree" 參數自己另開了一個 worktree（跟計畫共用的 worktree 分裂），已用 git merge 把它的 commit 併回主要工作 worktree（無衝突），並記錄教訓：之後同一個計畫的 implementer 派工不要加 isolation:"worktree"。Task 1、Task 2 各自審查通過（0 Critical/Important）
+- **全分支最終審查（Opus）抓到 1 個 Critical**：item_005 自動代入最高點數的算法沒有跟考驗門檻範圍對齊，玩家高屬性值時會超出所有 tier 的 max 範圍，導致 evaluateTiers 拋錯、道具被消耗、考驗卡住——完全違反卡面「必定通過」的設計初衷。實測 6 角色×5 張受影響考驗，42 組裡 20 組會拋錯。同時發現一個無關的既有問題：自然擲骰知識/意志高時也有約10.7%機率拋出同樣錯誤
+- 跟開發者確認修法方向（AskUserQuestion）：item_005 改用語意修正（直接選中 tier 資料裡標記 pass:true 的門檻，不再湊數字），既有問題選擇一併修正（把 5 張受影響卡片的 pass tier max 從 8 拉寬到 16）
+- 修正派工＋範圍限定複審皆通過（全數 ADDRESSED、無新增破壞），694/694 測試全綠
+- 合併回 main（本機 fast-forward），同時清理了 Task 1 誤開的殘留 worktree/分支（已確認完全併入 main 才刪除），無殘留 node 行程
+
+**完成項目**：
+- 廣播範圍收斂（Handover 項目 4a）——完成並合併，含後續 Critical 修正一起併入同一分支
+- 擲骰道具介入畫面完善（Handover 項目 9，含 diceInterjectionText 資料層＋前端呈現＋item_005 override 語意修正＋既有 tier 範圍缺口修復）——完成並合併，694/694 測試全綠
+- Handover 項目 14 新增（回合制同步化，僅備忘）
+
+**遇到瓶頸**：
+- Task 1 implementer 誤用 isolation:"worktree" 導致分支分裂，事後用 git merge 修正（無資料遺失，純屬多一道整併手續）
+- 全分支審查抓到的 Critical 屬於「計畫本身設計層面的落差」而非 implementer 偏離計畫——已依規則列出可能原因跟開發者討論確認方向，才動手修正，沒有自行預設方向
+
+**開發者交代備忘事項**：
+- 收工前確認系統無殘留 node 行程；本階段所有 worktree/分支均已清理
