@@ -374,7 +374,7 @@ function handlePersistentModifier(gameState, playerId, effect) {
   return { pending: false };
 }
 
-function computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice, context) {
+function computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice, context, tiers) {
   if (!interjectionChoice) {
     const adjustedCount = Math.max(1, Math.min(8, applyModifiers(baseCount, modifiers, 'onBeforeRoll', context)));
     const rolled = rollDice(adjustedCount, context.rng);
@@ -391,7 +391,10 @@ function computeInterjectedRoll(gameState, promptState, playerId, baseCount, mod
     player.diceInterjectionUsedThisTurn = [...(player.diceInterjectionUsedThisTurn || []), itemId];
   }
   if (diceInterjection.override) {
-    return resolveFinalRoll(baseCount, diceInterjection, context.rng);
+    // A "guaranteed" roll intentionally skips the onBeforeRoll/onAfterRoll
+    // modifiers below -- a negative modifier could otherwise defeat the
+    // guarantee item_005's card text promises.
+    return resolveFinalRoll(baseCount, diceInterjection, context.rng, tiers);
   }
   const boostedCount = baseCount + (diceInterjection.bonusDice || 0);
   const adjustedCount = Math.max(1, Math.min(8, applyModifiers(boostedCount, modifiers, 'onBeforeRoll', context)));
@@ -421,7 +424,7 @@ function handleDiceCheck(gameState, promptState, playerId, effect, context) {
   // chosen item's own cost effects, or the matched tier's effects), each of
   // which needs a fresh scan if it contains its own nested dice_check.
   const { interjectionChoice, ...restContext } = context;
-  const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice || null, restContext);
+  const finalSum = computeInterjectedRoll(gameState, promptState, playerId, baseCount, modifiers, interjectionChoice || null, restContext, effect.tiers);
   const tier = evaluateTiers(finalSum, effect.tiers);
   const bonusOnPass = (tier.pass && interjectionChoice && Array.isArray(interjectionChoice.diceInterjection.bonusOnPass))
     ? interjectionChoice.diceInterjection.bonusOnPass

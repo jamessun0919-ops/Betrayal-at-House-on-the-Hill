@@ -127,7 +127,7 @@
         "tiers": [
           {
             "min": 5,
-            "max": 8,
+            "max": 16,
             "pass": true,
             "effects": [
               {

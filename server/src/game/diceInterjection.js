@@ -19,10 +19,26 @@ function findInterjectionOptions(player, itemCatalog, sourceDeckType) {
   return options;
 }
 
-function resolveFinalRoll(baseCount, chosenDiceInterjection, rng) {
+function resolveFinalRoll(baseCount, chosenDiceInterjection, rng, tiers) {
   if (chosenDiceInterjection && chosenDiceInterjection.override) {
+    // "Guaranteed pass" targets the tier the card's own data marks pass:true
+    // directly, rather than synthesizing a dice sum and hoping it lands in
+    // range -- authored tier ranges aren't guaranteed to cover an item's
+    // theoretical max roll (2026-09-01 final review: they didn't, for 5 real
+    // checks, and the old approach threw NO_MATCHING_TIER and destroyed the
+    // item without resolving the check). leaveCheck/collapseCheck have no
+    // tiers (they're threshold-based, not tiered) and fall through to the
+    // auto-max branch below, where "higher roll is always better" genuinely
+    // holds.
+    if (Array.isArray(tiers)) {
+      const passTier = tiers.find((t) => t.pass === true);
+      if (passTier) {
+        return passTier.min;
+      }
+    }
     const faces = chosenDiceInterjection.customFaces || DIE_FACES;
-    return baseCount * Math.max(...faces);
+    const clampedBaseCount = Math.max(1, Math.min(8, baseCount));
+    return clampedBaseCount * Math.max(...faces);
   }
   const boostedCount = baseCount + (chosenDiceInterjection ? (chosenDiceInterjection.bonusDice || 0) : 0);
   const clampedCount = Math.max(1, Math.min(8, boostedCount));

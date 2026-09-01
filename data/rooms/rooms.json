@@ -407,7 +407,7 @@
             "tiers": [
               {
                 "min": 6,
-                "max": 8,
+                "max": 16,
                 "pass": true,
                 "effects": [
                   {

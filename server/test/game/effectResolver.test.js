@@ -1106,7 +1106,7 @@ test('resolveEffects dice_check resumed with a chosen bonusDice item applies its
   expect(player.inventory).toEqual([{ id: 'item_006' }]); // still held
 });
 
-test('resolveEffects dice_check resumed with a chosen override item auto-substitutes the max possible roll and removes the consumable item', () => {
+test('resolveEffects dice_check resumed with a chosen override item picks the pass:true tier directly, ignoring the auto-max computation', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
   player.inventory.push({ id: 'item_005' });
@@ -1116,8 +1116,8 @@ test('resolveEffects dice_check resumed with a chosen override item auto-substit
       type: 'dice_check',
       diceCount: 3,
       tiers: [
-        { min: 5, max: 8, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
-        { min: 0, max: 4, effects: [] },
+        { min: 5, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+        { min: 0, max: 4, pass: false, effects: [] },
       ],
     },
   ], {
@@ -1125,8 +1125,31 @@ test('resolveEffects dice_check resumed with a chosen override item auto-substit
     interjectionChoice: { itemId: 'item_005', diceInterjection },
   });
   expect(result.pending).toBe(false);
-  expect(player.stats.might.currentIndex).toBe(3); // auto max: 3 dice * face max 2 = 6 -> matched the 5-8 tier
+  expect(player.stats.might.currentIndex).toBe(3); // picked the pass:true tier's min (5), not the old auto-max (3*2=6)
   expect(player.inventory).toEqual([]); // consumable item removed
+});
+
+test('resolveEffects dice_check resumed with a chosen override item does not throw NO_MATCHING_TIER when baseCount would overshoot every tier range', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'item_005' });
+  const diceInterjection = { scope: 'any', override: true, consumesItem: true };
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    {
+      type: 'dice_check',
+      diceCount: 8, // 8 dice * default max face 2 = 16 -- overshoots this real-shaped tier set's max:8
+      tiers: [
+        { min: 5, max: 8, pass: true, effects: [{ type: 'stat_change', stat: 'might', delta: 1 }] },
+        { min: 0, max: 4, pass: false, effects: [] },
+      ],
+    },
+  ], {
+    rng: () => { throw new Error('should not roll when overriding'); },
+    interjectionChoice: { itemId: 'item_005', diceInterjection },
+  });
+  expect(result.pending).toBe(false);
+  expect(player.stats.might.currentIndex).toBe(3); // did not throw -- picked the pass:true tier directly
+  expect(player.inventory).toEqual([]);
 });
 
 test('resolveEffects dice_check does not leak interjectionChoice into a nested effect resolved from the matched tier', () => {

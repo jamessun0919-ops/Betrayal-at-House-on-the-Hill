@@ -127,3 +127,23 @@ test('resolveFinalRoll with an override interjection uses the item\'s own custom
   const di = { override: true, customFaces: [3, 3, 4, 4, 5, 5] };
   expect(resolveFinalRoll(2, di, rng)).toBe(10); // 2 dice * custom max face (5)
 });
+
+test('resolveFinalRoll with an override interjection and tiers picks the pass:true tier, returning its min', () => {
+  const rng = () => { throw new Error('should not be called'); };
+  const di = { override: true };
+  const tiers = [
+    { min: 5, max: 8, pass: true },
+    { min: 0, max: 4, pass: false },
+  ];
+  // baseCount 8 would auto-max to 8*2=16, which overshoots max:8 -- proves
+  // the tier lookup is used INSTEAD of the auto-max computation, not just
+  // as a fallback that happens to agree with it.
+  expect(resolveFinalRoll(8, di, rng, tiers)).toBe(5); // picks the pass tier's min directly
+});
+
+test('resolveFinalRoll with an override interjection falls back to auto-max when tiers has no pass:true entry', () => {
+  const rng = () => { throw new Error('should not be called'); };
+  const di = { override: true };
+  const tiers = [{ min: 0, max: 8, pass: false }];
+  expect(resolveFinalRoll(3, di, rng, tiers)).toBe(6); // no pass:true tier -- falls back to 3 dice * default max face (2)
+});
