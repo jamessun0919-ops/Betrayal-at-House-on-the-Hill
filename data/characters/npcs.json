@@ -1,0 +1,20 @@
+[
+  {
+    "npcID": "npc_001",
+    "codename": null,
+    "filename": null,
+    "fileicon": null,
+    "gender": null,
+    "age": null,
+    "tall": null,
+    "occupation": null,
+    "itemID": null,
+    "itemname": null,
+    "stats": {
+      "might": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "speed": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "knowledge": { "track": [], "baseIndex": 0, "skullIndex": 0 },
+      "sanity": { "track": [], "baseIndex": 0, "skullIndex": 0 }
+    }
+  }
+]
