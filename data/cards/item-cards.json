@@ -69,13 +69,14 @@
     "id": "item_005",
     "name": "天使羽毛",
     "description": "據說為某間教堂擁有的神聖物品，由位高權重的神職人員保管，謠傳具有改變現實的力量",
-    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使該次考驗結果必定通過。本道具使用一次後消失。",
+    "text": "該次考驗結果必定通過。本道具使用一次後消失。",
     "effects": [],
     "diceInterjection": {
       "scope": "any",
       "override": true,
       "consumesItem": true
     },
+    "diceInterjectionText": "你可以選擇使用天使羽毛，使本次檢定結果必定通過",
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -84,7 +85,7 @@
     "id": "item_006",
     "name": "詭異人偶",
     "description": "面容精緻生動，服裝華美乾淨的洋娃娃，放在髒亂的櫃子裡特別顯得格格不入。",
-    "text": "每當玩家需要擲骰子前可以選擇使用此物品，使用後可以多投擲兩顆骰子（最多八顆），使用後意志降低一個級別，每回合限用一次，本道具使用後不會消失",
+    "text": "可以多投擲兩顆骰子（最多八顆），使用後意志降低一個級別，每回合限用一次，本道具使用後不會消失",
     "effects": [],
     "diceInterjection": {
       "scope": "any",
@@ -98,6 +99,7 @@
       ],
       "consumesItem": false
     },
+    "diceInterjectionText": "你可以選擇使用詭異人偶，本次擲骰多擲兩顆骰子，代價是意志降低一個級別",
     "category": "reusable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -152,13 +154,14 @@
     "id": "item_010",
     "name": "油燈",
     "description": "油燈散發出的微光驅散了部分黑暗，使你在遇到突發情況時能有更好的應對",
-    "text": "當玩家因事件卡需要進行考驗時，可以多投擲一顆骰子（最多八顆）",
+    "text": "發生事件需要進行考驗時，可以多投擲一顆骰子（最多八顆）",
     "effects": [],
     "diceInterjection": {
       "scope": "eventTriggered",
       "bonusDice": 1,
       "consumesItem": false
     },
+    "diceInterjectionText": "你可以選擇使用油燈，本次擲骰多擲一顆骰子",
     "category": "gear",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -621,9 +624,10 @@
     "id": "item_048",
     "name": "海盜金幣",
     "description": "傳說中能夠實現貪婪者願望，但是會讓使用者詛咒纏身的金幣。",
-    "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次考驗減少一顆骰子，如該考驗通過，則額外隨機取得一件物品（原考驗內容與結果不受影響）。",
+    "text": "這次考驗減少一顆骰子，如該考驗通過，則額外隨機取得一件物品（原考驗內容與結果不受影響）。",
     "effects": [],
     "diceInterjection": { "scope": "diceCheckOnly", "consumesItem": true, "bonusDice": -1, "bonusOnPass": [{ "type": "draw_card", "deck": "item", "count": 1 }] },
+    "diceInterjectionText": "你可以選擇使用海盜金幣，以本次擲骰減少一顆骰子為代價，換取通過後得到隨機一件物品的機會。",
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
@@ -632,9 +636,10 @@
     "id": "item_049",
     "name": "賭神骰子",
     "description": "傳說中的賭神隨身攜帶的骰子，使用前記得驗牌",
-    "text": "每當玩家需要擲骰子前可以選擇使用此物品，該次擲骰的骰子六面點數設定從[0,0,1,1,2,2]改為[1,1,1,2,2,2]，考驗完成後修改回原設定。",
+    "text": "這次擲骰的骰子六面點數設定從[0,0,1,1,2,2]改為[1,1,1,2,2,2]，只生效一次，使用後消失。",
     "effects": [],
     "diceInterjection": { "scope": "any", "consumesItem": true, "customFaces": [1, 1, 1, 2, 2, 2] },
+    "diceInterjectionText": "你可以選擇使用賭神骰子，將骰子點數從0點/1點/2點改為只有1點/2點",
     "category": "consumable",
     "canTargetOthers": false,
     "needsCustomLogic": false
