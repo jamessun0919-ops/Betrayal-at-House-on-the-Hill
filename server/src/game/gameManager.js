@@ -35,6 +35,9 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
     if (character.itemID) {
       addItem(newPlayer, { id: character.itemID });
       const itemContent = cards && (cards.items || []).find((i) => i.id === character.itemID);
+      if (itemContent && itemContent.companionItemId) {
+        addItem(newPlayer, { id: itemContent.companionItemId });
+      }
       if (itemContent && itemContent.category === 'weapon') {
         newPlayer.wieldedWeaponId = character.itemID;
       } else if (itemContent && itemContent.category === 'gear') {

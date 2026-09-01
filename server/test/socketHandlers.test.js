@@ -3939,15 +3939,10 @@ test('game:selectAction room_action with a fixed item list: finds nothing when e
   httpServer.close();
 });
 
-test('game:selectAction room_action: finding a triggerOnDraw weapon also grants its companion item, with its own game:cardDrawn broadcast', async () => {
+test('game:selectAction room_action: finding a weapon with a companionItemId also grants the companion item, with its own game:cardDrawn broadcast', async () => {
   const content = makeSearchRoomContent(['item_001']);
   content.cards.items = [
-    {
-      id: 'item_001',
-      name: '左輪手槍',
-      effects: [{ type: 'grant_item', itemId: 'item_046' }],
-      triggerOnDraw: true,
-    },
+    { id: 'item_001', name: '左輪手槍', effects: [], companionItemId: 'item_046' },
     { id: 'item_046', name: '左輪子彈' },
   ];
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
@@ -3972,7 +3967,7 @@ test('game:selectAction room_action: finding a triggerOnDraw weapon also grants 
   httpServer.close();
 });
 
-test('game:selectAction room_action: finding a non-triggerOnDraw item behaves exactly as before (no extra grant, no extra broadcast)', async () => {
+test('game:selectAction room_action: finding an item with no companionItemId behaves exactly as before (no extra grant, no extra broadcast)', async () => {
   const content = makeSearchRoomContent(['item_002']);
   content.cards.items = [{ id: 'item_002', name: '測試道具', effects: [] }];
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
@@ -3994,17 +3989,12 @@ test('game:selectAction room_action: finding a non-triggerOnDraw item behaves ex
   httpServer.close();
 });
 
-test('game:selectAction room_action: a triggerOnDraw card plus its granted item together exceed the carry limit -- both are offered in the choice, with the ammo (last newly-acquired item) as the default', async () => {
+test('game:selectAction room_action: a weapon plus its companion item together exceed the carry limit -- both are offered in the choice, with the companion (last newly-acquired item) as the default', async () => {
   const content = makeSearchRoomContent(['item_001']);
   content.cards.items = [
     { id: 'item_101', name: '道具一' },
     { id: 'item_102', name: '道具二' },
-    {
-      id: 'item_001',
-      name: '左輪手槍',
-      effects: [{ type: 'grant_item', itemId: 'item_046' }],
-      triggerOnDraw: true,
-    },
+    { id: 'item_001', name: '左輪手槍', effects: [], companionItemId: 'item_046' },
     { id: 'item_046', name: '左輪子彈' },
   ];
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode, effectResolverManager } = await setUpStartedGameWithContent(content);
@@ -4013,50 +4003,39 @@ test('game:selectAction room_action: a triggerOnDraw card plus its granted item 
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.actionPoints = 1;
-  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }); // this test's default character has might 3 (see makeStats() in this file) -- 2 held + 2 newly acquired = 4 > cap 3
+  player.inventory.push({ id: 'item_101' }, { id: 'item_102' }); // default character has might 3 (see makeStats() in this file) -- 2 held + 2 newly acquired = 4 > cap 3
 
   const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
   const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
   expect(result.error).toBeUndefined();
   const pending = await pendingPromise;
 
-  expect(pending.itemIds.sort()).toEqual(['item_101', 'item_102', 'item_001', 'item_046'].sort()); // all 4 held items are offered -- newly-acquired items are NOT excluded from the choice
+  expect(pending.itemIds.sort()).toEqual(['item_101', 'item_102', 'item_001', 'item_046'].sort());
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_046'); // pickInventoryChoiceDefault prefers the LAST newly-acquired item still held as the timeout default
+  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_046');
 
   clientA.close();
   clientB.close();
   httpServer.close();
 });
 
-test('game:selectAction room_action: a triggerOnDraw card with an unsupported effect type throws server-side after the primary card is already granted', async () => {
-  const content = makeSearchRoomContent(['item_001']);
-  content.cards.items = [
-    {
-      id: 'item_001',
-      name: '左輪手槍',
-      effects: [{ type: 'stat_change', stat: 'might', delta: 1 }], // not grant_item -- must be rejected
-      triggerOnDraw: true,
+test('game:selectAction item: using item_001 (empty effects, companionItemId is a data field not an effect) is a harmless no-op, matching an ordinary effect-less weapon -- regression guard against the exploit the final review caught', async () => {
+  const content = makeContent({
+    cards: {
+      events: [], omens: [],
+      items: [{ id: 'item_001', name: '左輪手槍', effects: [], companionItemId: 'item_046', category: 'weapon' }, { id: 'item_046', name: '左輪子彈' }],
     },
-  ];
+  });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
-
-  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
-  player.actionPoints = 1;
+  player.inventory.push({ id: 'item_001' });
 
-  // The throw happens after ack(result) already fired (existing search-action
-  // ack timing -- see game:searchEmpty, same pattern), so result.error stays
-  // undefined; the error is only visible server-side (console.error in the
-  // outer catch). What's verifiable here is the resulting state: item_001
-  // itself was already added to inventory before the loop hit the
-  // unsupported effect and threw, so nothing past that point ran.
-  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_001' }, resolve)
+  );
   expect(result.error).toBeUndefined();
-
-  expect(player.inventory).toEqual([{ id: 'item_001' }]);
-  expect(player.searchedThisTurn).toBe(true);
+  expect(player.inventory).toEqual([{ id: 'item_001' }]); // no item_046 granted, item_001 not consumed -- effects was empty, companionItemId is never read by this path
 
   clientA.close();
   clientB.close();

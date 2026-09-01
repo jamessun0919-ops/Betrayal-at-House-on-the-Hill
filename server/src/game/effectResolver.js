@@ -457,6 +457,9 @@ function handleDrawCard(gameState, playerId, effect) {
     }
     const card = drawCard(deck);
     addItem(player, { id: card.id });
+    if (card.companionItemId) {
+      addItem(player, { id: card.companionItemId });
+    }
     drawnCards.push({ id: card.id, name: card.name });
   }
   const result = { pending: false, appliedCount: drawnCards.length };
@@ -480,6 +483,9 @@ function handleTakePreviewedCard(gameState, playerId, effect) {
   }
   const [card] = deck.cards.splice(index, 1);
   addItem(player, { id: card.id });
+  if (card.companionItemId) {
+    addItem(player, { id: card.companionItemId });
+  }
   return { pending: false, appliedCount: 1, drawnCards: [{ id: card.id, name: card.name }] };
 }
 

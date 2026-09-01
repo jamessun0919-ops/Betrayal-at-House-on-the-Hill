@@ -342,16 +342,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
               addItem(currentPlayer, { id: searchOutcome.card.id });
               io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: searchOutcome.card.id, cardName: searchOutcome.card.name, hasCheck: false });
               const newlyAcquiredIds = [searchOutcome.card.id];
-              if (searchOutcome.card.triggerOnDraw) {
-                for (const effect of searchOutcome.card.effects) {
-                  if (effect.type !== 'grant_item') {
-                    throw new Error('UNSUPPORTED_DRAW_TRIGGER_EFFECT');
-                  }
-                  addItem(currentPlayer, { id: effect.itemId });
-                  const grantedCard = content.cards.items.find((i) => i.id === effect.itemId);
-                  io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: effect.itemId, cardName: grantedCard ? grantedCard.name : effect.itemId, hasCheck: false });
-                  newlyAcquiredIds.push(effect.itemId);
-                }
+              if (searchOutcome.card.companionItemId) {
+                addItem(currentPlayer, { id: searchOutcome.card.companionItemId });
+                const grantedCard = content.cards.items.find((i) => i.id === searchOutcome.card.companionItemId);
+                io.to(roomCode).emit('game:cardDrawn', { playerId, deckType: 'item', cardId: searchOutcome.card.companionItemId, cardName: grantedCard ? grantedCard.name : searchOutcome.card.companionItemId, hasCheck: false });
+                newlyAcquiredIds.push(searchOutcome.card.companionItemId);
               }
               openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, playerId, content.cards, newlyAcquiredIds, inventoryChoiceTimeoutMs);
             } else {

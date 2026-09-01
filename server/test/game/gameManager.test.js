@@ -144,6 +144,17 @@ test('startGame auto-wields a weapon-category starting item', () => {
   expect(gameState.players.get('p1').wieldedWeaponId).toBe('item_101');
 });
 
+test('startGame grants the companion item alongside a starting item that has a companionItemId', () => {
+  const manager = createGameManager();
+  const characters = makeCharacters();
+  characters[0].itemID = 'item_001';
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs({
+    characters,
+    cards: { items: [{ id: 'item_001', name: '左輪手槍', category: 'weapon', companionItemId: 'item_046' }], events: [], omens: [] },
+  }));
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_001' }, { id: 'item_046' }]);
+});
+
 test('startGame auto-wears a gear-category starting item', () => {
   const manager = createGameManager();
   const characters = makeCharacters();

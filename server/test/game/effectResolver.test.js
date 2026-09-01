@@ -658,6 +658,28 @@ test('resolveEffects draw_card throws UNKNOWN_DECK_TYPE for an unrecognized deck
   ).toThrow('UNKNOWN_DECK_TYPE');
 });
 
+test('resolveEffects draw_card grants a drawn card\'s companionItemId alongside it', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    items: [{ id: 'item_001', name: '左輪手槍', companionItemId: 'item_046' }],
+  });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'draw_card', deck: 'item', count: 1 },
+  ]);
+  expect(result.pending).toBe(false);
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_001' }, { id: 'item_046' }]);
+});
+
+test('resolveEffects take_previewed_card grants the previewed card\'s companionItemId alongside it', () => {
+  const gameState = makeGameStateWithPlayer('p1', {
+    items: [{ id: 'item_001', name: '左輪手槍', companionItemId: 'item_046' }],
+  });
+  const result = resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'take_previewed_card', deck: 'item', cardId: 'item_001' },
+  ]);
+  expect(result.pending).toBe(false);
+  expect(gameState.players.get('p1').inventory).toEqual([{ id: 'item_001' }, { id: 'item_046' }]);
+});
+
 test('resolveEffects move_to_previous_room moves the player back to their previous position', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
