@@ -1,4 +1,4 @@
-const { rollDice } = require('./effectPipeline');
+const { rollDice, DIE_FACES } = require('./effectPipeline');
 
 function findInterjectionOptions(player, itemCatalog, sourceDeckType) {
   if (!Array.isArray(itemCatalog)) {
@@ -19,12 +19,10 @@ function findInterjectionOptions(player, itemCatalog, sourceDeckType) {
   return options;
 }
 
-function resolveFinalRoll(baseCount, chosenDiceInterjection, overrideValue, rng) {
+function resolveFinalRoll(baseCount, chosenDiceInterjection, rng) {
   if (chosenDiceInterjection && chosenDiceInterjection.override) {
-    if (!Number.isInteger(overrideValue) || overrideValue < 0 || overrideValue > 8) {
-      throw new Error('INVALID_OVERRIDE_VALUE');
-    }
-    return overrideValue;
+    const faces = chosenDiceInterjection.customFaces || DIE_FACES;
+    return baseCount * Math.max(...faces);
   }
   const boostedCount = baseCount + (chosenDiceInterjection ? (chosenDiceInterjection.bonusDice || 0) : 0);
   const clampedCount = Math.max(1, Math.min(8, boostedCount));

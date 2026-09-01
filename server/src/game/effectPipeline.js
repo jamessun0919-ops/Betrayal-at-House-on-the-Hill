@@ -41,4 +41,4 @@ function evaluateTiers(rollResult, tiers) {
   return tier;
 }
 
-module.exports = { rollDice, applyModifiers, evaluateTiers };
+module.exports = { rollDice, applyModifiers, evaluateTiers, DIE_FACES };

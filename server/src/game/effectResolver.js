@@ -381,7 +381,7 @@ function computeInterjectedRoll(gameState, promptState, playerId, baseCount, mod
     return applyModifiers(rolled, modifiers, 'onAfterRoll', context);
   }
   const player = requirePlayer(gameState, playerId);
-  const { itemId, diceInterjection, overrideValue } = interjectionChoice;
+  const { itemId, diceInterjection } = interjectionChoice;
   if (Array.isArray(diceInterjection.cost) && diceInterjection.cost.length > 0) {
     resolveEffects(gameState, promptState, playerId, diceInterjection.cost, context);
   }
@@ -391,7 +391,7 @@ function computeInterjectedRoll(gameState, promptState, playerId, baseCount, mod
     player.diceInterjectionUsedThisTurn = [...(player.diceInterjectionUsedThisTurn || []), itemId];
   }
   if (diceInterjection.override) {
-    return resolveFinalRoll(baseCount, diceInterjection, overrideValue, context.rng);
+    return resolveFinalRoll(baseCount, diceInterjection, context.rng);
   }
   const boostedCount = baseCount + (diceInterjection.bonusDice || 0);
   const adjustedCount = Math.max(1, Math.min(8, applyModifiers(boostedCount, modifiers, 'onBeforeRoll', context)));
