@@ -150,21 +150,25 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
         // Omen (imprint) card descriptions already narrate the outcome ("你的手臂上
         // 出現了...印記") unlike event cards, whose description is pure scene-setting --
         // omens never get a second eventNoCheck/feedbacktextOccur popup, only the intro.
-        setPendingCheckQueue((prev) => [
-          ...prev,
-          { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
-        ]);
-      } else if (data.deckType === 'event') {
-        setPendingCheckQueue((prev) => [
-          ...prev,
-          { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
-        ]);
-        const drawnCard = findCardInfo(data.cardId, cardContent);
-        if (!data.hasCheck && !(drawnCard && drawnCard.activatedOnUse)) {
+        if (data.playerId === playerId) {
           setPendingCheckQueue((prev) => [
             ...prev,
-            { noCheck: true, kind: 'eventNoCheck', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+            { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
           ]);
+        }
+      } else if (data.deckType === 'event') {
+        if (data.playerId === playerId) {
+          setPendingCheckQueue((prev) => [
+            ...prev,
+            { noCheck: true, kind: 'eventIntro', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+          ]);
+          const drawnCard = findCardInfo(data.cardId, cardContent);
+          if (!data.hasCheck && !(drawnCard && drawnCard.activatedOnUse)) {
+            setPendingCheckQueue((prev) => [
+              ...prev,
+              { noCheck: true, kind: 'eventNoCheck', sourceId: data.cardId, queueId: nextCheckQueueId.current++ },
+            ]);
+          }
         }
       } else if (!data.hasCheck) {
         setPendingCheckQueue((prev) => [
