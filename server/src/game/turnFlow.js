@@ -518,9 +518,6 @@ function unwearItemAction(gameState, player, itemId) {
 
 function selectAction(gameState, playerId, actionType, options = {}) {
   const player = requirePlayer(gameState, playerId);
-  if (getCurrentTurnPlayerId(gameState) !== playerId) {
-    throw new Error('NOT_YOUR_TURN');
-  }
   if (!ACTION_TYPES.includes(actionType)) {
     throw new Error('INVALID_ACTION_TYPE');
   }
@@ -531,30 +528,38 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   if (actionType === 'item') {
     const { itemId, targetPlayerId, mode, itemCategory } = options;
     if (mode === 'give') {
+      requirePhase(gameState, playerId, 'player_interact');
       return giveItemAction(gameState, player, itemId, targetPlayerId, itemCategory);
     }
     if (mode === 'leave') {
+      requirePhase(gameState, playerId, 'player_move');
       return leaveItemAction(gameState, player, itemId, itemCategory);
     }
     if (mode === 'pickup') {
+      requirePhase(gameState, playerId, 'player_move');
       return pickupItemAction(gameState, player, itemId);
     }
     if (mode === 'wield') {
+      requirePhase(gameState, playerId, 'player_move');
       return wieldItemAction(gameState, player, itemId, itemCategory);
     }
     if (mode === 'unwield') {
+      requirePhase(gameState, playerId, 'player_move');
       return unwieldItemAction(gameState, player, itemId);
     }
     if (mode === 'wear') {
+      requirePhase(gameState, playerId, 'player_move');
       return wearItemAction(gameState, player, itemId, itemCategory);
     }
     if (mode === 'unwear') {
+      requirePhase(gameState, playerId, 'player_move');
       return unwearItemAction(gameState, player, itemId);
     }
+    const effectTargetId = targetPlayerId || playerId;
+    requirePhase(gameState, playerId, effectTargetId === playerId ? 'player_move' : 'player_interact');
     if (!player.inventory.some((item) => item.id === itemId)) {
       throw new Error('ITEM_NOT_HELD');
     }
-    const effectTargetId = targetPlayerId || playerId;
     if (effectTargetId !== playerId && !options.itemCanTargetOthers) {
       throw new Error('ITEM_CANNOT_TARGET_OTHERS');
     }
@@ -571,6 +576,7 @@ function selectAction(gameState, playerId, actionType, options = {}) {
   }
 
   if (actionType === 'room_action') {
+    requirePhase(gameState, playerId, 'player_move');
     // Unreachable via the real socket path since the search mechanic (2026-08-18):
     // socketHandlers.js's room_action branch always sets hasRoomAction true --
     // craftRecipes/effects claim it, and any room that has neither defaults to
@@ -589,6 +595,7 @@ function selectAction(gameState, playerId, actionType, options = {}) {
     return { kind: 'room_action' };
   }
 
+  requirePhase(gameState, playerId, 'player_interact');
   player.actionPoints -= 1;
   // "attack" is still a stub — M3 (combat) resolves it.
   return { kind: actionType, pending: true };

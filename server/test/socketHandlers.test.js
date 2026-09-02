@@ -1510,7 +1510,9 @@ test('game:move no longer restricts by turn order -- either real player can move
 });
 
 test('game:selectAction spends 1 action point, broadcasts game:pendingAction, and updates state', async () => {
-  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+  const { httpServer, clientA, clientB, currentClient, gameManager, roomCode } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
 
   // 'attack' is the only actionType still a stub (item/room_action get real
   // logic in M2c-4) -- this test's original intent was "still a stub", not
@@ -3583,6 +3585,7 @@ test('game:selectAction item use with canTargetOthers broadcasts game:itemUseRes
   const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
   const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
   const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_060' });
 
   // The fix emits game:itemUseResolved twice -- once for the acting player,
@@ -3624,6 +3627,7 @@ test('game:selectAction item use of item_050 (聖水) on another player removes 
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
   const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
   const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' }, { id: 'omen_002' });
   getPlayer(gameState, otherPlayerId).inventory.push({ id: 'omen_002' });
 
@@ -3651,6 +3655,7 @@ test('game:selectAction item use of item_050 (聖水) on a target with no imprin
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
   const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
   const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' });
 
   await new Promise((resolve) =>
@@ -4646,6 +4651,7 @@ test('game:selectAction item mode:give transfers an item to a same-room player v
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGame();
   const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
   const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_003' });
 
   const result = await new Promise((resolve) =>
@@ -4667,6 +4673,7 @@ test('game:selectAction item mode:give rejects an imprint-category card even if 
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
   const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
   const gameState = getGameState(gameManager, roomCode);
+  gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'omen_002' });
 
   const result = await new Promise((resolve) =>

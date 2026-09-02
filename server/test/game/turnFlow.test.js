@@ -412,6 +412,7 @@ test('moveToRoom no longer restricts by turn order -- a second real player can m
 
 test('selectAction deducts 1 action point and returns a pending marker for attack (still a stub)', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   const startingAP = player.actionPoints;
   const result = selectAction(gameState, 'p1', 'attack');
   expect(result).toEqual({ kind: 'attack', pending: true });
@@ -429,12 +430,98 @@ test('selectAction throws NOT_ENOUGH_ACTION_POINTS when the player has 0 action 
   expect(() => selectAction(gameState, 'p1', 'attack')).toThrow('NOT_ENOUGH_ACTION_POINTS');
 });
 
-test('selectAction throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+test('selectAction throws NOT_YOUR_PHASE for mode:leave when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'leave' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:pickup when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'pickup' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:wield when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'wield' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:unwield when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'unwield' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:wear when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'wear' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:unwear when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'unwear' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for room_action when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'room_action', { hasRoomAction: true })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for a self-targeted item action when not in player_move', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003' })).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for mode:give when not in player_interact', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'p2' })
+  ).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for an other-targeted item action when not in player_interact, even with itemCanTargetOthers', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', targetPlayerId: 'p2', itemCanTargetOthers: true })
+  ).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws NOT_YOUR_PHASE for attack when not in player_interact', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  expect(() => selectAction(gameState, 'p1', 'attack')).toThrow('NOT_YOUR_PHASE');
+});
+
+test('selectAction throws ALREADY_LOCKED for a move-type action when the player has already locked their phase', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.phaseLocked = true;
+  expect(() => selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'wear' })).toThrow('ALREADY_LOCKED');
+});
+
+test('selectAction throws ALREADY_LOCKED for mode:give when the player has already locked their phase', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.currentPhase = 'player_interact';
+  player.phaseLocked = true;
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'p2' })
+  ).toThrow('ALREADY_LOCKED');
+});
+
+test('selectAction no longer restricts by turn order -- a second real player can act too, as long as the phase and lock state allow it', () => {
   const { gameState } = makeGameStateWithPlayer();
   addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0; // p1's turn
-  expect(() => selectAction(gameState, 'p2', 'item')).toThrow('NOT_YOUR_TURN');
+  gameState.currentPlayerIndex = 0; // still "p1's turn" under the old model, which selectAction no longer consults
+  const result = selectAction(gameState, 'p2', 'room_action', { hasRoomAction: true });
+  expect(result).toEqual({ kind: 'room_action' });
 });
 
 test('isTurnOver reflects whether action points have reached 0', () => {
@@ -782,6 +869,7 @@ test('selectAction item: throws ITEM_NOT_HELD when the player does not have the 
 
 test('selectAction item: succeeds targeting another player in the same room when itemCanTargetOthers is true', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   // addPlayer always places new players at the entrance hall (0,0), same as p1.
   player.inventory.push({ id: 'item_003' });
@@ -792,6 +880,7 @@ test('selectAction item: succeeds targeting another player in the same room when
 
 test('selectAction item: throws ITEM_CANNOT_TARGET_OTHERS when targeting another player without permission', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   player.inventory.push({ id: 'item_010' });
   expect(() =>
@@ -801,6 +890,7 @@ test('selectAction item: throws ITEM_CANNOT_TARGET_OTHERS when targeting another
 
 test('selectAction item: throws TARGET_NOT_IN_ROOM when the target is elsewhere, even with itemCanTargetOthers', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   player2.x = 5; // move p2 out of the entrance hall
   player.inventory.push({ id: 'item_003' });
@@ -811,6 +901,7 @@ test('selectAction item: throws TARGET_NOT_IN_ROOM when the target is elsewhere,
 
 test('selectAction item mode:give transfers the item to a same-room target player', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   player.inventory.push({ id: 'item_003' });
   const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   other.floor = player.floor;
@@ -825,6 +916,7 @@ test('selectAction item mode:give transfers the item to a same-room target playe
 
 test('selectAction item mode:give clears the giver\'s wieldedWeaponId when giving away the wielded weapon', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   player.inventory.push({ id: 'item_001' });
   player.wieldedWeaponId = 'item_001';
   const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
@@ -837,6 +929,7 @@ test('selectAction item mode:give clears the giver\'s wieldedWeaponId when givin
 
 test('selectAction item mode:give clears the giver\'s wornGearIds when giving away a worn gear item', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   player.inventory.push({ id: 'item_008' });
   player.wornGearIds = ['item_008'];
   const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
@@ -849,6 +942,7 @@ test('selectAction item mode:give clears the giver\'s wornGearIds when giving aw
 
 test('selectAction item mode:give throws TARGET_NOT_IN_ROOM when the target is elsewhere', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   player.inventory.push({ id: 'item_003' });
   const other = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   other.floor = player.floor;
@@ -912,6 +1006,7 @@ test('selectAction item mode:leave throws ITEM_NOT_HELD when the player does not
 
 test('selectAction item mode:give throws IMPRINT_CANNOT_BE_GIVEN for an imprint-category card', () => {
   const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
   player.inventory.push({ id: 'omen_002' });
   const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   player2.floor = player.floor; player2.x = player.x; player2.y = player.y;
