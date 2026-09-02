@@ -65,7 +65,6 @@ test('enterPhase on an empty NPC phase (no NPCs exist yet) auto-advances to the 
   enterPhase(gameState, 'npc_move'); // zero NPC participants -- auto-advances
   expect(gameState.currentPhase).toBe('player_interact'); // the next phase that actually has participants
 
-  gameState.players.get('p1').phaseLocked = true;
   enterPhase(gameState, 'npc_interact'); // zero NPC participants -- auto-advances
   expect(gameState.currentPhase).toBe('settlement');
 });
