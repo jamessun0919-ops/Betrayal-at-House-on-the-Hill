@@ -332,8 +332,8 @@ function resolveTeleportDestination(gameState, playerId) {
 
 // 「跳下」的兩個具體案例：崩塌的房間（已有 collapseLink 才能跳）、包廂房/舞廳配對
 // （放置時就決定好座標，永遠可跳）。純粹是「知道目的地在哪就移過去」，不檢查
-// NOT_YOUR_TURN/行動力——呼叫方（socketHandlers.js）已經透過 selectAction 檢查過
-// 回合與行動力，這裡只負責移動本身。
+// 階段/行動力——呼叫方（socketHandlers.js）已經透過 selectAction 的 room_action
+// 分支呼叫過 requirePhase 並檢查過行動力，這裡只負責移動本身。
 function performTeleport(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const destination = resolveTeleportDestination(gameState, playerId);

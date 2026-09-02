@@ -3658,10 +3658,11 @@ test('game:selectAction item use of item_050 (聖水) on a target with no imprin
   gameState.currentPhase = 'player_interact';
   getPlayer(gameState, currentPlayerId).inventory.push({ id: 'item_050' });
 
-  await new Promise((resolve) =>
+  const result = await new Promise((resolve) =>
     currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_050', targetPlayerId: otherPlayerId }, resolve)
   );
 
+  expect(result.error).toBeUndefined(); // the action itself must actually run -- otherwise "no imprint to remove" and "blocked by phase gate" look identical below
   expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_050' }]);
   expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([]);
 
