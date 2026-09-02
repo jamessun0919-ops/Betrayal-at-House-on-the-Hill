@@ -67,6 +67,12 @@ test('startGame generates a random turn order covering every player, independent
   expect(gameState.currentPlayerIndex).toBe(0);
 });
 
+test('startGame initializes the phase state machine at player_move', () => {
+  const manager = createGameManager();
+  const gameState = startGame(manager, 'ROOM1', baseStartArgs());
+  expect(gameState.currentPhase).toBe('player_move');
+});
+
 test('startGame throws UNKNOWN_CHARACTER when a player references a characterId not in the list', () => {
   const manager = createGameManager();
   const args = baseStartArgs({

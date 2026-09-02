@@ -1712,6 +1712,40 @@ test('when a move exhausts action points, the turn does not auto-advance -- game
   httpServer.close();
 });
 
+test('game:lockPhase locks the calling player and advances the round once every real player has locked', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, gameManager, roomCode } = await setUpStartedGame();
+
+  const firstLockResult = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(firstLockResult.error).toBeUndefined();
+  expect(firstLockResult.currentPhase).toBe('player_move'); // still player_move -- the other player hasn't locked yet
+
+  const secondLockResult = await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve));
+  expect(secondLockResult.error).toBeUndefined();
+  // Both real players are now locked -- player_move advances, cascades through
+  // the empty npc_move phase (no NPCs exist), and lands on player_interact.
+  expect(secondLockResult.currentPhase).toBe('player_interact');
+
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState.currentPhase).toBe('player_interact');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:lockPhase rejects a second lock from the same player with ALREADY_LOCKED', async () => {
+  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGame();
+
+  const first = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(first.error).toBeUndefined();
+  const second = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(second.error).toBe('ALREADY_LOCKED');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into a room with a populated item deck draws a card, adds it to inventory, and resolves its non-choice effects', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],

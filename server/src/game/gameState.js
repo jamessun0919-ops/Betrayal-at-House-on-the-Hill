@@ -84,6 +84,9 @@ function serializeGameState(gameState) {
     // done; null before that so this function stays safe to call any time.
     turnOrder: gameState.turnOrder || null,
     currentPlayerIndex: gameState.currentPlayerIndex ?? null,
+    // Set by GameManager.startGame's enterPhase(gameState, 'player_move')
+    // call; null before that, same reasoning as turnOrder above.
+    currentPhase: gameState.currentPhase || null,
   };
 }
 

@@ -1,5 +1,6 @@
 const { createGameState, addPlayer } = require('./gameState');
 const { addItem } = require('./playerEntity');
+const { enterPhase } = require('./phaseFlow');
 
 function shuffle(array) {
   const result = array.slice();
@@ -49,6 +50,7 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
   // shuffle, per the developer's explicit ruling (see M2b design doc §3).
   gameState.turnOrder = shuffle(players.map((p) => p.playerId));
   gameState.currentPlayerIndex = 0;
+  enterPhase(gameState, 'player_move');
   manager.games.set(roomCode, gameState);
   return gameState;
 }

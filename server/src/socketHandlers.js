@@ -15,6 +15,7 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
+const { lockPlayerPhase } = require('./game/phaseFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
@@ -480,6 +481,26 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:endTurn error', err);
+        ack({ error: err.message || 'BAD_REQUEST' });
+      }
+    });
+
+    socket.on('game:lockPhase', (payload, callback) => {
+      const ack = typeof callback === 'function' ? callback : () => {};
+      try {
+        const { roomCode, playerId } = socket.data;
+        if (!roomCode || !playerId) {
+          return ack({ error: 'NOT_IN_ROOM' });
+        }
+        const gameState = getGameState(gameManager, roomCode);
+        if (!gameState) {
+          return ack({ error: 'GAME_NOT_STARTED' });
+        }
+        lockPlayerPhase(gameState, playerId);
+        ack({ currentPhase: gameState.currentPhase });
+        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+      } catch (err) {
+        console.error('game:lockPhase error', err);
         ack({ error: err.message || 'BAD_REQUEST' });
       }
     });
