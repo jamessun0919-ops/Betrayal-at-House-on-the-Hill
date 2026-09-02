@@ -1,6 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { getStatValue } = require('../../src/game/playerEntity');
-const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase } = require('../../src/game/phaseFlow');
+const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase } = require('../../src/game/phaseFlow');
 
 function makeStats() {
   return {
@@ -119,4 +119,36 @@ test('lockPlayerPhase throws ALREADY_LOCKED when the same player locks twice in 
   enterPhase(gameState, 'player_move');
   lockPlayerPhase(gameState, 'p1');
   expect(() => lockPlayerPhase(gameState, 'p1')).toThrow('ALREADY_LOCKED');
+});
+
+test('requirePhase does not throw when the player is in the expected phase and unlocked', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  enterPhase(gameState, 'player_move');
+  expect(() => requirePhase(gameState, 'p1', 'player_move')).not.toThrow();
+});
+
+test('requirePhase throws PLAYER_NOT_FOUND for an unknown playerId', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  enterPhase(gameState, 'player_move');
+  expect(() => requirePhase(gameState, 'ghost', 'player_move')).toThrow('PLAYER_NOT_FOUND');
+});
+
+test('requirePhase throws NOT_YOUR_PHASE when the current phase does not match expectedPhase', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  enterPhase(gameState, 'player_move');
+  expect(() => requirePhase(gameState, 'p1', 'player_interact')).toThrow('NOT_YOUR_PHASE');
+});
+
+test('requirePhase throws NOT_YOUR_PHASE for an NPC player even if currentPhase matches expectedPhase', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  enterPhase(gameState, 'player_move');
+  gameState.players.get('p1').isNPC = true;
+  expect(() => requirePhase(gameState, 'p1', 'player_move')).toThrow('NOT_YOUR_PHASE');
+});
+
+test('requirePhase throws ALREADY_LOCKED when the player has already locked the current phase', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']); // 2 players so p1 locking alone doesn't auto-advance the phase
+  enterPhase(gameState, 'player_move');
+  lockPlayerPhase(gameState, 'p1');
+  expect(() => requirePhase(gameState, 'p1', 'player_move')).toThrow('ALREADY_LOCKED');
 });

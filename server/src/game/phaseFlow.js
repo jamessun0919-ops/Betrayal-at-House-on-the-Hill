@@ -87,4 +87,20 @@ function lockPlayerPhase(gameState, playerId) {
   }
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase };
+// Gate for the existing action functions in turnFlow.js (moveToRoom,
+// useStairs, and eventually selectAction's sub-branches) -- replaces the old
+// getCurrentTurnPlayerId ownership check with a phase-based one. Reuses the
+// same two error codes lockPlayerPhase already throws (NOT_YOUR_PHASE,
+// ALREADY_LOCKED) rather than inventing new ones, since both mean the same
+// thing to a caller: the current phase state doesn't allow this right now.
+function requirePhase(gameState, playerId, expectedPhase) {
+  const player = requirePlayer(gameState, playerId);
+  if (player.isNPC || gameState.currentPhase !== expectedPhase) {
+    throw new Error('NOT_YOUR_PHASE');
+  }
+  if (player.phaseLocked) {
+    throw new Error('ALREADY_LOCKED');
+  }
+}
+
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase };
