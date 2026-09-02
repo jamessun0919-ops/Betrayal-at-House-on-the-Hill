@@ -1495,13 +1495,14 @@ test('game:diceChoiceRespond resolves a pending leaveCheck that still fails afte
   httpServer.close();
 });
 
-test('game:move rejects a caller who is not the current turn player', async () => {
+test('game:move no longer restricts by turn order -- either real player can move once phase-gated instead of turn-gated', async () => {
   const { httpServer, clientA, clientB, otherClient } = await setUpStartedGame();
 
   const result = await new Promise((resolve) => {
     otherClient.emit('game:move', { direction: 'east' }, resolve);
   });
-  expect(result.error).toBe('NOT_YOUR_TURN');
+  expect(result.error).toBeUndefined();
+  expect(result.kind).toBe('open_door');
 
   clientA.close();
   clientB.close();

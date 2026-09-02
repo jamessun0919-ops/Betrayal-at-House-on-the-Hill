@@ -3,6 +3,7 @@ const { canMoveBetween, placeNewRoom, placeRoomAt, placeAtRandomOpenDoor, coordK
 const { drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDeck');
 const { dropToBasement } = require('./collapseFall');
 const { getPlayer } = require('./gameState');
+const { requirePhase } = require('./phaseFlow');
 const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem, clearEquipStateIfNeeded } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
@@ -73,9 +74,7 @@ function getAvailableDirections(gameState, playerId) {
 
 function moveToRoom(gameState, playerId, direction, leaveCheck = null, rollOptions = {}) {
   const player = requirePlayer(gameState, playerId);
-  if (getCurrentTurnPlayerId(gameState) !== playerId) {
-    throw new Error('NOT_YOUR_TURN');
-  }
+  requirePhase(gameState, playerId, 'player_move');
   if (player.actionPoints < 1) {
     throw new Error('NOT_ENOUGH_ACTION_POINTS');
   }
@@ -670,9 +669,7 @@ function canUseStairs(gameState, playerId) {
 
 function useStairs(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
-  if (getCurrentTurnPlayerId(gameState) !== playerId) {
-    throw new Error('NOT_YOUR_TURN');
-  }
+  requirePhase(gameState, playerId, 'player_move');
   if (player.summons) {
     throw new Error('SUMMON_ACTIVE');
   }

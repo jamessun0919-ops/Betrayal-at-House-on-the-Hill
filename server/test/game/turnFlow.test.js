@@ -41,6 +41,10 @@ function makeGameStateWithPlayer(drawableRooms) {
   // unless a test overrides this to specifically exercise turn-order logic.
   gameState.turnOrder = ['p1'];
   gameState.currentPlayerIndex = 0;
+  // moveToRoom/useStairs now gate on the phase system (requirePhase) instead
+  // of turnOrder -- default every test into player_move so existing callers
+  // keep passing without each test having to set this up itself.
+  gameState.currentPhase = 'player_move';
   return { gameState, player };
 }
 
@@ -192,6 +196,7 @@ test('moveToRoom throws INVALID_MOVE_DIRECTION for a direction not currently ava
   const player2 = addPlayer(gameState2, { playerId: 'p1', name: 'Alice', stats: makeStats() });
   gameState2.turnOrder = ['p1'];
   gameState2.currentPlayerIndex = 0;
+  gameState2.currentPhase = 'player_move';
   moveToRoom(gameState2, 'p1', 'east'); // exhausts the deck, player now at (1,1), AP=2 (4 - the flat door-open cost of 2)
   resetActionPoints(player2); // simulate starting a new turn
   // North of (1,1) is unexplored and the deck is empty, so it's neither a
@@ -381,12 +386,28 @@ test('getAvailableDirections omits directions where neighbor room exists but has
   expect(available.find((a) => a.direction === 'west')).toBeUndefined();
 });
 
-test('moveToRoom throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+test('moveToRoom throws NOT_YOUR_PHASE when the current phase is not player_move', () => {
   const { gameState } = makeGameStateWithPlayer();
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
+  gameState.currentPhase = 'player_interact';
+  expect(() => moveToRoom(gameState, 'p1', 'east')).toThrow('NOT_YOUR_PHASE');
+});
+
+test('moveToRoom throws ALREADY_LOCKED when the player has already locked their phase', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  gameState.players.get('p1').phaseLocked = true;
+  expect(() => moveToRoom(gameState, 'p1', 'east')).toThrow('ALREADY_LOCKED');
+});
+
+test('moveToRoom no longer restricts by turn order -- a second real player can move too, as long as the phase and lock state allow it', () => {
+  const { gameState } = makeGameStateWithPlayer();
+  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0; // p1's turn
-  expect(() => moveToRoom(gameState, 'p2', 'east')).toThrow('NOT_YOUR_TURN');
+  gameState.currentPlayerIndex = 0; // still "p1's turn" under the old model, which moveToRoom no longer consults
+  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'] });
+  const result = moveToRoom(gameState, 'p2', 'west');
+  expect(result).toEqual({ kind: 'move', x: -1, y: 1, enteredNewRoom: true });
+  expect(player2.x).toBe(-1);
+  expect(player2.y).toBe(1);
 });
 
 test('selectAction deducts 1 action point and returns a pending marker for attack (still a stub)', () => {
@@ -710,14 +731,31 @@ test('useStairs throws STAIRS_NOT_AVAILABLE when the player is not at a stairs-l
   expect(() => useStairs(gameState, 'p1')).toThrow('STAIRS_NOT_AVAILABLE');
 });
 
-test('useStairs throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
+test('useStairs throws NOT_YOUR_PHASE when the current phase is not player_move', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.x = 0;
+  player.y = -1; // room_lobby_c
+  gameState.currentPhase = 'player_interact';
+  expect(() => useStairs(gameState, 'p1')).toThrow('NOT_YOUR_PHASE');
+});
+
+test('useStairs throws ALREADY_LOCKED when the player has already locked their phase', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  player.x = 0;
+  player.y = -1; // room_lobby_c
+  player.phaseLocked = true;
+  expect(() => useStairs(gameState, 'p1')).toThrow('ALREADY_LOCKED');
+});
+
+test('useStairs no longer restricts by turn order -- a second real player can use stairs too, as long as the phase and lock state allow it', () => {
   const { gameState } = makeGameStateWithPlayer();
   const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
   player2.x = 0;
   player2.y = -1; // room_lobby_c
   gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0; // p1's turn
-  expect(() => useStairs(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
+  gameState.currentPlayerIndex = 0; // still "p1's turn" under the old model, which useStairs no longer consults
+  const result = useStairs(gameState, 'p2');
+  expect(result).toEqual({ kind: 'stairs', floor: 'upper', x: 0, y: 0 });
 });
 
 test('useStairs throws SUMMON_ACTIVE when the player is controlling a summon', () => {
