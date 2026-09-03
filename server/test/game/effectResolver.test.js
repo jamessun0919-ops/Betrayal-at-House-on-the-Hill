@@ -365,8 +365,44 @@ test('resolveEffects remove_imprint removes an imprint with a non-stat_change ef
   player.inventory.push({ id: 'omen_004' });
   resolveEffects(gameState, createPromptState(), 'p1', [
     { type: 'remove_imprint' },
-  ], { omenCatalog: [{ id: 'omen_004', category: 'imprint', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }] });
+  ], { omenCatalog: [{ id: 'omen_004', category: 'imprint', effects: [{ type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' }] }] });
   expect(player.inventory).toEqual([]);
+});
+
+test('resolveEffects remove_imprint deletes the controller\'s NPC when the removed imprint matches its linkedImprintId', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_004' });
+  gameState.players.set('npc_1', {
+    playerId: 'npc_1', isNPC: true, controlledBy: 'p1', linkedImprintId: 'omen_004',
+    floor: 'ground', x: 0, y: 0, inventory: [{ id: 'item_003' }],
+  });
+  const room = { roomId: 'room_test', droppedItems: [] };
+  gameState.board = { ground: new Map([['0,0', room]]) };
+
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: [{ id: 'omen_004', category: 'imprint', effects: [{ type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' }] }] });
+
+  expect(gameState.players.has('npc_1')).toBe(false);
+  expect(room.droppedItems).toEqual([{ id: 'item_003' }]); // carried item dropped where the NPC stood
+});
+
+test('resolveEffects remove_imprint leaves an NPC alone when the removed imprint is a different card', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_005' });
+  gameState.players.set('npc_1', {
+    playerId: 'npc_1', isNPC: true, controlledBy: 'p1', linkedImprintId: 'omen_004',
+    floor: 'ground', x: 0, y: 0, inventory: [],
+  });
+  gameState.board = { ground: new Map([['0,0', { roomId: 'room_test', droppedItems: [] }]]) };
+
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: [{ id: 'omen_005', category: 'imprint', effects: [{ type: 'stat_change', stat: 'speed', delta: 1 }] }] });
+
+  expect(gameState.players.has('npc_1')).toBe(true);
 });
 
 test('resolveEffects remove_imprint ignores non-imprint cards even when present in the catalogs', () => {
@@ -543,69 +579,45 @@ test('resolveEffects toggle_active throws ITEM_NOT_HELD when the player does not
   ).toThrow('ITEM_NOT_HELD');
 });
 
-test('resolveEffects switch_control creates player.summons at the player\'s current position', () => {
+function makeNpcCatalog() {
+  return [{
+    npcID: 'npc_001',
+    stats: {
+      might: { track: [1], baseIndex: 0, skullIndex: 0 },
+      speed: { track: [6], baseIndex: 0, skullIndex: 0 },
+      knowledge: { track: [1], baseIndex: 0, skullIndex: 0 },
+      sanity: { track: [1], baseIndex: 0, skullIndex: 0 },
+    },
+  }];
+}
+
+test('resolveEffects create_npc adds a new NPC entity to gameState.players at the player\'s current position', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
   player.floor = 'ground';
   player.x = 3;
   player.y = -2;
+  const before = gameState.players.size;
   resolveEffects(gameState, createPromptState(), 'p1', [
-    { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
-  ]);
-  expect(player.summons).toEqual({
-    type: 'spiritDog',
-    floor: 'ground',
-    x: 3,
-    y: -2,
-    actionPoints: 6,
-    carryingItemId: null,
-  });
-  expect(player.summonUsedThisTurn).toBe(true);
+    { type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' },
+  ], { npcCatalog: makeNpcCatalog() });
+  expect(gameState.players.size).toBe(before + 1);
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  expect(npc.npcID).toBe('npc_001');
+  expect(npc.controlledBy).toBe('p1');
+  expect(npc.linkedImprintId).toBe('omen_004');
+  expect(npc.floor).toBe('ground');
+  expect(npc.x).toBe(3);
+  expect(npc.y).toBe(-2);
 });
 
-test('resolveEffects switch_control throws SUMMON_ALREADY_USED_THIS_TURN on a second switch in the same turn', () => {
+test('resolveEffects create_npc throws UNKNOWN_NPC_ID when npcID isn\'t in the catalog', () => {
   const gameState = makeGameStateWithPlayer();
-  const player = gameState.players.get('p1');
-  const effect = { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 };
-  resolveEffects(gameState, createPromptState(), 'p1', [effect]);
-  // Dissipate the first summon so only the once-per-turn flag can block the retry.
-  player.summons = null;
-  expect(() => resolveEffects(gameState, createPromptState(), 'p1', [effect])).toThrow(
-    'SUMMON_ALREADY_USED_THIS_TURN'
-  );
-});
-
-test('resolveEffects switch_control throws SUMMON_ALREADY_ACTIVE when a summon is already out', () => {
-  const gameState = makeGameStateWithPlayer();
-  const player = gameState.players.get('p1');
-  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
   expect(() =>
     resolveEffects(gameState, createPromptState(), 'p1', [
-      { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
-    ])
-  ).toThrow('SUMMON_ALREADY_ACTIVE');
-});
-
-test('resolveEffects switch_control throws INVALID_SWITCH_CONTROL_EFFECT for a missing or non-string summonType', () => {
-  const gameState = makeGameStateWithPlayer();
-  expect(() =>
-    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', actionPoints: 6 }])
-  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
-  expect(() =>
-    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', summonType: '', actionPoints: 6 }])
-  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
-});
-
-test('resolveEffects switch_control throws INVALID_SWITCH_CONTROL_EFFECT for missing or non-positive actionPoints', () => {
-  const gameState = makeGameStateWithPlayer();
-  expect(() =>
-    resolveEffects(gameState, createPromptState(), 'p1', [{ type: 'switch_control', summonType: 'spiritDog' }])
-  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
-  expect(() =>
-    resolveEffects(gameState, createPromptState(), 'p1', [
-      { type: 'switch_control', summonType: 'spiritDog', actionPoints: 0 },
-    ])
-  ).toThrow('INVALID_SWITCH_CONTROL_EFFECT');
+      { type: 'create_npc', npcID: 'no_such_npc', linkedImprintId: 'omen_004' },
+    ], { npcCatalog: makeNpcCatalog() })
+  ).toThrow('UNKNOWN_NPC_ID');
 });
 
 test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {
@@ -1865,18 +1877,14 @@ test('event_031 in data/cards/event-cards.json has the expected choice+random_ef
   expect(event031.needsCustomLogic).toBe(false);
 });
 
-test('omen_004 (獵犬) in data/cards/omen-cards.json has the passive might/sanity bonus alongside switch_control', () => {
+test('omen_004 (獵犬) in data/cards/omen-cards.json has the passive might/sanity bonus alongside create_npc', () => {
   const omenCards = JSON.parse(fs.readFileSync(path.join(__dirname, '../../../data/cards/omen-cards.json'), 'utf8'));
   const omen004 = omenCards.find((c) => c.id === 'omen_004');
   expect(omen004).toBeDefined();
-  // The card's own text grants might+1/sanity+1 while held (reversed automatically by
-  // remove_imprint) on top of the active summon-control ability -- both design docs that
-  // touched this card (2026-08-09 summon design, 2026-08-26 imprint design) only wired the
-  // switch_control half, leaving the passive stat bonus unimplemented until this fix.
   expect(omen004.effects).toEqual([
     { type: 'stat_change', stat: 'might', delta: 1 },
     { type: 'stat_change', stat: 'sanity', delta: 1 },
-    { type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 },
+    { type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' },
   ]);
 });
 

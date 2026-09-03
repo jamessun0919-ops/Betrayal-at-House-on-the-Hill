@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS, isBelowBase } = require('./playerEntity');
+const { changeStat, addItem, removeItem, getStatValue, movePlayerTo, STATS, isBelowBase, createNpc } = require('./playerEntity');
 const { attachModifier } = require('./modifiers');
 const { coordKey, DIRECTION_DELTA, canMoveBetween } = require('./boardGenerator');
 const { SIDES, OPPOSITE_SIDE } = require('./doorLayout');
@@ -144,6 +144,16 @@ function handleRemoveImprint(gameState, promptState, playerId, effect, context) 
   const chosenId = imprintIds[Math.floor(Math.random() * imprintIds.length)];
   const cardDef = catalog.find((c) => c.id === chosenId);
   removeItem(player, chosenId);
+  for (const [npcId, npc] of gameState.players) {
+    if (npc.isNPC && npc.controlledBy === playerId && npc.linkedImprintId === chosenId) {
+      const npcRoom = gameState.board[npc.floor].get(coordKey(npc.x, npc.y));
+      for (const item of npc.inventory) {
+        npcRoom.droppedItems.push(item);
+      }
+      gameState.players.delete(npcId);
+      break; // at most one NPC per imprint instance
+    }
+  }
   for (const cardEffect of cardDef.effects || []) {
     if (cardEffect.type === 'stat_change' && !cardEffect.restoreToBase && !cardEffect.setToLevel) {
       changeStat(player, cardEffect.stat, -cardEffect.delta, gameState.hauntStarted);
@@ -325,29 +335,23 @@ function handleRoomGate(gameState, promptState, playerId, effect, context) {
   return resolveEffects(gameState, promptState, playerId, effect.effects, context);
 }
 
-function handleSwitchControl(gameState, playerId, effect) {
+function handleCreateNpc(gameState, playerId, effect, context) {
   const player = requirePlayer(gameState, playerId);
-  if (typeof effect.summonType !== 'string' || effect.summonType.length === 0) {
-    throw new Error('INVALID_SWITCH_CONTROL_EFFECT');
+  const npcCatalog = (context && context.npcCatalog) || [];
+  const npcData = npcCatalog.find((n) => n.npcID === effect.npcID);
+  if (!npcData) {
+    throw new Error('UNKNOWN_NPC_ID');
   }
-  if (!Number.isInteger(effect.actionPoints) || effect.actionPoints < 1) {
-    throw new Error('INVALID_SWITCH_CONTROL_EFFECT');
-  }
-  if (player.summons) {
-    throw new Error('SUMMON_ALREADY_ACTIVE');
-  }
-  if (player.summonUsedThisTurn) {
-    throw new Error('SUMMON_ALREADY_USED_THIS_TURN');
-  }
-  player.summons = {
-    type: effect.summonType,
+  const npc = createNpc({
+    npcID: effect.npcID,
+    controlledBy: playerId,
+    linkedImprintId: effect.linkedImprintId,
     floor: player.floor,
     x: player.x,
     y: player.y,
-    actionPoints: effect.actionPoints,
-    carryingItemId: null,
-  };
-  player.summonUsedThisTurn = true;
+    stats: npcData.stats,
+  });
+  gameState.players.set(npc.playerId, npc);
   return { pending: false };
 }
 
@@ -560,7 +564,7 @@ const HANDLERS = Object.assign(Object.create(null), {
   move_to_random_other_player_room: (gameState, promptState, playerId) => handleMoveToRandomOtherPlayerRoom(gameState, playerId),
   random_effect: (gameState, promptState, playerId, effect, context) => handleRandomEffect(gameState, promptState, playerId, effect, context),
   toggle_active: (gameState, promptState, playerId, effect, context) => handleToggleActive(gameState, promptState, playerId, effect, context),
-  switch_control: (gameState, promptState, playerId, effect) => handleSwitchControl(gameState, playerId, effect),
+  create_npc: (gameState, promptState, playerId, effect, context) => handleCreateNpc(gameState, playerId, effect, context),
   persistent_modifier: (gameState, promptState, playerId, effect) => handlePersistentModifier(gameState, playerId, effect),
   draw_card: (gameState, promptState, playerId, effect) => handleDrawCard(gameState, playerId, effect),
   take_previewed_card: (gameState, promptState, playerId, effect) => handleTakePreviewedCard(gameState, playerId, effect),

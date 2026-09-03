@@ -16,6 +16,7 @@ function makeContent(overrides = {}) {
       { id: 'char_001', codename: 'Alice-character', stats: makeStats() },
       { id: 'char_002', codename: 'Bob-character', stats: makeStats() },
     ],
+    npcs: [],
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground' }],
     startingRooms: [
       { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
@@ -4838,95 +4839,6 @@ test('drawing an activatedOnUse omen adds it to inventory without resolving its 
   expect(player.inventory).toEqual([{ id: 'omen_004' }]);
   // The card says "當玩家使用..." -- drawing it must NOT seize control of a summon.
   expect(player.summons).toBeFalsy();
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-test('an activatedOnUse omen resolves its effects only when the player later uses it via game:selectAction', async () => {
-  const content = makeContent({
-    cards: {
-      events: [], items: [],
-      omens: [{
-        id: 'omen_004',
-        name: '犬靈',
-        effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }],
-        activatedOnUse: true,
-      }],
-    },
-  });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
-  const gameState = getGameState(gameManager, roomCode);
-  const player = getPlayer(gameState, currentPlayerId);
-  player.inventory.push({ id: 'omen_004' });
-  expect(player.summons).toBeFalsy();
-
-  const result = await new Promise((resolve) =>
-    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve)
-  );
-  expect(result.error).toBeUndefined();
-  expect(player.summons).toBeTruthy();
-  expect(player.summons.type).toBe('spiritDog');
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-test('a player controlling a summon moves the summon via game:move, leaving the player\'s own position untouched', async () => {
-  const content = makeContent({
-    cards: {
-      events: [], items: [],
-      omens: [{ id: 'omen_004', name: '犬靈', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }],
-    },
-  });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
-  const gameState = getGameState(gameManager, roomCode);
-  const player = getPlayer(gameState, currentPlayerId);
-  player.inventory.push({ id: 'omen_004' });
-  gameState.board.ground.set('-1,1', { roomId: 'room_manual', x: -1, y: 1, doorSides: ['north', 'east', 'south', 'west'], droppedItems: [] });
-
-  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
-  expect(player.summons).toBeTruthy();
-  const playerX = player.x;
-  const playerY = player.y;
-
-  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'west' }, resolve));
-  expect(moveResult.error).toBeUndefined();
-  expect(player.summons.x).toBe(-1);
-  expect(player.summons.y).toBe(1);
-  expect(player.x).toBe(playerX); // player's own position frozen
-  expect(player.y).toBe(playerY);
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-test('game:selectAction actionType:dissipate clears the summon and does not end the turn by itself', async () => {
-  const content = makeContent({
-    cards: {
-      events: [], items: [],
-      omens: [{ id: 'omen_004', name: '犬靈', effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }] }],
-    },
-  });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
-  const gameState = getGameState(gameManager, roomCode);
-  const player = getPlayer(gameState, currentPlayerId);
-  player.inventory.push({ id: 'omen_004' });
-
-  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
-  expect(player.summons).toBeTruthy();
-  const apBeforeDissipate = player.actionPoints;
-
-  const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'dissipate' }, resolve));
-  expect(result.error).toBeUndefined();
-  expect(player.summons).toBeNull();
-  // Dissipating is a pure state switch -- it must not itself spend the
-  // player's own action points or force the turn to end.
-  expect(player.actionPoints).toBe(apBeforeDissipate);
-  expect(gameState.turnOrder[gameState.currentPlayerIndex]).toBe(currentPlayerId);
 
   clientA.close();
   clientB.close();

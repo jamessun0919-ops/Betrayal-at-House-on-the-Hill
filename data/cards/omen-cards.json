@@ -34,7 +34,7 @@
     "effects": [
       { "type": "stat_change", "stat": "might", "delta": 1 },
       { "type": "stat_change", "stat": "sanity", "delta": 1 },
-      { "type": "switch_control", "summonType": "spiritDog", "actionPoints": 6 }
+      { "type": "create_npc", "npcID": "npc_001", "linkedImprintId": "omen_004" }
     ],
     "activatedOnUse": true, 
     "category": "imprint", 
