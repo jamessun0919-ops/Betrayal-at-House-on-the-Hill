@@ -616,47 +616,6 @@ function getCurrentTurnPlayerId(gameState) {
   return gameState.turnOrder[gameState.currentPlayerIndex];
 }
 
-function advanceTurn(gameState) {
-  requireTurnOrder(gameState);
-  const outgoingPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
-  const outgoingPlayer = getPlayer(gameState, outgoingPlayerId);
-  if (outgoingPlayer) {
-    const summon = outgoingPlayer.summons;
-    if (summon && summon.carryingItemId) {
-      const room = getRoomAt(gameState, summon.floor, summon.x, summon.y);
-      room.droppedItems.push({ id: summon.carryingItemId });
-    }
-    outgoingPlayer.summons = null; // safety net -- should already be null before a turn can end
-    outgoingPlayer.summonUsedThisTurn = false;
-    outgoingPlayer.diceInterjectionUsedThisTurn = [];
-    outgoingPlayer.searchedThisTurn = false;
-  }
-  gameState.currentPlayerIndex = (gameState.currentPlayerIndex + 1) % gameState.turnOrder.length;
-  const nextPlayerId = gameState.turnOrder[gameState.currentPlayerIndex];
-  const nextPlayer = getPlayer(gameState, nextPlayerId);
-  resetActionPoints(nextPlayer);
-  // Deliberately AFTER resetActionPoints: resetActionPoints reads the stat value
-  // (e.g. speed) BEFORE it gets reverted here, so a temporary buff like item_038's
-  // speed boost still grants its extra action points on the very turn it wears off.
-  // Reordering this would make that half of the card's effect worthless.
-  for (const revert of nextPlayer.pendingStatReverts) {
-    changeStat(nextPlayer, revert.stat, revert.delta, gameState.hauntStarted);
-  }
-  nextPlayer.pendingStatReverts = [];
-  return nextPlayerId;
-}
-
-function endTurn(gameState, playerId) {
-  const player = requirePlayer(gameState, playerId);
-  if (getCurrentTurnPlayerId(gameState) !== playerId) {
-    throw new Error('NOT_YOUR_TURN');
-  }
-  if (player.summons) {
-    throw new Error('SUMMON_ACTIVE');
-  }
-  return advanceTurn(gameState);
-}
-
 function canUseStairs(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const grid = gameState.board[player.floor];
@@ -706,8 +665,6 @@ module.exports = {
   selectSummonAction,
   isTurnOver,
   getCurrentTurnPlayerId,
-  advanceTurn,
-  endTurn,
   canUseStairs,
   useStairs,
   resumeCollapseCheck,

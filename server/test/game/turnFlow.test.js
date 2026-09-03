@@ -9,8 +9,6 @@ const {
   selectSummonAction,
   isTurnOver,
   getCurrentTurnPlayerId,
-  advanceTurn,
-  endTurn,
   canUseStairs,
   useStairs,
   resumeCollapseCheck,
@@ -544,98 +542,6 @@ test('getCurrentTurnPlayerId throws NO_TURN_ORDER when turnOrder is missing or e
   expect(() => getCurrentTurnPlayerId(gameState)).toThrow('NO_TURN_ORDER');
   gameState.turnOrder = [];
   expect(() => getCurrentTurnPlayerId(gameState)).toThrow('NO_TURN_ORDER');
-});
-
-test('advanceTurn moves to the next player and wraps around at the end', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  addPlayer(gameState, { playerId: 'p3', name: 'Carl', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2', 'p3'];
-  gameState.currentPlayerIndex = 0;
-  expect(advanceTurn(gameState)).toBe('p2');
-  expect(gameState.currentPlayerIndex).toBe(1);
-  expect(advanceTurn(gameState)).toBe('p3');
-  expect(advanceTurn(gameState)).toBe('p1'); // wraps back to the start
-  expect(gameState.currentPlayerIndex).toBe(0);
-});
-
-test('advanceTurn throws NO_TURN_ORDER when turnOrder is missing or empty', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  delete gameState.turnOrder;
-  expect(() => advanceTurn(gameState)).toThrow('NO_TURN_ORDER');
-});
-
-test('advanceTurn resets the next player action points to their speed stat value', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  // Simulate p2 having already spent all their action points in a prior round.
-  player2.actionPoints = 0;
-  expect(advanceTurn(gameState)).toBe('p2');
-  expect(player2.actionPoints).toBe(getStatValue(player2, 'speed'));
-  expect(player2.actionPoints).toBe(4);
-});
-
-test('advanceTurn applies the next player\'s pending stat reverts and clears them', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  player2.stats.might.currentIndex = 1; // was dropped to min (skullIndex 0 + 1)
-  player2.stats.speed.currentIndex = 4; // was raised to max (track.length 5 - 1)
-  player2.pendingStatReverts = [{ stat: 'might', delta: 1 }, { stat: 'speed', delta: -2 }];
-  advanceTurn(gameState);
-  expect(player2.stats.might.currentIndex).toBe(2); // 1 + 1 reverted -> back to baseIndex
-  expect(player2.stats.speed.currentIndex).toBe(2); // 4 - 2 reverted -> back to baseIndex
-  expect(player2.pendingStatReverts).toEqual([]);
-  expect(player2.actionPoints).toBe(6); // resetActionPoints ran BEFORE the revert, using the still-boosted speed (track[4] = 6, not the reverted track[2] = 4) -- proves the intentional ordering
-});
-
-test('advanceTurn does not touch a player whose pendingStatReverts is empty', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  const player2 = addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  advanceTurn(gameState);
-  expect(player2.stats.might.currentIndex).toBe(2); // unchanged (baseIndex)
-  expect(player2.pendingStatReverts).toEqual([]);
-});
-
-test('advanceTurn does not apply the outgoing player\'s own pendingStatReverts (only the incoming player\'s)', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  player.pendingStatReverts = [{ stat: 'might', delta: 5 }]; // p1 (outgoing) has one queued
-  advanceTurn(gameState);
-  expect(player.stats.might.currentIndex).toBe(2); // untouched -- not p1's turn yet
-  expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: 5 }]); // still queued, not cleared
-});
-
-test('endTurn advances the turn even when the current player still has unspent actionPoints', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player.actionPoints = 3; // deliberately not exhausted
-  const result = endTurn(gameState, 'p1');
-  expect(result).toBe('p2');
-  expect(gameState.turnOrder[gameState.currentPlayerIndex]).toBe('p2');
-});
-
-test('endTurn throws NOT_YOUR_TURN when called by a player who is not the current turn player', () => {
-  const { gameState } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  expect(() => endTurn(gameState, 'p2')).toThrow('NOT_YOUR_TURN');
-});
-
-test('endTurn throws SUMMON_ACTIVE when the player has an active summon', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
-  expect(() => endTurn(gameState, 'p1')).toThrow('SUMMON_ACTIVE');
 });
 
 test('moveToRoom into room_collapsed_room: passing the speed check (5+) leaves the player in place, no fall', () => {
@@ -1234,51 +1140,6 @@ test('selectSummonAction actionType:dissipate works even when the summon has 0 a
 test('selectSummonAction throws NO_ACTIVE_SUMMON when the player has no summon', () => {
   const { gameState } = makeGameStateWithPlayer();
   expect(() => selectSummonAction(gameState, 'p1', 'dissipate', {})).toThrow('NO_ACTIVE_SUMMON');
-});
-
-test('advanceTurn clears the outgoing player\'s summons as a safety net', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 3, carryingItemId: null };
-  player.summonUsedThisTurn = true;
-  advanceTurn(gameState);
-  expect(player.summons).toBeNull();
-  // The once-per-turn switch allowance resets for the outgoing player's next turn.
-  expect(player.summonUsedThisTurn).toBe(false);
-});
-
-test('advanceTurn resets the outgoing player\'s diceInterjectionUsedThisTurn to an empty array', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player.diceInterjectionUsedThisTurn = ['item_006'];
-  advanceTurn(gameState);
-  expect(player.diceInterjectionUsedThisTurn).toEqual([]);
-});
-
-test('advanceTurn resets the outgoing player\'s searchedThisTurn to false', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player.searchedThisTurn = true;
-  advanceTurn(gameState);
-  expect(player.searchedThisTurn).toBe(false);
-});
-
-test('advanceTurn drops the outgoing summon\'s carried item into its room instead of destroying it', () => {
-  const { gameState, player } = makeGameStateWithPlayer();
-  gameState.turnOrder = ['p1', 'p2'];
-  gameState.currentPlayerIndex = 0;
-  addPlayer(gameState, { playerId: 'p2', name: 'Bob', stats: makeStats() });
-  player.summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 3, carryingItemId: 'item_003' };
-  advanceTurn(gameState);
-  expect(player.summons).toBeNull();
-  const room = gameState.board.ground.get(coordKey(0, 0));
-  expect(room.droppedItems).toEqual([{ id: 'item_003' }]);
 });
 
 test('drawing room_ballroom on the ground floor also places room_gallery at the same (x,y) on the upper floor', () => {
