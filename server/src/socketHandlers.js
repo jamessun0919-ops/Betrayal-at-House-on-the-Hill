@@ -1407,6 +1407,7 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
     roomContent: { rooms: content.rooms, startingRooms: content.startingRooms },
     cardContent: { items: content.cards.items, events: content.cards.events, omens: content.cards.omens },
     characterContent: content.characters,
+    npcContent: content.npcs,
   });
 }
 

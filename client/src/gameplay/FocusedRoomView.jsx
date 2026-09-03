@@ -204,9 +204,14 @@ function directionButtonStyle(direction) {
   return { ...base, left: 'calc(-1 * var(--peek-size) / 2)', top: '50%', transform: 'translate(-50%, -50%)' };
 }
 
-function findCharacterIcon(characterId, characterContent) {
-  if (!characterContent || !characterId) return null;
-  const character = characterContent.find((c) => c.id === characterId);
+function findCharacterIcon(p, characterContent, npcContent) {
+  if (p.isNPC) {
+    if (!npcContent || !p.npcID) return null;
+    const npc = npcContent.find((n) => n.npcID === p.npcID);
+    return npc?.fileicon ? `/images/${npc.fileicon}` : null;
+  }
+  if (!characterContent || !p.characterId) return null;
+  const character = characterContent.find((c) => c.id === p.characterId);
   return character?.fileicon ? `/images/${character.fileicon}` : null;
 }
 
@@ -217,6 +222,7 @@ export default function FocusedRoomView({
   roomsInSameSpot,
   allPlayers,
   characterContent,
+  npcContent,
   directions,
   onMove,
 }) {
@@ -314,7 +320,11 @@ export default function FocusedRoomView({
         )}
       </div>
       {(roomsInSameSpot.length >= 3
-        ? [...roomsInSameSpot].sort((a, b) => (a.characterId || '').localeCompare(b.characterId || ''))
+        ? [...roomsInSameSpot].sort((a, b) => {
+            if (a.isNPC !== b.isNPC) return a.isNPC ? 1 : -1; // NPCs sort after every real player
+            if (a.isNPC) return (a.npcID || '').localeCompare(b.npcID || '');
+            return (a.characterId || '').localeCompare(b.characterId || '');
+          })
         : roomsInSameSpot
       ).map((p, i) => {
         const colorIndex = allPlayers.findIndex((ap) => ap.playerId === p.playerId);
@@ -323,7 +333,7 @@ export default function FocusedRoomView({
             key={p.playerId}
             name={p.name}
             colorIndex={colorIndex === -1 ? i : colorIndex}
-            iconSrc={findCharacterIcon(p.characterId, characterContent)}
+            iconSrc={findCharacterIcon(p, characterContent, npcContent)}
             style={roomsInSameSpot.length >= 3 ? gridBadgeStyle(i) : badgeStyle(p.enteredFromSide, i, roomsInSameSpot.length)}
           />
         );

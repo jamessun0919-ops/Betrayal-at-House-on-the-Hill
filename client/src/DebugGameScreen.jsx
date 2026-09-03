@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
+import NpcPanel from './gameplay/NpcPanel';
 import CheckModal from './gameplay/CheckModal';
 import SimplePopup from './gameplay/SimplePopup';
 import { getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
@@ -104,6 +105,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   // static reference data sent once on game:started, not part of
   // game:stateUpdate's payload.
   const [characterContent] = useState(initialGameState?.characterContent || null);
+  // Same pattern again -- npcContent (NPC icon filenames) is static
+  // reference data sent once on game:started, not part of game:stateUpdate's
+  // payload.
+  const [npcContent] = useState(initialGameState?.npcContent || null);
+  const [actingAsNpcId, setActingAsNpcId] = useState(null);
   const [lastPromptResolved, setLastPromptResolved] = useState(null);
   const [actionError, setActionError] = useState('');
   const [messages, setMessages] = useState([]);
@@ -283,7 +289,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   }
 
   function handleMove(direction) {
-    socket.emit('game:move', { direction }, (res) => {
+    socket.emit('game:move', { direction, ...(actingAsNpcId ? { actingAsNpcId } : {}) }, (res) => {
       if (res && res.error) {
         console.error('[game:move]', res.error);
         setActionError(res.error);
@@ -292,7 +298,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   }
 
   function handleSelectAction(actionType, options = {}) {
-    socket.emit('game:selectAction', { actionType, ...options }, (res) => {
+    socket.emit('game:selectAction', { actionType, ...options, ...(actingAsNpcId ? { actingAsNpcId } : {}) }, (res) => {
       if (res && res.error) {
         console.error('[game:selectAction]', res.error);
         setActionError(res.error);
@@ -306,7 +312,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   }
 
   function handleLockPhase() {
-    socket.emit('game:lockPhase', {}, (res) => {
+    socket.emit('game:lockPhase', { ...(actingAsNpcId ? { actingAsNpcId } : {}) }, (res) => {
       if (res && res.error) {
         console.error('[game:lockPhase]', res.error);
         setActionError(res.error);
@@ -346,25 +352,30 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
 
   // Precomputed once for the playing-phase render -- both the action panel
   // and the viewport room view need these.
-  let me, currentRoom, hasRoomForFloor, directions, roommates, roomActions;
+  let me, myNpcs, activeEntity, currentRoom, hasRoomForFloor, directions, roommates, roomActions;
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
-    currentRoom = gameState.board[me.floor].find((r) => r.x === me.x && r.y === me.y);
+    myNpcs = gameState.players.filter((p) => p.isNPC && p.controlledBy === playerId);
+    activeEntity = actingAsNpcId ? gameState.players.find((p) => p.playerId === actingAsNpcId) : me;
+    currentRoom = gameState.board[activeEntity.floor].find((r) => r.x === activeEntity.x && r.y === activeEntity.y);
     hasRoomForFloor =
-      me.floor === 'ground'
+      activeEntity.floor === 'ground'
         ? gameState.roomDeck.hasRoomForGround
-        : me.floor === 'upper'
+        : activeEntity.floor === 'upper'
           ? gameState.roomDeck.hasRoomForUpper
           : gameState.roomDeck.hasRoomForBasement;
-    directions = getAvailableDirections(me, currentRoom, gameState.board[me.floor]).filter(
-      (d) => d.kind === 'move' || hasRoomForFloor
+    directions = getAvailableDirections(activeEntity, currentRoom, gameState.board[activeEntity.floor]).filter(
+      (d) => d.kind === 'move' || (!actingAsNpcId && hasRoomForFloor)
     );
     // Same-room players (excluding self) -- CharacterPanel's item "給予"
-    // option needs this to offer a target to give to.
+    // option needs this to offer a target to give to. Always about `me`'s
+    // own room, unaffected by which entity is currently being controlled.
     roommates = gameState.players.filter(
       (p) => p.playerId !== playerId && p.floor === me.floor && p.x === me.x && p.y === me.y
     );
-    roomActions = roomContent ? getRoomActions(findRoomInfo(currentRoom.roomId, roomContent), currentRoom) : [];
+    roomActions = actingAsNpcId
+      ? []
+      : (roomContent ? getRoomActions(findRoomInfo(currentRoom.roomId, roomContent), currentRoom) : []);
   }
 
   const header = (
@@ -440,18 +451,19 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 }
 
                 const roomsInSameSpot = gameState.players.filter(
-                  (p) => p.floor === me.floor && p.x === me.x && p.y === me.y
+                  (p) => p.floor === activeEntity.floor && p.x === activeEntity.x && p.y === activeEntity.y
                 );
 
                 return (
                   <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <FocusedRoomView
                       currentRoom={currentRoom}
-                      boardRooms={gameState.board[me.floor]}
+                      boardRooms={gameState.board[activeEntity.floor]}
                       roomContent={roomContent}
                       roomsInSameSpot={roomsInSameSpot}
                       allPlayers={gameState.players}
                       characterContent={characterContent}
+                      npcContent={npcContent}
                       directions={directions}
                       onMove={handleMove}
                     />
@@ -459,32 +471,54 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 );
               })()}
               {/* 四個角落浮動按鈕：不管目前是聚焦房間還是總覽地圖都要顯示 */}
-              <button
-                style={cornerButtonStyle('top-left')}
-                onClick={() => (roomActions.length > 1 ? setShowRoomActionMenu(true) : handleSelectAction('room_action'))}
-              >
-                {wrapLabel('房間行動', 2)}
-              </button>
+              {!actingAsNpcId && (
+                <button
+                  style={cornerButtonStyle('top-left')}
+                  onClick={() => (roomActions.length > 1 ? setShowRoomActionMenu(true) : handleSelectAction('room_action'))}
+                >
+                  {wrapLabel('房間行動', 2)}
+                </button>
+              )}
               <button style={cornerButtonStyle('top-right')} onClick={() => setMapMode(mapMode === 'focused' ? 'overview' : 'focused')}>
                 {wrapLabel(mapMode === 'focused' ? '筆記資訊' : '目前房間', 2)}
               </button>
-              <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
-                {wrapLabel('襲擊目標', 2)}
-              </button>
+              {!actingAsNpcId && (
+                <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
+                  {wrapLabel('襲擊目標', 2)}
+                </button>
+              )}
               <button style={cornerButtonStyle('bottom-right')} onClick={handleLockPhase}>
-                {wrapLabel('階段結束', 2)}
+                {wrapLabel(actingAsNpcId ? 'NPC階段結束' : '階段結束', 2)}
               </button>
             </div>
           </div>
           <div className="playing-layout__panel">
-            <CharacterPanel
-              player={me}
-              messages={messages}
-              cardContent={cardContent}
-              characterContent={characterContent}
-              onSelectAction={handleSelectAction}
-              roommates={roommates}
-            />
+            {myNpcs.length > 0 && (
+              <div style={{ marginBottom: 8 }}>
+                <button onClick={() => setActingAsNpcId(null)} disabled={!actingAsNpcId}>操控：自己</button>
+                {myNpcs.map((npc) => (
+                  <button key={npc.playerId} onClick={() => setActingAsNpcId(npc.playerId)} disabled={actingAsNpcId === npc.playerId}>
+                    操控：{npc.npcID}
+                  </button>
+                ))}
+              </div>
+            )}
+            {actingAsNpcId ? (
+              <NpcPanel
+                npc={activeEntity}
+                roomDroppedItems={currentRoom.droppedItems || []}
+                onSelectAction={handleSelectAction}
+              />
+            ) : (
+              <CharacterPanel
+                player={me}
+                messages={messages}
+                cardContent={cardContent}
+                characterContent={characterContent}
+                onSelectAction={handleSelectAction}
+                roommates={roommates}
+              />
+            )}
           </div>
           {showRoomActionMenu && (
             <div
