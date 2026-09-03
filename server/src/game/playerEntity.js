@@ -11,7 +11,7 @@ function isNonDecreasing(track) {
   return true;
 }
 
-function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionPoints }) {
+function buildStatTracks(stats) {
   for (const stat of STATS) {
     const def = stats[stat];
     if (!def || !isValidTrackShape(def.track)) {
@@ -27,7 +27,6 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
       throw new Error('INVALID_BASE_INDEX');
     }
   }
-
   const statTracks = {};
   for (const stat of STATS) {
     const def = stats[stat];
@@ -39,6 +38,11 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
       overflow: 0,
     };
   }
+  return statTracks;
+}
+
+function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionPoints }) {
+  const statTracks = buildStatTracks(stats);
   return {
     playerId,
     name,
@@ -55,6 +59,28 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     wieldedWeaponId: null, // id of the currently wielded weapon-category item, at most one
     wornGearIds: [], // ids of currently worn gear-category items, no cap
     pendingStatReverts: [], // {stat, delta} entries applied and cleared by phaseFlow.js's enterPhase when this player's next round's player_move phase starts
+  };
+}
+
+function generateNpcInstanceId() {
+  return 'npc_' + Math.random().toString(36).slice(2, 10);
+}
+
+function createNpc({ npcID, controlledBy, linkedImprintId, floor, x, y, stats }) {
+  const statTracks = buildStatTracks(stats);
+  return {
+    playerId: generateNpcInstanceId(),
+    isNPC: true,
+    npcID,
+    controlledBy,
+    linkedImprintId,
+    floor,
+    x,
+    y,
+    stats: statTracks,
+    actionPoints: 0,
+    inventory: [],
+    phaseLocked: false,
   };
 }
 
@@ -161,6 +187,7 @@ function clearEquipStateIfNeeded(player, itemId) {
 module.exports = {
   STATS,
   createPlayer,
+  createNpc,
   changeStat,
   resetActionPoints,
   movePlayerTo,

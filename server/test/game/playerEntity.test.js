@@ -1,4 +1,4 @@
-const { STATS, createPlayer, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem, clearEquipStateIfNeeded } = require('../../src/game/playerEntity');
+const { STATS, createPlayer, createNpc, changeStat, resetActionPoints, movePlayerTo, getStatValue, isBelowBase, addItem, removeItem, clearEquipStateIfNeeded } = require('../../src/game/playerEntity');
 
 function makeStats() {
   return {
@@ -8,6 +8,15 @@ function makeStats() {
     speed: { track: [2, 3, 4, 4, 5, 6], baseIndex: 2, skullIndex: 0 },
     knowledge: { track: [1, 1, 2, 3, 4], baseIndex: 1, skullIndex: 0 },
     sanity: { track: [1, 2, 3, 4, 5], baseIndex: 2, skullIndex: 0 },
+  };
+}
+
+function makeNpcStats() {
+  return {
+    might: { track: [1], baseIndex: 0, skullIndex: 0 },
+    speed: { track: [6], baseIndex: 0, skullIndex: 0 },
+    knowledge: { track: [1], baseIndex: 0, skullIndex: 0 },
+    sanity: { track: [1], baseIndex: 0, skullIndex: 0 },
   };
 }
 
@@ -375,4 +384,44 @@ test('clearEquipStateIfNeeded is a no-op when the itemId is neither wielded nor 
   clearEquipStateIfNeeded(player, 'item_099');
   expect(player.wieldedWeaponId).toBe('item_001');
   expect(player.wornGearIds).toEqual(['item_008']);
+});
+
+test('createNpc builds a player-shaped NPC entity at the controller\'s position', () => {
+  const npc = createNpc({
+    npcID: 'npc_001',
+    controlledBy: 'p1',
+    linkedImprintId: 'omen_004',
+    floor: 'ground',
+    x: 3,
+    y: -2,
+    stats: makeNpcStats(),
+  });
+  expect(npc.isNPC).toBe(true);
+  expect(npc.npcID).toBe('npc_001');
+  expect(npc.controlledBy).toBe('p1');
+  expect(npc.linkedImprintId).toBe('omen_004');
+  expect(npc.floor).toBe('ground');
+  expect(npc.x).toBe(3);
+  expect(npc.y).toBe(-2);
+  expect(npc.actionPoints).toBe(0);
+  expect(npc.inventory).toEqual([]);
+  expect(npc.phaseLocked).toBe(false);
+  expect(typeof npc.playerId).toBe('string');
+  expect(npc.playerId.startsWith('npc_')).toBe(true);
+  expect(npc.stats.speed.track).toEqual([6]);
+  expect(npc.stats.speed.currentIndex).toBe(0);
+});
+
+test('createNpc generates a different playerId for each call', () => {
+  const a = createNpc({ npcID: 'npc_001', controlledBy: 'p1', linkedImprintId: 'omen_004', floor: 'ground', x: 0, y: 0, stats: makeNpcStats() });
+  const b = createNpc({ npcID: 'npc_001', controlledBy: 'p1', linkedImprintId: 'omen_004', floor: 'ground', x: 0, y: 0, stats: makeNpcStats() });
+  expect(a.playerId).not.toBe(b.playerId);
+});
+
+test('createNpc throws MISSING_STAT_DEFINITION for an incomplete stats object, same validation as createPlayer', () => {
+  const stats = makeNpcStats();
+  delete stats.speed;
+  expect(() =>
+    createNpc({ npcID: 'npc_001', controlledBy: 'p1', linkedImprintId: 'omen_004', floor: 'ground', x: 0, y: 0, stats })
+  ).toThrow('MISSING_STAT_DEFINITION');
 });
