@@ -2552,6 +2552,22 @@ async function setUpStartedGameWithContent(content, options) {
   return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager, effectResolverManager };
 }
 
+// A round is 5 phases (player_move -> npc_move -> player_interact ->
+// npc_interact -> settlement), not 1 immediate hand-off like the old turn
+// model. With 2 real players and no NPCs, npc_move/npc_interact
+// auto-cascade, so completing one full round takes 3 pairs of locks (6
+// total game:endTurn calls). Needed only by tests that verify per-ROUND
+// resets (e.g. item_038's stat revert, the once-per-round search gate) --
+// those only fire when player_move is re-entered, not on every phase lock.
+async function completeFullRound(currentClient, otherClient) {
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve)); // lock player_move
+  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve)); // -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve)); // lock player_interact
+  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve)); // -> settlement
+  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve)); // lock settlement
+  return new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve)); // -> wraps to a fresh player_move
+}
+
 test('game:effectPromptRespond resolves the pending choice and applies the chosen effects', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
@@ -3252,7 +3268,7 @@ test('game:selectAction item_044 with rng landing on option 1: broadcasts game:r
   httpServer.close();
 });
 
-test('game:selectAction item_038 sets might to the non-lethal floor and speed to max, reverting both at the start of the user\'s next turn', async () => {
+test('game:selectAction item_038 sets might to the non-lethal floor and speed to max, reverting both at the start of the user\'s next round', async () => {
   const content = makeContent({
     cards: {
       events: [],
@@ -3282,14 +3298,13 @@ test('game:selectAction item_038 sets might to the non-lethal floor and speed to
   expect(me.stats.speed.currentIndex).toBe(4); // track.length 5 - 1
   expect(me.inventory).toEqual([]); // consumed
 
-  // The user ends their own turn -- now it's the other player's turn. Not reverted yet.
-  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
-  me = getPlayer(gameState, currentPlayerId);
-  expect(me.stats.might.currentIndex).toBe(1);
-  expect(me.stats.speed.currentIndex).toBe(4);
-
-  // The other player ends their turn -- it cycles back to the item_038 user. Reverted now.
-  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  // A round is 5 phases, not 1 immediate hand-off -- both real players must
+  // lock through player_move, player_interact, and settlement before the
+  // round wraps back to a fresh player_move, which is the only place the
+  // revert fires (moved there from the old turnFlow.js advanceTurn in the
+  // 2026-09-03 regression fix). Not reverted partway through.
+  const finalLock = await completeFullRound(currentClient, otherClient);
+  expect(finalLock.currentPhase).toBe('player_move');
   me = getPlayer(gameState, currentPlayerId);
   expect(me.stats.might.currentIndex).toBe(2); // baseIndex, reverted
   expect(me.stats.speed.currentIndex).toBe(2); // baseIndex, reverted
@@ -4090,7 +4105,7 @@ test('game:selectAction room_action: a second search in the same turn is rejecte
   httpServer.close();
 });
 
-test('game:selectAction room_action: a player can search the same room again on their next turn, after searching it once and ending the turn', async () => {
+test('game:selectAction room_action: a player can search the same room again on their next round, after searching it once and completing a round', async () => {
   const content = makeSearchRoomContent(['item_001', 'item_002']);
   content.cards.items = [
     { id: 'item_001', name: '測試道具1', effects: [] },
@@ -4102,18 +4117,22 @@ test('game:selectAction room_action: a player can search the same room again on 
   const gameState = getGameState(gameManager, roomCode);
   getPlayer(gameState, currentPlayerId).actionPoints = 1;
 
-  // Turn 1: search once, get one of the two listed items.
+  // Round 1: search once, get one of the two listed items.
   const firstFoundPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
   await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
   const firstFound = await firstFoundPromise;
 
-  // Same-turn second search is rejected (already covered by another test);
-  // end the turn, let the other player also end theirs, and cycle back.
-  await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
-  await new Promise((resolve) => otherClient.emit('game:endTurn', {}, resolve));
+  // Same-round second search is rejected (already covered by another test);
+  // a round is 5 phases, not 1 immediate hand-off -- both real players must
+  // lock through player_move, player_interact, and settlement before the
+  // round wraps back to a fresh player_move, which is the only place
+  // searchedThisTurn resets (moved there from the old turnFlow.js
+  // advanceTurn in the 2026-09-03 regression fix).
+  const finalLock = await completeFullRound(currentClient, otherClient);
+  expect(finalLock.currentPhase).toBe('player_move');
   getPlayer(gameState, currentPlayerId).actionPoints = 1; // restore AP for the second search
 
-  // Turn 2 (same player, same room, no move needed -- they never left):
+  // Round 2 (same player, same room, no move needed -- they never left):
   // search again and get the other listed item.
   const secondFoundPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
   const result = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
