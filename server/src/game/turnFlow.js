@@ -4,7 +4,7 @@ const { drawFeasibleRoom, hasRoomForFloor, removeRoomById } = require('./roomDec
 const { dropToBasement } = require('./collapseFall');
 const { getPlayer } = require('./gameState');
 const { requirePhase } = require('./phaseFlow');
-const { movePlayerTo, resetActionPoints, getStatValue, changeStat, addItem, clearEquipStateIfNeeded } = require('./playerEntity');
+const { movePlayerTo, getStatValue, changeStat, addItem, clearEquipStateIfNeeded } = require('./playerEntity');
 const { rollDice, applyModifiers } = require('./effectPipeline');
 const { findInterjectionOptions } = require('./diceInterjection');
 

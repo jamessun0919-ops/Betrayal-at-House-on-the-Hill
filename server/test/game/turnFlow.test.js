@@ -1,5 +1,5 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
-const { resetActionPoints, getStatValue } = require('../../src/game/playerEntity');
+const { resetActionPoints } = require('../../src/game/playerEntity');
 const { coordKey } = require('../../src/game/boardGenerator');
 const {
   getAvailableDirections,
