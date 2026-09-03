@@ -779,6 +779,20 @@ test('selectAction item: throws TARGET_NOT_IN_ROOM when the target is elsewhere,
   ).toThrow('TARGET_NOT_IN_ROOM');
 });
 
+test('selectAction item: throws TARGET_IS_NPC when using an item on an NPC', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  const npc = addPlayer(gameState, { playerId: 'npc_1', name: 'Dog', stats: makeStats() });
+  npc.isNPC = true;
+  npc.floor = player.floor;
+  npc.x = player.x;
+  npc.y = player.y;
+  player.inventory.push({ id: 'item_003' });
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', targetPlayerId: 'npc_1', itemCanTargetOthers: true })
+  ).toThrow('TARGET_IS_NPC');
+});
+
 test('selectAction item mode:give transfers the item to a same-room target player', () => {
   const { gameState, player } = makeGameStateWithPlayer();
   gameState.currentPhase = 'player_interact';
@@ -831,6 +845,20 @@ test('selectAction item mode:give throws TARGET_NOT_IN_ROOM when the target is e
   expect(() =>
     selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'p2' })
   ).toThrow('TARGET_NOT_IN_ROOM');
+});
+
+test('selectAction item mode:give throws TARGET_IS_NPC when the target is an NPC', () => {
+  const { gameState, player } = makeGameStateWithPlayer();
+  gameState.currentPhase = 'player_interact';
+  player.inventory.push({ id: 'item_003' });
+  const npc = addPlayer(gameState, { playerId: 'npc_1', name: 'Dog', stats: makeStats() });
+  npc.isNPC = true;
+  npc.floor = player.floor;
+  npc.x = player.x;
+  npc.y = player.y;
+  expect(() =>
+    selectAction(gameState, 'p1', 'item', { itemId: 'item_003', mode: 'give', targetPlayerId: 'npc_1' })
+  ).toThrow('TARGET_IS_NPC');
 });
 
 test('selectAction item mode:leave removes the item from inventory and adds it to the current room\'s droppedItems', () => {

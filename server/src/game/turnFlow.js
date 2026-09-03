@@ -350,6 +350,9 @@ function giveItemAction(gameState, player, itemId, targetPlayerId, itemCategory)
     throw new Error('IMPRINT_CANNOT_BE_GIVEN');
   }
   const targetPlayer = requirePlayer(gameState, targetPlayerId);
+  if (targetPlayer.isNPC) {
+    throw new Error('TARGET_IS_NPC');
+  }
   if (
     targetPlayer.floor !== player.floor ||
     targetPlayer.x !== player.x ||
@@ -485,6 +488,9 @@ function selectAction(gameState, playerId, actionType, options = {}) {
       throw new Error('ITEM_CANNOT_TARGET_OTHERS');
     }
     const targetPlayer = requirePlayer(gameState, effectTargetId);
+    if (targetPlayer.isNPC) {
+      throw new Error('TARGET_IS_NPC');
+    }
     if (
       targetPlayer.floor !== player.floor ||
       targetPlayer.x !== player.x ||
