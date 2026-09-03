@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { resetActionPoints } = require('./playerEntity');
+const { resetActionPoints, changeStat } = require('./playerEntity');
 
 const PHASE_ORDER = ['player_move', 'npc_move', 'player_interact', 'npc_interact', 'settlement'];
 
@@ -52,6 +52,27 @@ function enterPhase(gameState, phase) {
     // separate reset step.
     for (const p of getParticipants(gameState, phase)) {
       resetActionPoints(p);
+    }
+  }
+  if (phase === 'player_move') {
+    // These three per-round resets used to live in turnFlow.js's advanceTurn
+    // (2026-09-03 regression: nothing calls advanceTurn anymore now that the
+    // client's phase-end button emits game:lockPhase instead of
+    // game:endTurn, so they'd never fire again). Moved here so they fire
+    // once per round, for every real player, when a new round's player_move
+    // begins.
+    for (const p of getParticipants(gameState, phase)) {
+      // Deliberately AFTER resetActionPoints above: resetActionPoints reads
+      // the stat value BEFORE it gets reverted here, so a temporary buff
+      // like item_038's speed boost still grants its extra action point on
+      // the very turn it wears off. Reordering this would make that half of
+      // the card's effect worthless.
+      for (const revert of p.pendingStatReverts || []) {
+        changeStat(p, revert.stat, revert.delta, gameState.hauntStarted);
+      }
+      p.pendingStatReverts = [];
+      p.diceInterjectionUsedThisTurn = [];
+      p.searchedThisTurn = false;
     }
   }
   // A phase with zero eligible participants can never receive a lock, so it

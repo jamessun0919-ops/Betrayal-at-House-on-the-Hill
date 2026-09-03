@@ -1,5 +1,5 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
-const { getStatValue } = require('../../src/game/playerEntity');
+const { getStatValue, changeStat } = require('../../src/game/playerEntity');
 const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase } = require('../../src/game/phaseFlow');
 
 function makeStats() {
@@ -151,4 +151,46 @@ test('requirePhase throws ALREADY_LOCKED when the player has already locked the 
   enterPhase(gameState, 'player_move');
   lockPlayerPhase(gameState, 'p1');
   expect(() => requirePhase(gameState, 'p1', 'player_move')).toThrow('ALREADY_LOCKED');
+});
+
+// 2026-09-03 regression: these three per-round resets used to live in
+// turnFlow.js's advanceTurn, which nothing calls anymore now that the
+// client's phase-end button emits game:lockPhase instead of game:endTurn.
+// Moved here so they fire once per round (entering player_move) instead of
+// never firing again.
+test('enterPhase resets searchedThisTurn to false for real players entering player_move', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  player.searchedThisTurn = true;
+  enterPhase(gameState, 'player_move');
+  expect(player.searchedThisTurn).toBe(false);
+});
+
+test('enterPhase resets diceInterjectionUsedThisTurn to an empty array for real players entering player_move', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  player.diceInterjectionUsedThisTurn = ['item_005'];
+  enterPhase(gameState, 'player_move');
+  expect(player.diceInterjectionUsedThisTurn).toEqual([]);
+});
+
+test('enterPhase applies and clears pendingStatReverts for real players entering player_move', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  const beforeMight = player.stats.might.currentIndex;
+  player.pendingStatReverts = [{ stat: 'might', delta: -1 }];
+  enterPhase(gameState, 'player_move');
+  expect(player.stats.might.currentIndex).toBe(beforeMight - 1);
+  expect(player.pendingStatReverts).toEqual([]);
+});
+
+test('enterPhase applies pendingStatReverts after resetActionPoints, so a temporary speed buff still grants its extra action point on the turn it wears off', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  changeStat(player, 'speed', 1, gameState.hauntStarted); // simulate item_038's temporary +1 speed
+  const boostedSpeed = getStatValue(player, 'speed'); // 5, per makeStats' speed track at baseIndex+1
+  player.pendingStatReverts = [{ stat: 'speed', delta: -1 }]; // scheduled to revert on next player_move entry
+  enterPhase(gameState, 'player_move');
+  expect(player.actionPoints).toBe(boostedSpeed); // AP rolled against the still-boosted value before the revert applied
+  expect(getStatValue(player, 'speed')).toBe(4); // speed itself has now reverted back to base
 });
