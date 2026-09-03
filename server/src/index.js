@@ -6,6 +6,7 @@ const { createCharacterSelectionManager } = require('./game/characterSelectionMa
 const { createEffectResolverManager } = require('./game/effectResolverManager');
 const {
   loadCharacters,
+  loadNpcs,
   loadRooms,
   loadStartingRooms,
   loadEventCards,
@@ -21,6 +22,7 @@ const characterSelectionManager = createCharacterSelectionManager();
 const effectResolverManager = createEffectResolverManager();
 const content = {
   characters: loadCharacters(),
+  npcs: loadNpcs(),
   rooms: loadRooms(),
   startingRooms: loadStartingRooms(),
   cards: {

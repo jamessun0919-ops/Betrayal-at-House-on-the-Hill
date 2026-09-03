@@ -24,6 +24,10 @@ function loadCharacters(dataDir = DEFAULT_DATA_DIR) {
   return loadJsonFile(path.join(dataDir, 'characters', 'characters.json'));
 }
 
+function loadNpcs(dataDir = DEFAULT_DATA_DIR) {
+  return loadJsonFile(path.join(dataDir, 'characters', 'npcs.json'));
+}
+
 function loadEventCards(dataDir = DEFAULT_DATA_DIR) {
   return loadJsonFile(path.join(dataDir, 'cards', 'event-cards.json'));
 }
@@ -40,6 +44,7 @@ module.exports = {
   loadRooms,
   loadStartingRooms,
   loadCharacters,
+  loadNpcs,
   loadEventCards,
   loadItemCards,
   loadOmenCards,
