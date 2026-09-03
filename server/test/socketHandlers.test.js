@@ -4020,6 +4020,39 @@ test('game:selectAction room_action with a fixed item list: finds nothing when e
   httpServer.close();
 });
 
+test('game:selectAction room_action: two real players searching the same room in sequence -- the second gets searchEmpty once the first has taken the only item (concurrency invariant: synchronous handlers serialize this without any extra locking)', async () => {
+  const content = makeContent();
+  content.cards.items = [{ id: 'item_001', name: '測試道具', effects: [] }];
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  // Both players start in the same room (room_lobby_a, the shared entrance
+  // hall) -- reuse it as the search target instead of moving somewhere else,
+  // it's already the same room for both without any extra setup.
+  const placedRoom = gameState.board.ground.get(coordKey(0, 1));
+  placedRoom.item = ['item_001'];
+
+  const cardDrawnPromise = new Promise((resolve) => currentClient.once('game:cardDrawn', resolve));
+  const firstResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(firstResult.error).toBeUndefined();
+  const cardDrawn = await cardDrawnPromise;
+  expect(cardDrawn.cardId).toBe('item_001');
+
+  const searchEmptyPromise = new Promise((resolve) => otherClient.once('game:searchEmpty', resolve));
+  const secondResult = await new Promise((resolve) => otherClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(secondResult.error).toBeUndefined();
+  const searchEmpty = await searchEmptyPromise;
+  expect(searchEmpty.playerId).toBe(otherPlayerId);
+
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_001' }]);
+  expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:selectAction room_action: finding a weapon with a companionItemId also grants the companion item, with its own game:cardDrawn broadcast', async () => {
   const content = makeSearchRoomContent(['item_001']);
   content.cards.items = [
@@ -4749,6 +4782,31 @@ test('game:selectAction item mode:leave then mode:pickup round-trips an item thr
   );
   expect(pickupResult.error).toBeUndefined();
   expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_003' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction item mode:pickup: two real players trying to pick up the same room-dropped item -- the second gets ITEM_NOT_IN_ROOM once the first has taken it (concurrency invariant: synchronous handlers serialize this without any extra locking)', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } = await setUpStartedGame();
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  const placedRoom = gameState.board.ground.get(coordKey(0, 1)); // shared starting room -- both players are already here
+  placedRoom.droppedItems.push({ id: 'item_003' });
+
+  const firstResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'pickup' }, resolve)
+  );
+  expect(firstResult.error).toBeUndefined();
+  expect(getPlayer(gameState, currentPlayerId).inventory).toEqual([{ id: 'item_003' }]);
+  expect(placedRoom.droppedItems).toEqual([]);
+
+  const secondResult = await new Promise((resolve) =>
+    otherClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'pickup' }, resolve)
+  );
+  expect(secondResult.error).toBe('ITEM_NOT_IN_ROOM');
+  expect(getPlayer(gameState, otherPlayerId).inventory).toEqual([]);
 
   clientA.close();
   clientB.close();
