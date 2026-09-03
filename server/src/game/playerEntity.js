@@ -54,7 +54,7 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     previousPosition: null, // {floor,x,y} snapshot of where the player was immediately before their current position, set by movePlayerTo; null until they've moved at least once
     wieldedWeaponId: null, // id of the currently wielded weapon-category item, at most one
     wornGearIds: [], // ids of currently worn gear-category items, no cap
-    pendingStatReverts: [], // {stat, delta} entries applied and cleared by advanceTurn when this player's own next turn starts
+    pendingStatReverts: [], // {stat, delta} entries applied and cleared by phaseFlow.js's enterPhase when this player's next round's player_move phase starts
   };
 }
 
