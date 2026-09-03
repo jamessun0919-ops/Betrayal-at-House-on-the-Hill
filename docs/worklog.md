@@ -1496,3 +1496,31 @@
 **開發者交代備忘事項**：
 - 下次開工可以繼續討論階段C（行動力欄位所有權交接）或階段D（舊制正式退役）
 - 本階段沒有啟動任何本機測試/預覽伺服器，只跑了Jest測試指令，收工前確認無殘留node行程
+
+## 2026-09-03 第 1 次工作階段
+
+**當日工作內容**：
+- 開始討論階段C（行動力欄位所有權交接），agent發現嚴重設計缺陷：階段C會讓行動力永遠不再刷新，連單人測試都會壞掉，開發者裁示重新排序，先做階段D（舊制退役）
+- 討論階段D時，agent發現階段D本身也有缺陷：沒有前端UI可以呼叫`game:lockPhase`，玩家完全無法結束任何階段，開發者確認最終順序改為：UI串接→舊制退役→行動力交接
+- 直接動手實作最小前端「階段UI」變更（套用CLAUDE.md單一檔案豁免，不跑完整brainstorm/SDD流程）：`client/src/DebugGameScreen.jsx`既有「回合結束」按鈕改接`game:lockPhase`並改名「階段結束」，新增`settlement`階段的確認彈窗；透過Browser pane完整走過`player_move`→`player_interact`→`settlement`→回到`player_move`的流程驗證正確，console零錯誤
+- 實作過程中agent主動（在開發者回報前）重新讀`advanceTurn`完整內容，發現一個真實的生產環境回歸：`searchedThisTurn`/`diceInterjectionUsedThisTurn`/`pendingStatReverts`三個每回合重置的欄位，因為新制客戶端已經不再呼叫`advanceTurn`而靜默停止重置。寫失敗測試證實後，開發者裁示立即修到`enterPhase`裡，新增4個測試驗證修正
+- 繼續討論階段D（舊制正式退役）：確認`turnOrder`/`currentPlayerIndex`/`getCurrentTurnPlayerId`保留作純讀取資料（僅供尚未重寫的summon機制使用）、`game:endTurn`事件保留當作`game:lockPhase`的別名以降低風險。開發者針對測試命名提出重要語意規則：新制的「回合」包含5個階段，程式碼註解與測試名稱必須清楚區分「回合結束」與「階段結束」，不可比照舊制混用
+- 撰寫階段D設計文件與實作計畫（4個任務，含開發者額外要求的「新制正式接管後檢查刪除死代碼」任務），開發者選擇Subagent-Driven執行
+- 執行階段D：Task1刪除`advanceTurn`/`endTurn`與13個既有測試；Task2將`game:endTurn`改接`lockPlayerPhase`；Task3新增`completeFullRound`測試輔助函式，改寫2個依賴完整回合的測試（item_038回退、搜尋重置）；Task4死代碼清查，過程中發現漏抓的孤兒import（`resetActionPoints`/`getStatValue`）與一個過時註解，由agent直接補上
+- 全分支最終審查（Opus）發現本次工作階段最重大的問題：`game:endTurn`（保留的別名）與`game:lockPhase`（客戶端實際呼叫的路徑）行為早已分岔——`game:lockPhase`完全沒有4道防護（效果選擇中/擲骰選擇中/道具選擇中/summon作用中）也沒有呼叫房間`onceOnlyPerPlayer`加成，代表這個加成機制在實際遊戲中一直是靜默失效的；開發者裁示立即修正而非留待之後
+- 修正：兩個socket事件改共用同一個`handleLockPhase`共用函式，新增2個測試直接驗證`game:lockPhase`路徑本身的防護與加成生效；另修正1個測試命名的回合/階段語意錯誤（agent自己這次分支新增的測試，非既有測試）
+- 開發者確認合併回main，測試套件從階段開始的739路增減至最終22 suites/734 tests全綠
+
+**完成項目**：
+- 階段UI（前端按鈕/彈窗串接`game:lockPhase`）——完成並驗證，含regression修正
+- 階段D（舊制`advanceTurn`/`endTurn`正式退役）——完整流程完成並合併，含死代碼清理與`game:lockPhase`/`game:endTurn`防護統一
+- Handover項目14：記錄C→D→UI重排序決策、階段UI完成細節、regression發現與修正、階段D完成細節（含guard-parity發現）
+
+**遇到瓶頸**：
+- 無非預期執行錯誤；本階段兩次由agent自己主動發現嚴重設計缺陷（階段C會讓單人測試都壞掉、階段D沒有UI無法結束任何階段），皆在寫任何程式碼前發現並提出重排序建議，開發者確認後才繼續
+- 一次agent自己造成、自己發現、自己修正的生產環境回歸（階段UI實作時漏了`advanceTurn`裡三個每回合重置欄位的責任轉移），已記錄為本專案durable教訓
+
+**開發者交代備忘事項**：
+- 下次開工：階段C（行動力欄位所有權交接）目前幾乎只剩確認性質的收尾工作，其原始動機已經在階段UI的regression修正裡解決
+- 「回合」vs「階段」用語規則：新制一個回合＝完整5個階段循環，程式碼註解/測試名稱要清楚區分，不可比照舊制混用
+- 本階段有啟動Browser pane預覽伺服器（server 3001 + client 5173）驗證階段UI變更，完成後已停止；其餘工作僅執行Jest測試指令；收工前確認無殘留node行程
