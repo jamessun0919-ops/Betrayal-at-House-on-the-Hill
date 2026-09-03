@@ -275,6 +275,21 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     };
   }, [socket]);
 
+  // If the NPC currently being controlled is deleted mid-session (e.g. its
+  // imprint was removed by another player's remove_imprint effect), fall
+  // back the switcher to the real player rather than staying pointed at a
+  // dead entity -- activeEntity's own fallback (above) prevents a render
+  // crash, but the switcher UI needs to reset too.
+  useEffect(() => {
+    if (
+      actingAsNpcId &&
+      gameState &&
+      !gameState.players.some((p) => p.isNPC && p.playerId === actingAsNpcId && p.controlledBy === playerId)
+    ) {
+      setActingAsNpcId(null);
+    }
+  }, [gameState, actingAsNpcId, playerId]);
+
   function handleStartCharacterSelect() {
     socket.emit('game:startCharacterSelect', {}, (res) => {
       if (res && res.error) setActionError(res.error);
@@ -356,7 +371,9 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
   if (gameState) {
     me = gameState.players.find((p) => p.playerId === playerId);
     myNpcs = gameState.players.filter((p) => p.isNPC && p.controlledBy === playerId);
-    activeEntity = actingAsNpcId ? gameState.players.find((p) => p.playerId === actingAsNpcId) : me;
+    activeEntity = (actingAsNpcId && gameState.players.some((p) => p.playerId === actingAsNpcId))
+      ? gameState.players.find((p) => p.playerId === actingAsNpcId)
+      : me;
     currentRoom = gameState.board[activeEntity.floor].find((r) => r.x === activeEntity.x && r.y === activeEntity.y);
     hasRoomForFloor =
       activeEntity.floor === 'ground'
@@ -371,7 +388,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     // option needs this to offer a target to give to. Always about `me`'s
     // own room, unaffected by which entity is currently being controlled.
     roommates = gameState.players.filter(
-      (p) => p.playerId !== playerId && p.floor === me.floor && p.x === me.x && p.y === me.y
+      (p) => p.playerId !== playerId && !p.isNPC && p.floor === me.floor && p.x === me.x && p.y === me.y
     );
     roomActions = actingAsNpcId
       ? []
