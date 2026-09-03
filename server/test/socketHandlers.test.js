@@ -4782,17 +4782,8 @@ test('game:selectAction item mode:pickup: two real players trying to pick up the
 });
 
 test('drawing an activatedOnUse omen adds it to inventory without resolving its effects', async () => {
-  const content = makeContent({
+  const content = makeNpcContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
-    cards: {
-      events: [], items: [],
-      omens: [{
-        id: 'omen_004',
-        name: '犬靈',
-        effects: [{ type: 'switch_control', summonType: 'spiritDog', actionPoints: 6 }],
-        activatedOnUse: true,
-      }],
-    },
   });
   const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
   const gameState = getGameState(gameManager, roomCode);
@@ -4804,8 +4795,8 @@ test('drawing an activatedOnUse omen adds it to inventory without resolving its 
 
   expect(drawn.cardId).toBe('omen_004');
   expect(player.inventory).toEqual([{ id: 'omen_004' }]);
-  // The card says "當玩家使用..." -- drawing it must NOT seize control of a summon.
-  expect(player.summons).toBeFalsy();
+  // The card says "當玩家使用..." -- drawing it must NOT create the NPC yet.
+  expect([...gameState.players.values()].some((p) => p.isNPC)).toBe(false);
 
   clientA.close();
   clientB.close();
@@ -4918,6 +4909,28 @@ test('game:selectAction with actingAsNpcId supports mode:pickup for the controll
   );
   expect(result.error).toBeUndefined();
   expect(npc.inventory).toEqual([{ id: 'item_003' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction with actingAsNpcId rejects a mode other than pickup/leave with NPC_ACTION_NOT_ALLOWED', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  gameState.currentPhase = 'npc_move';
+  npc.actionPoints = 1;
+  npc.inventory.push({ id: 'item_003' });
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'wield', actingAsNpcId: npc.playerId }, resolve)
+  );
+  expect(result).toEqual({ error: 'NPC_ACTION_NOT_ALLOWED' });
 
   clientA.close();
   clientB.close();
