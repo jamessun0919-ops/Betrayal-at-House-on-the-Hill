@@ -8,6 +8,7 @@ const { rollDice, applyModifiers, evaluateTiers } = require('./effectPipeline');
 const { createPrompt } = require('./promptState');
 const { hasCards, drawCard } = require('./cardDeck');
 const { findInterjectionOptions, resolveFinalRoll } = require('./diceInterjection');
+const { allParticipantsLocked, advancePhase } = require('./phaseFlow');
 
 const DECK_FIELD_BY_TYPE = { item: 'itemDeck', event: 'eventDeck', omen: 'omenDeck' };
 
@@ -151,6 +152,12 @@ function handleRemoveImprint(gameState, promptState, playerId, effect, context) 
         npcRoom.droppedItems.push(item);
       }
       gameState.players.delete(npcId);
+      // The deleted NPC may have been the last unlocked participant of the
+      // current phase -- enterPhase's auto-cascade only runs on phase entry
+      // or on a lock, not on a mid-phase deletion, so re-check here.
+      if (allParticipantsLocked(gameState, gameState.currentPhase)) {
+        advancePhase(gameState);
+      }
       break; // at most one NPC per imprint instance
     }
   }
@@ -341,6 +348,11 @@ function handleCreateNpc(gameState, playerId, effect, context) {
   const npcData = npcCatalog.find((n) => n.npcID === effect.npcID);
   if (!npcData) {
     throw new Error('UNKNOWN_NPC_ID');
+  }
+  for (const p of gameState.players.values()) {
+    if (p.isNPC && p.controlledBy === playerId && p.linkedImprintId === effect.linkedImprintId) {
+      throw new Error('NPC_ALREADY_ACTIVE');
+    }
   }
   const npc = createNpc({
     npcID: effect.npcID,

@@ -388,6 +388,29 @@ test('resolveEffects remove_imprint deletes the controller\'s NPC when the remov
   expect(room.droppedItems).toEqual([{ id: 'item_003' }]); // carried item dropped where the NPC stood
 });
 
+test('resolveEffects remove_imprint auto-advances the phase when deleting the NPC leaves the current NPC phase with no unlocked participants', () => {
+  const gameState = makeGameStateWithPlayer();
+  const player = gameState.players.get('p1');
+  player.inventory.push({ id: 'omen_004' });
+  gameState.players.set('npc_1', {
+    playerId: 'npc_1', isNPC: true, controlledBy: 'p1', linkedImprintId: 'omen_004',
+    floor: 'ground', x: 0, y: 0, inventory: [], phaseLocked: false,
+  });
+  gameState.board = { ground: new Map([['0,0', { roomId: 'room_test', droppedItems: [] }]]) };
+  gameState.currentPhase = 'npc_move'; // npc_1 is the only participant of this phase and is not locked
+
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'remove_imprint' },
+  ], { omenCatalog: [{ id: 'omen_004', category: 'imprint', effects: [{ type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' }] }] });
+
+  expect(gameState.players.has('npc_1')).toBe(false);
+  // Deleting npc_1 leaves npc_move with zero participants, so it must
+  // auto-advance rather than dangle -- per PHASE_ORDER the next phase is
+  // player_interact (p1, the lone real player, is unlocked there, so the
+  // cascade stops there rather than continuing to npc_interact/settlement).
+  expect(gameState.currentPhase).toBe('player_interact');
+});
+
 test('resolveEffects remove_imprint leaves an NPC alone when the removed imprint is a different card', () => {
   const gameState = makeGameStateWithPlayer();
   const player = gameState.players.get('p1');
@@ -618,6 +641,20 @@ test('resolveEffects create_npc throws UNKNOWN_NPC_ID when npcID isn\'t in the c
       { type: 'create_npc', npcID: 'no_such_npc', linkedImprintId: 'omen_004' },
     ], { npcCatalog: makeNpcCatalog() })
   ).toThrow('UNKNOWN_NPC_ID');
+});
+
+test('resolveEffects create_npc throws NPC_ALREADY_ACTIVE when the player already controls an NPC from the same imprint', () => {
+  const gameState = makeGameStateWithPlayer();
+  resolveEffects(gameState, createPromptState(), 'p1', [
+    { type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' },
+  ], { npcCatalog: makeNpcCatalog() });
+  const sizeAfterFirst = gameState.players.size;
+  expect(() =>
+    resolveEffects(gameState, createPromptState(), 'p1', [
+      { type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' },
+    ], { npcCatalog: makeNpcCatalog() })
+  ).toThrow('NPC_ALREADY_ACTIVE');
+  expect(gameState.players.size).toBe(sizeAfterFirst);
 });
 
 test('resolveEffects draw_card draws the requested count from the given deck, adds them to inventory, and reports appliedCount/drawnCards', () => {
