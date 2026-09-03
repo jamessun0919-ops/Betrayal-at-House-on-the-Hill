@@ -59,7 +59,7 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
 - 刪除 `effectResolver.js` 的 `switch_control`／`handleSwitchControl`
 - 刪除 `player.summons` 欄位與其初始化／清理邏輯（`playerEntity.js`）
 - 刪除對應 socket 事件（`game:moveSummon`／`game:selectSummonAction`，若存在獨立事件名）
-- **因此 `turnOrder`／`currentPlayerIndex`／`getCurrentTurnPlayerId`／`requireTurnOrder` 會失去唯一消費端**（階段D已確認這是它們僅剩的存在理由），一併刪除；`gameManager.js` `startGame` 洗牌初始化 `turnOrder` 的程式碼也一併清掉
+- **`getCurrentTurnPlayerId`／`requireTurnOrder` 會失去唯一消費端，一併刪除**。但 `gameState.turnOrder`／`currentPlayerIndex` 欄位本身與 `gameManager.js` 開局洗牌邏輯**保留不動**——寫計畫時查證發現，幾乎所有雙人測試共用的輔助函式（`setUpStartedGame`／`setUpStartedGameWithContent`）都是靠 `startedPayload.turnOrder[startedPayload.currentPlayerIndex]` 決定 `currentPlayerId`／`currentClient`／`otherClient`，這個模式雖然是舊制沿用下來的（現在已經沒有語意上的必要性，純粹拿來固定選一位玩家當測試裡的稱呼），但砍掉這兩個欄位會讓幾乎所有既有測試的共用輔助函式壞掉，遠超過這個子專案的範圍。開發者確認：欄位＋洗牌保留，只刪除真正的消費函式
 - 既有測試：`turnFlow.test.js`／`socketHandlers.test.js` 裡涉及 `moveSummon`/`selectSummonAction`/`switch_control`/`turnOrder`/`getCurrentTurnPlayerId` 的既有測試，全部刪除或改寫成對應新模型的測試
 
 ## 四、前端 UI
