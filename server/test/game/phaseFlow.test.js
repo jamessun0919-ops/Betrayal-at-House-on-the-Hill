@@ -1,6 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { getStatValue, changeStat } = require('../../src/game/playerEntity');
-const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase } = require('../../src/game/phaseFlow');
+const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity } = require('../../src/game/phaseFlow');
 
 function makeStats() {
   return {
@@ -108,12 +108,6 @@ test('lockPlayerPhase throws PLAYER_NOT_FOUND for an unknown playerId', () => {
   expect(() => lockPlayerPhase(gameState, 'ghost')).toThrow('PLAYER_NOT_FOUND');
 });
 
-test('lockPlayerPhase throws NOT_YOUR_PHASE when called during an NPC phase', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
-  gameState.currentPhase = 'npc_move'; // force the state directly, bypassing enterPhase's auto-cascade, to test the guard in isolation
-  expect(() => lockPlayerPhase(gameState, 'p1')).toThrow('NOT_YOUR_PHASE');
-});
-
 test('lockPlayerPhase throws ALREADY_LOCKED when the same player locks twice in the same phase', () => {
   const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   enterPhase(gameState, 'player_move');
@@ -139,18 +133,48 @@ test('requirePhase throws NOT_YOUR_PHASE when the current phase does not match e
   expect(() => requirePhase(gameState, 'p1', 'player_interact')).toThrow('NOT_YOUR_PHASE');
 });
 
-test('requirePhase throws NOT_YOUR_PHASE for an NPC player even if currentPhase matches expectedPhase', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
-  enterPhase(gameState, 'player_move');
-  gameState.players.get('p1').isNPC = true;
-  expect(() => requirePhase(gameState, 'p1', 'player_move')).toThrow('NOT_YOUR_PHASE');
-});
-
 test('requirePhase throws ALREADY_LOCKED when the player has already locked the current phase', () => {
   const gameState = makeGameStateWithPlayers(['p1', 'p2']); // 2 players so p1 locking alone doesn't auto-advance the phase
   enterPhase(gameState, 'player_move');
   lockPlayerPhase(gameState, 'p1');
   expect(() => requirePhase(gameState, 'p1', 'player_move')).toThrow('ALREADY_LOCKED');
+});
+
+test('requirePhase and lockPlayerPhase treat an NPC playerId exactly like a real player once phase/lock match', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false });
+  gameState.currentPhase = 'npc_move';
+  expect(() => requirePhase(gameState, 'npc_1', 'npc_move')).not.toThrow();
+  expect(() => lockPlayerPhase(gameState, 'npc_1')).not.toThrow();
+  expect(gameState.players.get('npc_1').phaseLocked).toBe(true);
+});
+
+test('resolveActingEntity returns the caller\'s own id when actingAsNpcId is not given', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  expect(resolveActingEntity(gameState, 'p1', undefined)).toBe('p1');
+  expect(resolveActingEntity(gameState, 'p1', null)).toBe('p1');
+});
+
+test('resolveActingEntity returns the NPC\'s own id when it is controlled by the caller', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1' });
+  expect(resolveActingEntity(gameState, 'p1', 'npc_1')).toBe('npc_1');
+});
+
+test('resolveActingEntity throws NPC_NOT_CONTROLLED_BY_YOU for an NPC controlled by someone else', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p2' });
+  expect(() => resolveActingEntity(gameState, 'p1', 'npc_1')).toThrow('NPC_NOT_CONTROLLED_BY_YOU');
+});
+
+test('resolveActingEntity throws NPC_NOT_CONTROLLED_BY_YOU for a non-existent NPC id', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  expect(() => resolveActingEntity(gameState, 'p1', 'no_such_npc')).toThrow('NPC_NOT_CONTROLLED_BY_YOU');
+});
+
+test('resolveActingEntity throws NPC_NOT_CONTROLLED_BY_YOU when actingAsNpcId points at a real player, not an NPC', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  expect(() => resolveActingEntity(gameState, 'p1', 'p2')).toThrow('NPC_NOT_CONTROLLED_BY_YOU');
 });
 
 // 2026-09-03 regression: these three per-round resets used to live in

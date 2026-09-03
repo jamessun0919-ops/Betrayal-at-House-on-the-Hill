@@ -92,13 +92,6 @@ function advancePhase(gameState) {
 function lockPlayerPhase(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const phase = gameState.currentPhase;
-  if (isNpcPhase(phase) || player.isNPC) {
-    // Real players never act during an NPC phase, and an NPC entity has no
-    // socket connection of its own to call this from -- NPC-phase locking
-    // (an owner locking their controlled NPC) is Handover item 8's "NPC 回合
-    // 的操控權授權" piece, deliberately deferred, see the design doc.
-    throw new Error('NOT_YOUR_PHASE');
-  }
   if (player.phaseLocked) {
     throw new Error('ALREADY_LOCKED');
   }
@@ -116,7 +109,7 @@ function lockPlayerPhase(gameState, playerId) {
 // thing to a caller: the current phase state doesn't allow this right now.
 function requirePhase(gameState, playerId, expectedPhase) {
   const player = requirePlayer(gameState, playerId);
-  if (player.isNPC || gameState.currentPhase !== expectedPhase) {
+  if (gameState.currentPhase !== expectedPhase) {
     throw new Error('NOT_YOUR_PHASE');
   }
   if (player.phaseLocked) {
@@ -124,4 +117,23 @@ function requirePhase(gameState, playerId, expectedPhase) {
   }
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase };
+// Authorization boundary for NPC-driven actions -- socketHandlers.js calls
+// this once per relevant event with the caller's own (trusted, from
+// socket.data) playerId and the optional actingAsNpcId from the payload,
+// then treats the returned id as "the playerId this action applies to" for
+// every existing function below (requirePhase/lockPlayerPhase/turnFlow.js's
+// moveToRoom/selectAction, or npcFlow.js for an NPC). Those functions no
+// longer need their own isNPC check -- this is the only place that decides
+// whether a caller is allowed to act as a given NPC.
+function resolveActingEntity(gameState, callerId, actingAsNpcId) {
+  if (!actingAsNpcId) {
+    return callerId;
+  }
+  const npc = getPlayer(gameState, actingAsNpcId);
+  if (!npc || !npc.isNPC || npc.controlledBy !== callerId) {
+    throw new Error('NPC_NOT_CONTROLLED_BY_YOU');
+  }
+  return actingAsNpcId;
+}
+
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity };
