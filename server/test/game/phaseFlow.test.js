@@ -149,6 +149,14 @@ test('requirePhase and lockPlayerPhase treat an NPC playerId exactly like a real
   expect(gameState.players.get('npc_1').phaseLocked).toBe(true);
 });
 
+test('lockPlayerPhase throws NOT_YOUR_PHASE when a real (non-NPC) player locks during npc_move/npc_interact', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.currentPhase = 'npc_move';
+  expect(() => lockPlayerPhase(gameState, 'p1')).toThrow('NOT_YOUR_PHASE');
+  gameState.currentPhase = 'npc_interact';
+  expect(() => lockPlayerPhase(gameState, 'p1')).toThrow('NOT_YOUR_PHASE');
+});
+
 test('resolveActingEntity returns the caller\'s own id when actingAsNpcId is not given', () => {
   const gameState = makeGameStateWithPlayers(['p1']);
   expect(resolveActingEntity(gameState, 'p1', undefined)).toBe('p1');

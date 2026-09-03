@@ -92,6 +92,9 @@ function advancePhase(gameState) {
 function lockPlayerPhase(gameState, playerId) {
   const player = requirePlayer(gameState, playerId);
   const phase = gameState.currentPhase;
+  if (isNpcPhase(phase) && !player.isNPC) {
+    throw new Error('NOT_YOUR_PHASE');
+  }
   if (player.phaseLocked) {
     throw new Error('ALREADY_LOCKED');
   }
@@ -136,4 +139,4 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
   return actingAsNpcId;
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity };
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked };
