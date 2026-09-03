@@ -14,7 +14,7 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, endTurn, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
+const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
 const { lockPlayerPhase } = require('./game/phaseFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
@@ -445,6 +445,12 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
+    // Legacy event name, kept as a compatibility alias for game:lockPhase so
+    // the ~40 existing tests that use it as scaffolding for unrelated
+    // features didn't all need editing when the old turn model retired
+    // (2026-09-03) -- it does NOT mean "end my turn" anymore (there is no
+    // single "turn" left, only phases within a round), it means "lock my
+    // current phase," exactly like game:lockPhase below.
     socket.on('game:endTurn', (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {
@@ -466,18 +472,23 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
         const player = getPlayer(gameState, playerId);
+        if (player.summons) {
+          // This guard used to live inside turnFlow.js's endTurn() itself;
+          // moved here since that function no longer exists.
+          return ack({ error: 'SUMMON_ACTIVE' });
+        }
         const placedRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
         const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
-        const nextPlayerId = endTurn(gameState, playerId);
+        lockPlayerPhase(gameState, playerId);
         try {
           applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition, effectChoiceTimeouts, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
         } catch (bonusErr) {
           // Same rationale as the resolveCardDraw catch below -- a bad room
-          // bonus definition must not prevent the turn from having already
-          // advanced, or skip the state broadcast.
+          // bonus definition must not prevent the phase from having already
+          // locked, or skip the state broadcast.
           console.error('applyRoomEndTurnBonus error', bonusErr);
         }
-        ack({ nextPlayerId });
+        ack({ currentPhase: gameState.currentPhase });
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:endTurn error', err);
