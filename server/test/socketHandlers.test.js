@@ -1545,7 +1545,7 @@ test('game:useStairs is rejected when the player is not standing at the stairs l
   httpServer.close();
 });
 
-test('game:endTurn is a legacy-named alias for game:lockPhase -- it locks the caller\'s phase and advances the round once every real player has locked', async () => {
+test('game:endTurn is a legacy-named alias for game:lockPhase -- it locks the caller\'s phase and advances to the next phase once every real player has locked', async () => {
   const { httpServer, clientA, clientB, currentClient, otherClient } = await setUpStartedGame();
 
   const firstResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
