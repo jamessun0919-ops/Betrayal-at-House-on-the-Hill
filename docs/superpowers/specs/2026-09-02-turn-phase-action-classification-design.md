@@ -88,9 +88,11 @@ function requirePhase(gameState, playerId, expectedPhase) {
 - **已知風險，實作時要注意**：`game:endTurn` 保留事件名稱不代表行為完全等價。舊制下，兩位真人玩家依序呼叫 `game:endTurn` 的效果是「輪流切換誰是當前玩家」；新制下，呼叫 `game:lockPhase`（別名）的效果是「鎖定呼叫者自己的階段，等全體都鎖定才會真的推進」——多人依序呼叫的中間狀態不完全一樣（例如 p1 呼叫後 p2 呼叫，舊制會變成「換 p2 的回合」，新制是「p1、p2都鎖定，一起進下一階段」）。這代表現有測試即使**程式碼不用改**，也需要**逐一確認斷言的觀察結果在新語意下依然成立**，不能只看「有沒有編譯過/呼叫路徑還在」就當作沒問題——這個查核工作是實作階段（SDD執行）的一部分，不是這份設計文件能提前窮舉完的。
 - **現有測試遷移**：`turnFlow.test.js` 裡直接測試 `advanceTurn`／`endTurn` 自身行為的測試（約15個，含 `searchedThisTurn`/`diceInterjectionUsedThisTurn` 重置測試——這兩個已經在 `phaseFlow.test.js` 有對應的新測試，刪除不會留下覆蓋率缺口）要跟著函式一起刪除；`getCurrentTurnPlayerId` 自己的測試（2個）與 `moveSummon`／`selectSummonAction` 的既有測試維持不動（函式本身沒變）。`socketHandlers.test.js` 的 42 個 `game:endTurn` 引用，只有 1 個（`nextPlayerId` 斷言）確定要改，其餘依上一點的風險說明逐一查核。
 
-### 階段 C：行動力欄位所有權交接（2026-09-03 定案，執行順序排在階段D之後）
+### 階段 C：行動力欄位所有權交接（2026-09-03 定案，執行順序排在階段D之後；**2026-09-03 第 2 次工作階段確認完成，純文件收尾，無程式碼異動**）
 
 移除 `turnFlow.js` `advanceTurn` 裡的 `resetActionPoints(nextPlayer)` 呼叫——但階段D已經把 `advanceTurn` 整支函式刪掉了，所以階段C做到這裡時，這一步實際上已經自動完成，階段C真正剩下的工作只是**確認**沒有任何殘留路徑還在重置行動力，以及視情況清理設計文件/註解裡對「兩套重置時機點」的過時描述。這一步的原始動機（2026-09-02 骨架完成時發現的「連續呼叫 `game:lockPhase` 可以繞一圈把行動力提前刷新」問題）已經在 2026-09-03 搬移三個每回合重置到 `enterPhase` 時一併解決。
+
+**確認結果**：`grep` 全部 `resetActionPoints` 呼叫點，只剩 2 處——`phaseFlow.js` 的 `enterPhase`（進入 move 階段時的正常每回合重置）與 `gameState.js`（玩家加入遊戲的一次性初始化）。`turnFlow.js` 已完全不 import、不呼叫 `resetActionPoints`（階段D Task4 死代碼清查已移除孤兒 import）。沒有找到任何殘留註解還在描述「新舊兩制各自獨立重置行動力」這種已經不存在的狀態——`phaseFlow.js` 裡提到 `advanceTurn` 的註解是歷史說明（解釋這段程式碼為什麼會搬到這裡），不是描述目前仍有兩套系統並存，不需要修改。行動力欄位（`actionPoints`）確認已由新制單一擁有，M2E 第二子專案（既有機制歸類＋新舊制行動力欄位交接）至此全部完成（階段A／B／UI／D／C）。
 
 ## 已知影響與風險
 
