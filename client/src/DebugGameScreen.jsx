@@ -305,10 +305,10 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
     handleSelectAction('room_action', { actionIndex });
   }
 
-  function handleEndTurn() {
-    socket.emit('game:endTurn', {}, (res) => {
+  function handleLockPhase() {
+    socket.emit('game:lockPhase', {}, (res) => {
       if (res && res.error) {
-        console.error('[game:endTurn]', res.error);
+        console.error('[game:lockPhase]', res.error);
         setActionError(res.error);
       }
     });
@@ -471,8 +471,8 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               <button style={cornerButtonStyle('bottom-left')} onClick={() => handleSelectAction('attack')}>
                 {wrapLabel('襲擊目標', 2)}
               </button>
-              <button style={cornerButtonStyle('bottom-right')} onClick={handleEndTurn}>
-                {wrapLabel('回合結束', 2)}
+              <button style={cornerButtonStyle('bottom-right')} onClick={handleLockPhase}>
+                {wrapLabel('階段結束', 2)}
               </button>
             </div>
           </div>
@@ -592,6 +592,13 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               title={resolveSimplePopupTitle(pendingCheckQueue[0], roomContent, cardContent)}
               body={resolveSimplePopupBody(pendingCheckQueue[0], roomContent, cardContent)}
               onDone={() => setPendingCheckQueue((prev) => prev.slice(1))}
+            />
+          )}
+          {gameState.currentPhase === 'settlement' && (
+            <SimplePopup
+              title="結算階段"
+              body="本回合尚無需要結算的效果。"
+              onDone={handleLockPhase}
             />
           )}
         </div>
