@@ -4,7 +4,7 @@
 
 讓 2026-09-02 完成的五階段狀態機骨架（`server/src/game/phaseFlow.js`）真正接管遊戲行為：把現有會做「回合擁有權」判斷的程式碼，逐步從舊制（`turnFlow.js` 的 `turnOrder`/`currentPlayerIndex`/`getCurrentTurnPlayerId`）換成新制（`gameState.currentPhase`/`player.phaseLocked`），最終讓舊制完全退役。行動力欄位（`actionPoints`）的重置時機，也在這個過程中正式交給新制單一擁有。
 
-依開發者要求拆成四個階段依序實作，每個階段各自有自己的 Jest 測試驗證；過渡期間新舊兩制同時存在、判斷邏輯不完全一致，是刻意接受的中間態（開發者明確表示：在整個回合制改動全部完成之前，不會進行多人真實上線測試，只要求每個階段自己的測試邏輯正確）。
+依開發者要求拆成多個階段依序實作，每個階段各自有自己的 Jest 測試驗證；過渡期間新舊兩制同時存在、判斷邏輯不完全一致，是刻意接受的中間態（開發者明確表示：在整個回合制改動全部完成之前，不會進行多人真實上線測試，只要求每個階段自己的測試邏輯正確）。原本規劃階段A→B→C→D，2026-09-03 brainstorm階段C時發現順序有問題（見下方階段C/D/UI各自的說明），最終改為 A→B→UI→D→C。
 
 ## 現況
 
@@ -70,15 +70,27 @@ function requirePhase(gameState, playerId, expectedPhase) {
 
 `actionType`合法性檢查（`INVALID_ACTION_TYPE`）與行動力檢查（`NOT_ENOUGH_ACTION_POINTS`）維持在函式最上方、不用等到判斷完階段才檢查——這兩個是跟階段完全無關的既有驗證，維持原本檢查順序即可。
 
-### 階段 C：行動力欄位所有權交接
+### 階段 UI：前端每階段結束按鈕、結算彈窗
 
-移除 `turnFlow.js` `advanceTurn` 裡的 `resetActionPoints(nextPlayer)` 呼叫——這一步做完之後，行動力重置只剩 `phaseFlow.js` 的 `enterPhase` 這一個時機點，2026-09-02 骨架完成時發現的「連續呼叫 `game:lockPhase` 可以繞一圈把行動力提前刷新」問題會自然消失（因為屆時舊制根本不會再自己重置行動力，兩套時機點的衝突不存在了）。
+**已於 2026-09-03 完成並合併**（原本排在階段D之後，brainstorm階段C時發現移除舊制行動力重置會讓單人測試也玩不下去，往下追查又發現階段D退役 `endTurn` 若沒有前端UI會讓玩家完全無法結束回合，兩次發現都指向同一個結論：UI要先做。最終順序改為 UI→D→C，詳見 Handover 項目14）。範圍：`client/src/DebugGameScreen.jsx` 唯一的「回合結束」按鈕改名「階段結束」、呼叫目標從 `game:endTurn` 改成 `game:lockPhase`；新增依 `currentPhase === 'settlement'` 條件渲染的結算確認彈窗（重用既有 `SimplePopup`，無實際結算內容）。合併後緊接著發現並修復一個真實回歸：`advanceTurn` 原本負責的 `searchedThisTurn`／`diceInterjectionUsedThisTurn`／`pendingStatReverts` 三個每回合重置，因為按鈕不再呼叫 `game:endTurn` 而完全停止運作——已搬進 `enterPhase`，詳見 Handover 項目14。
 
-### 階段 D：舊制正式退役
+### 階段 D：舊制正式退役（2026-09-03 定案，執行順序排在階段C之前）
 
-- `turnOrder`/`currentPlayerIndex`/`advanceTurn`/`endTurn`/`getCurrentTurnPlayerId` 移除，或視情況保留 `turnOrder` 純粹作為初始座位/UI排序用途（不再讀取來做任何行動閘門判斷）——實際保留或移除，等做到這階段、盤點清楚還有沒有其他地方依賴 `turnOrder` 的既有語意（例如角色 icon 排序、初始房間分配）再決定，這裡先不定案。
-- `game:endTurn` socket 事件、對應的「結束回合」按鈕語意上被 `game:lockPhase`（鎖定目前階段）取代——UI 串接（後續子專案清單第4項）會處理實際前端改動，這裡只處理伺服器端退役。
-- 現有 717 個測試裡，凡是假設嚴格輪流制（例如手動設定 `gameState.turnOrder`/`currentPlayerIndex`、依賴 `advanceTurn` 換人）的測試，需要同步改寫成新制的階段/鎖定語意。這一步不是「事後遷移」，是這個階段本身的驗收條件——階段D做完，全部測試應該只依賴新制通過，不再依賴舊制。
+**範圍已確認，尚未實作**：
+
+- **`turnOrder`／`currentPlayerIndex`／`getCurrentTurnPlayerId` 保留，作為純讀取資料**：`gameManager.js` `startGame` 依然在開局時洗牌初始化一次，之後永遠不再被任何邏輯推進（`advanceTurn` 被刪除後，沒有任何呼叫點會改變 `currentPlayerIndex`）。保留原因：`moveSummon`／`selectSummonAction`（Handover 項目8的犬靈操控機制，已知完全沒有前端UI可觸發、確定會被項目8的新NPC實體模型整個取代）仍然依賴 `getCurrentTurnPlayerId` 做擁有權判斷——與其現在花力氣改寫這兩支即將被整個換掉的函式，不如保留它們依賴的既有函式當作靜態唯讀資料的消費端，等項目8真正重寫召喚機制時一併處理。
+- **`turnFlow.js` 的 `advanceTurn`／`endTurn` 刪除**：這兩支函式是真正驅動回合推進的邏輯，現在完全沒有任何路徑會呼叫到（`game:endTurn` 這個 socket 事件名稱本身保留，見下方，但內部不再呼叫這兩支函式）。`advanceTurn` 原本做的三件事：①行動力重置、②`searchedThisTurn`／`diceInterjectionUsedThisTurn`／`pendingStatReverts` 三個每回合重置——**這兩類已於 2026-09-03 搬進 `phaseFlow.js` 的 `enterPhase`**（上方「階段UI」小節記錄的回歸修復，已完成並合併，不是這個階段的工作）；③操控者結束回合時強制清空 `summons`（含掉落召喚物身上道具）——**刻意不搬，留給項目8**，這段邏輯屬於即將被整個取代的舊召喚機制，搬過去是白工。
+- **`game:endTurn` socket 事件保留，內部改成呼叫 `lockPlayerPhase`（不是刪除）**：查證發現 `socketHandlers.test.js` 裡有 42 次 `game:endTurn` 引用，但大多數測試真正要測的不是 `endTurn` 本身，是借用它當「推進遊戲狀態」的工具去測試其他機制（例如 `applyRoomEndTurnBonus` 的「房間 onceOnlyPerPlayer 加成」、`grant_item` 觸發背包選擇會擋住 `endTurn`、待定的擲骰/效果選擇會擋住 `endTurn` 等）。**開發者確認：保留 `game:endTurn` 這個 socket 事件名稱當作 `game:lockPhase` 的相容別名，降低測試改寫風險**——舊制的擁有權判斷（`NOT_YOUR_TURN`）真的不存在了，只是 socket 事件名稱本身不變。具體改法：
+  - `endTurn(gameState, playerId)` 呼叫改成 `lockPlayerPhase(gameState, playerId)`
+  - `SUMMON_ACTIVE` 檢查（`if (player.summons) throw...`）手動保留在 `socketHandlers.js` 的 handler 裡（原本在 `endTurn` 函式內，函式被刪除後這個檢查需要留在呼叫端），維持既有測試「操控召喚物時不能結束回合」的行為不變
+  - `applyRoomEndTurnBonus` 呼叫不受影響（它是依 `playerId`——執行動作的那個人——判斷，不是依 `nextPlayerId`，跟底層是舊制還是新制無關）
+  - ack 回傳格式從 `{ nextPlayerId }` 改成 `{ currentPhase: gameState.currentPhase }`（比照 `game:lockPhase` 自己的 handler）——目前只有 1 個既有測試斷言 `result.nextPlayerId`，需要跟著改
+- **已知風險，實作時要注意**：`game:endTurn` 保留事件名稱不代表行為完全等價。舊制下，兩位真人玩家依序呼叫 `game:endTurn` 的效果是「輪流切換誰是當前玩家」；新制下，呼叫 `game:lockPhase`（別名）的效果是「鎖定呼叫者自己的階段，等全體都鎖定才會真的推進」——多人依序呼叫的中間狀態不完全一樣（例如 p1 呼叫後 p2 呼叫，舊制會變成「換 p2 的回合」，新制是「p1、p2都鎖定，一起進下一階段」）。這代表現有測試即使**程式碼不用改**，也需要**逐一確認斷言的觀察結果在新語意下依然成立**，不能只看「有沒有編譯過/呼叫路徑還在」就當作沒問題——這個查核工作是實作階段（SDD執行）的一部分，不是這份設計文件能提前窮舉完的。
+- **現有測試遷移**：`turnFlow.test.js` 裡直接測試 `advanceTurn`／`endTurn` 自身行為的測試（約15個，含 `searchedThisTurn`/`diceInterjectionUsedThisTurn` 重置測試——這兩個已經在 `phaseFlow.test.js` 有對應的新測試，刪除不會留下覆蓋率缺口）要跟著函式一起刪除；`getCurrentTurnPlayerId` 自己的測試（2個）與 `moveSummon`／`selectSummonAction` 的既有測試維持不動（函式本身沒變）。`socketHandlers.test.js` 的 42 個 `game:endTurn` 引用，只有 1 個（`nextPlayerId` 斷言）確定要改，其餘依上一點的風險說明逐一查核。
+
+### 階段 C：行動力欄位所有權交接（2026-09-03 定案，執行順序排在階段D之後）
+
+移除 `turnFlow.js` `advanceTurn` 裡的 `resetActionPoints(nextPlayer)` 呼叫——但階段D已經把 `advanceTurn` 整支函式刪掉了，所以階段C做到這裡時，這一步實際上已經自動完成，階段C真正剩下的工作只是**確認**沒有任何殘留路徑還在重置行動力，以及視情況清理設計文件/註解裡對「兩套重置時機點」的過時描述。這一步的原始動機（2026-09-02 骨架完成時發現的「連續呼叫 `game:lockPhase` 可以繞一圈把行動力提前刷新」問題）已經在 2026-09-03 搬移三個每回合重置到 `enterPhase` 時一併解決。
 
 ## 已知影響與風險
 
@@ -90,7 +102,8 @@ function requirePhase(gameState, playerId, expectedPhase) {
 ## 範圍排除
 
 - 並發安全機制（先到先得的實際程式碼）：後續子專案清單第3項，等這裡的分類/階段真正允許多人同時行動後才有意義做
-- 前端 UI（每階段結束按鈕、結算彈窗）：後續子專案清單第4項
 - M3 傷害/攻擊系統本身：`attack` 這裡只接對階段，不實作內容
+- 互動階段結算的實際運算規則：後續子專案清單第5項
 - NPC 操控機制：Handover 項目8，等這裡跟並發機制先穩定
 - 倒數計時：後續子專案清單第7項
+- 召喚物（`moveSummon`／`selectSummonAction`）的既有回合擁有權判斷與 `advanceTurn` 原本的清理邏輯：留給項目8 NPC實體模型重寫時一併處理，不在這份文件任何階段的範圍內
