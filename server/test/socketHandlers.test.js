@@ -1613,21 +1613,6 @@ test('game:endTurn is rejected while an effect choice is pending', async () => {
   httpServer.close();
 });
 
-test('game:endTurn rejects the caller while they are controlling an active summon', async () => {
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
-  const gameState = getGameState(gameManager, roomCode);
-  getPlayer(gameState, currentPlayerId).summons = {
-    type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null,
-  };
-
-  const result = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
-  expect(result.error).toBe('SUMMON_ACTIVE');
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
 test('game:endTurn applies a room\'s onceOnlyPerPlayer bonus the first time the player ends their turn there', async () => {
   const content = makeContent({
     startingRooms: [
@@ -1747,24 +1732,6 @@ test('game:lockPhase rejects a second lock from the same player with ALREADY_LOC
   expect(first.error).toBeUndefined();
   const second = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
   expect(second.error).toBe('ALREADY_LOCKED');
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
-// 2026-09-03: game:lockPhase and game:endTurn share one handler body
-// (handleLockPhase in socketHandlers.js) precisely so these guards and the
-// room bonus apply no matter which event name a caller uses -- the client
-// only ever emits game:lockPhase, so this coverage matters more than the
-// equivalent game:endTurn tests above.
-test('game:lockPhase rejects the caller while they are controlling an active summon', async () => {
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
-  const gameState = getGameState(gameManager, roomCode);
-  getPlayer(gameState, currentPlayerId).summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
-
-  const result = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
-  expect(result.error).toBe('SUMMON_ACTIVE');
 
   clientA.close();
   clientB.close();
@@ -4839,6 +4806,140 @@ test('drawing an activatedOnUse omen adds it to inventory without resolving its 
   expect(player.inventory).toEqual([{ id: 'omen_004' }]);
   // The card says "當玩家使用..." -- drawing it must NOT seize control of a summon.
   expect(player.summons).toBeFalsy();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+function makeNpcContent(overrides = {}) {
+  return makeContent({
+    npcs: [{
+      npcID: 'npc_001',
+      stats: {
+        might: { track: [1], baseIndex: 0, skullIndex: 0 },
+        speed: { track: [6], baseIndex: 0, skullIndex: 0 },
+        knowledge: { track: [1], baseIndex: 0, skullIndex: 0 },
+        sanity: { track: [1], baseIndex: 0, skullIndex: 0 },
+      },
+    }],
+    cards: {
+      events: [], items: [],
+      omens: [{ id: 'omen_004', name: '犬靈', category: 'imprint', activatedOnUse: true, effects: [{ type: 'create_npc', npcID: 'npc_001', linkedImprintId: 'omen_004' }] }],
+    },
+    ...overrides,
+  });
+}
+
+test('game:selectAction using omen_004 creates a controllable NPC at the player\'s position', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  const npc = gameState.players.get([...gameState.players.keys()].find((id) => gameState.players.get(id).isNPC));
+  expect(npc.controlledBy).toBe(currentPlayerId);
+  expect(npc.floor).toBe(player.floor);
+  expect(npc.x).toBe(player.x);
+  expect(npc.y).toBe(player.y);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move with actingAsNpcId moves the controlled NPC, leaving the real player\'s own position untouched', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  gameState.currentPhase = 'npc_move'; // force -- npc_move only naturally arrives after every real player locks player_move/player_interact
+  npc.actionPoints = 1; // force -- entering npc_move via enterPhase() (bypassed above) is what normally grants this; see npcFlow.test.js for the same convention
+  const playerX = player.x;
+  const playerY = player.y;
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:move', { direction: 'north', actingAsNpcId: npc.playerId }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  expect(npc.x).toBe(0);
+  expect(npc.y).toBe(0);
+  expect(player.x).toBe(playerX);
+  expect(player.y).toBe(playerY);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:move with actingAsNpcId rejects an NPC not controlled by the caller', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  gameState.currentPhase = 'npc_move';
+
+  const result = await new Promise((resolve) =>
+    otherClient.emit('game:move', { direction: 'north', actingAsNpcId: npc.playerId }, resolve)
+  );
+  expect(result.error).toBe('NPC_NOT_CONTROLLED_BY_YOU');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:selectAction with actingAsNpcId supports mode:pickup for the controlled NPC', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  gameState.currentPhase = 'npc_move';
+  npc.actionPoints = 1; // force -- see game:move test above for why this is needed when bypassing enterPhase()
+  const room = gameState.board[npc.floor].get(coordKey(npc.x, npc.y));
+  room.droppedItems.push({ id: 'item_003' });
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_003', mode: 'pickup', actingAsNpcId: npc.playerId }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  expect(npc.inventory).toEqual([{ id: 'item_003' }]);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:lockPhase with actingAsNpcId locks the NPC\'s own phaseLocked, not the caller\'s', async () => {
+  const content = makeNpcContent();
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'omen_004' });
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'omen_004' }, resolve));
+  const npc = [...gameState.players.values()].find((p) => p.isNPC);
+  gameState.currentPhase = 'npc_move';
+
+  const result = await new Promise((resolve) =>
+    currentClient.emit('game:lockPhase', { actingAsNpcId: npc.playerId }, resolve)
+  );
+  expect(result.error).toBeUndefined();
+  expect(npc.phaseLocked).toBe(true);
+  expect(player.phaseLocked).toBe(false);
 
   clientA.close();
   clientB.close();

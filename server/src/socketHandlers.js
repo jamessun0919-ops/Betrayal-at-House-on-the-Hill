@@ -14,8 +14,9 @@ const {
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
 const { startGame, getGameState } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
-const { moveToRoom, moveSummon, selectAction, selectSummonAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
-const { lockPlayerPhase } = require('./game/phaseFlow');
+const { moveToRoom, selectAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
+const { lockPlayerPhase, resolveActingEntity } = require('./game/phaseFlow');
+const { moveNpc, npcItemAction } = require('./game/npcFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
@@ -182,14 +183,15 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
-        const { direction } = payload || {};
-        const player = getPlayer(gameState, playerId);
-        if (player.summons) {
-          const result = moveSummon(gameState, playerId, direction);
+        const { direction, actingAsNpcId } = payload || {};
+        if (actingAsNpcId) {
+          const npcId = resolveActingEntity(gameState, playerId, actingAsNpcId);
+          const result = moveNpc(gameState, npcId, direction);
           ack(result);
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
         }
+        const player = getPlayer(gameState, playerId);
         const currentRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
         const currentRoomDefinition = findRoomDefinition(content, currentRoom.roomId);
         const leaveCheck = (currentRoomDefinition && !isExemptFromLeaveCheck(player, currentRoom.roomId)) ? currentRoomDefinition.leaveCheck : null;
@@ -236,14 +238,19 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
-        const player = getPlayer(gameState, playerId);
-        if (player.summons) {
-          const { actionType, itemId, mode } = payload || {};
-          const result = selectSummonAction(gameState, playerId, actionType, { itemId, mode });
+        const { actingAsNpcId } = payload || {};
+        if (actingAsNpcId) {
+          const npcId = resolveActingEntity(gameState, playerId, actingAsNpcId);
+          const { itemId, mode } = payload || {};
+          if (mode !== 'pickup' && mode !== 'leave') {
+            return ack({ error: 'NPC_ACTION_NOT_ALLOWED' });
+          }
+          const result = npcItemAction(gameState, npcId, itemId, mode);
           ack(result);
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
         }
+        const player = getPlayer(gameState, playerId);
         const { actionType, itemId, targetPlayerId, mode } = payload || {};
         const selectOptions = { itemId, targetPlayerId, mode };
         let sourceEffects = null;
@@ -371,7 +378,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           try {
             const resolverEntry = getResolver(effectResolverManager, roomCode);
             const targetForEffects = result.targetPlayerId || playerId;
-            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
+            const effectResult = resolveEffects(gameState, resolverEntry.promptState, targetForEffects, sourceEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens, npcCatalog: content.npcs });
             const outcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, targetForEffects, sourceId, effectResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, playerId);
             if (actionType === 'item' && (!mode || mode === 'use') && !effectResult.pending && !effectResult.diceCheckResult) {
               // revealedLocations excludes whoever resolveEffects ran as (targetForEffects), so this
@@ -478,12 +485,15 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
-        const player = getPlayer(gameState, playerId);
-        if (player.summons) {
-          // This guard used to live inside turnFlow.js's endTurn() itself;
-          // moved here since that function no longer exists.
-          return ack({ error: 'SUMMON_ACTIVE' });
+        const { actingAsNpcId } = payload || {};
+        if (actingAsNpcId) {
+          const npcId = resolveActingEntity(gameState, playerId, actingAsNpcId);
+          lockPlayerPhase(gameState, npcId);
+          ack({ currentPhase: gameState.currentPhase });
+          io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
+          return;
         }
+        const player = getPlayer(gameState, playerId);
         const placedRoom = gameState.board[player.floor].get(coordKey(player.x, player.y));
         const roomDefinition = findRoomDefinition(content, placedRoom.roomId);
         lockPlayerPhase(gameState, playerId);
@@ -527,7 +537,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
         const chosenEffects = [...resolveChoiceOption(options, result.chosenOptionId), ...(pendingBonusEffects || [])];
-        const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
+        const nextResult = resolveEffects(gameState, resolverEntry.promptState, choicePlayerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens, npcCatalog: content.npcs });
         const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, choicePlayerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
         if (resolveOutcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: resolveOutcome.drawnCards });
@@ -990,7 +1000,7 @@ function applyRoomEndTurnBonus(io, effectResolverManager, gameState, roomCode, p
     return;
   }
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
+  const effectResult = resolveEffects(gameState, resolverEntry.promptState, playerId, bonusEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens, npcCatalog: content.npcs });
   handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, roomDefinition.id, effectResult, effectChoiceTimeouts, false, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
   player.roomBonusesReceived = [...received, roomDefinition.id];
 }
@@ -1100,6 +1110,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     now: Date.now(),
     itemCatalog: content.cards.items,
     omenCatalog: content.cards.omens,
+    npcCatalog: content.npcs,
     sourceDeckType: deckType,
   });
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, card.id, effectResult, effectChoiceTimeouts, false, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
@@ -1237,7 +1248,7 @@ function resumeRollChoice(io, effectResolverManager, gameState, roomCode, player
   }
   const resolverEntry = getResolver(effectResolverManager, roomCode);
   const { effect, sourceId, consumeItemIfApplied, sourceDeckType } = resumeContext;
-  const context = { now: Date.now(), interjectionChoice, itemCatalog: content.cards.items, omenCatalog: content.cards.omens, sourceDeckType };
+  const context = { now: Date.now(), interjectionChoice, itemCatalog: content.cards.items, omenCatalog: content.cards.omens, npcCatalog: content.npcs, sourceDeckType };
   const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, [effect], context);
   return handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
 }
@@ -1343,7 +1354,7 @@ function handleEffectChoiceTimeout(io, effectResolverManager, gameState, roomCod
     }
     io.to(roomCode).emit('game:promptResolved', result);
     const chosenEffects = [...resolveChoiceOption(options, result.chosenOptionId), ...(pendingBonusEffects || [])];
-    const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens });
+    const nextResult = resolveEffects(gameState, resolverEntry.promptState, playerId, chosenEffects, { now: Date.now(), itemCatalog: content.cards.items, omenCatalog: content.cards.omens, npcCatalog: content.npcs });
     const resolveOutcome = handleEffectResolveResult(io, effectResolverManager, gameState, roomCode, playerId, sourceId, nextResult, effectChoiceTimeouts, consumeItemIfApplied, content, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
     io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
   } catch (err) {
