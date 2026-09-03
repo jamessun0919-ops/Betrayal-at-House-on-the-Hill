@@ -194,3 +194,35 @@ test('enterPhase applies pendingStatReverts after resetActionPoints, so a tempor
   expect(player.actionPoints).toBe(boostedSpeed); // AP rolled against the still-boosted value before the revert applied
   expect(getStatValue(player, 'speed')).toBe(4); // speed itself has now reverted back to base
 });
+
+// 2026-09-03: negative counterparts to the four tests above -- entering a
+// phase OTHER than player_move must NOT fire any of these three resets.
+// Without this coverage, moving the `if (phase === 'player_move')` guard
+// (or deleting it) would silently pass every existing test in this file.
+test('enterPhase does NOT reset searchedThisTurn/diceInterjectionUsedThisTurn/pendingStatReverts when entering player_interact', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  const beforeMight = player.stats.might.currentIndex;
+  player.searchedThisTurn = true;
+  player.diceInterjectionUsedThisTurn = ['item_005'];
+  player.pendingStatReverts = [{ stat: 'might', delta: -1 }];
+  enterPhase(gameState, 'player_interact');
+  expect(player.searchedThisTurn).toBe(true);
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_005']);
+  expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: -1 }]);
+  expect(player.stats.might.currentIndex).toBe(beforeMight); // not reverted
+});
+
+test('enterPhase does NOT reset searchedThisTurn/diceInterjectionUsedThisTurn/pendingStatReverts when entering settlement', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const player = gameState.players.get('p1');
+  const beforeMight = player.stats.might.currentIndex;
+  player.searchedThisTurn = true;
+  player.diceInterjectionUsedThisTurn = ['item_005'];
+  player.pendingStatReverts = [{ stat: 'might', delta: -1 }];
+  enterPhase(gameState, 'settlement');
+  expect(player.searchedThisTurn).toBe(true);
+  expect(player.diceInterjectionUsedThisTurn).toEqual(['item_005']);
+  expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: -1 }]);
+  expect(player.stats.might.currentIndex).toBe(beforeMight); // not reverted
+});
