@@ -445,13 +445,20 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       }
     });
 
-    // Legacy event name, kept as a compatibility alias for game:lockPhase so
-    // the ~40 existing tests that use it as scaffolding for unrelated
-    // features didn't all need editing when the old turn model retired
-    // (2026-09-03) -- it does NOT mean "end my turn" anymore (there is no
-    // single "turn" left, only phases within a round), it means "lock my
-    // current phase," exactly like game:lockPhase below.
-    socket.on('game:endTurn', (payload, callback) => {
+    // game:endTurn is a legacy event name, kept as a compatibility alias for
+    // game:lockPhase so the ~40 existing tests that use it as scaffolding
+    // for unrelated features didn't all need editing when the old turn
+    // model retired (2026-09-03) -- it does NOT mean "end my turn" anymore
+    // (there is no single "turn" left, only phases within a round), it
+    // means "lock my current phase." Both event names share this one
+    // handler body so they're genuinely identical, not just similarly
+    // named -- an earlier draft of this alias claimed equivalence with
+    // game:lockPhase while the two handlers still had diverging guards and
+    // only one of them called applyRoomEndTurnBonus, silently breaking the
+    // room onceOnlyPerPlayer bonus and the pending-choice/summon guards on
+    // whichever event name the client didn't happen to use. Fixed here by
+    // making both names call this single implementation.
+    function handleLockPhase(eventName, payload, callback) {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {
         const { roomCode, playerId } = socket.data;
@@ -491,30 +498,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         ack({ currentPhase: gameState.currentPhase });
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
-        console.error('game:endTurn error', err);
+        console.error(`${eventName} error`, err);
         ack({ error: err.message || 'BAD_REQUEST' });
       }
-    });
+    }
 
-    socket.on('game:lockPhase', (payload, callback) => {
-      const ack = typeof callback === 'function' ? callback : () => {};
-      try {
-        const { roomCode, playerId } = socket.data;
-        if (!roomCode || !playerId) {
-          return ack({ error: 'NOT_IN_ROOM' });
-        }
-        const gameState = getGameState(gameManager, roomCode);
-        if (!gameState) {
-          return ack({ error: 'GAME_NOT_STARTED' });
-        }
-        lockPlayerPhase(gameState, playerId);
-        ack({ currentPhase: gameState.currentPhase });
-        io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
-      } catch (err) {
-        console.error('game:lockPhase error', err);
-        ack({ error: err.message || 'BAD_REQUEST' });
-      }
-    });
+    socket.on('game:endTurn', (payload, callback) => handleLockPhase('game:endTurn', payload, callback));
+    socket.on('game:lockPhase', (payload, callback) => handleLockPhase('game:lockPhase', payload, callback));
 
     socket.on('game:effectPromptRespond', (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};

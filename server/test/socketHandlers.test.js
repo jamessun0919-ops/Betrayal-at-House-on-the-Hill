@@ -1752,6 +1752,48 @@ test('game:lockPhase rejects a second lock from the same player with ALREADY_LOC
   httpServer.close();
 });
 
+// 2026-09-03: game:lockPhase and game:endTurn share one handler body
+// (handleLockPhase in socketHandlers.js) precisely so these guards and the
+// room bonus apply no matter which event name a caller uses -- the client
+// only ever emits game:lockPhase, so this coverage matters more than the
+// equivalent game:endTurn tests above.
+test('game:lockPhase rejects the caller while they are controlling an active summon', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGame();
+  const gameState = getGameState(gameManager, roomCode);
+  getPlayer(gameState, currentPlayerId).summons = { type: 'spiritDog', floor: 'ground', x: 0, y: 0, actionPoints: 6, carryingItemId: null };
+
+  const result = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(result.error).toBe('SUMMON_ACTIVE');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('game:lockPhase applies a room\'s onceOnlyPerPlayer bonus the first time the player locks there', async () => {
+  const content = makeContent({
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', effects: [{ type: 'stat_change', stat: 'sanity', delta: 1, onceOnlyPerPlayer: true }] },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+
+  const result = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(result.error).toBeUndefined();
+  expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex + 1);
+  expect(player.roomBonusesReceived).toEqual(['room_lobby_a']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into a room with a populated item deck draws a card, adds it to inventory, and resolves its non-choice effects', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
