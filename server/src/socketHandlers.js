@@ -741,9 +741,13 @@ function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolv
       }
     }
     io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
-    scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
   } catch (err) {
     console.error('phase timeout error', err);
+  } finally {
+    // Always re-arm, even if something above threw -- otherwise a single
+    // unexpected error permanently stops this room's phase clock, wedging
+    // it in place instead of just losing one timeout cycle.
+    scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs);
   }
 }
 
@@ -1162,7 +1166,6 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     resolverEntry.pendingChoice.set(playerId, {
       promptId: effectResult.promptId,
       options: effectResult.options,
-      defaultOptionId: effectResult.defaultOptionId,
       onTimeout: effectResult.onTimeout,
       playerId,
       sourceId,
