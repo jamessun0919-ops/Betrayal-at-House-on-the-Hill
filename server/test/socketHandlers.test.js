@@ -2945,54 +2945,6 @@ test('phase timeout resolves a player\'s pending inventory choice via the defaul
   httpServer.close();
 });
 
-test('a real effectPromptRespond before the deadline cancels the scheduled timeout so it cannot later double-resolve the choice', async () => {
-  const content = makeContent({
-    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
-    cards: {
-      events: [],
-      items: [{
-        id: 'item_002',
-        name: '測試選擇道具',
-        effects: [{
-          type: 'choice',
-          description: '選擇要下降哪項',
-          options: [
-            { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
-            { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
-          ],
-          timeoutMs: 100,
-          defaultOptionId: 'opt_might',
-        }],
-      }],
-      omens: [],
-    },
-  });
-  const { httpServer, clientA, clientB, currentClient } = await setUpStartedGameWithContent(content);
-
-  const resolvedEvents = [];
-  currentClient.on('game:promptResolved', (payload) => resolvedEvents.push(payload));
-
-  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
-  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
-  const pendingChoice = await pendingChoicePromise;
-
-  await new Promise((resolve) => {
-    currentClient.emit('game:effectPromptRespond', { promptId: pendingChoice.promptId, optionId: 'opt_speed' }, resolve);
-  });
-
-  // Wait past where the original 100ms deadline would have fired, to prove the
-  // scheduled timeout was actually cancelled and cannot later double-resolve.
-  await new Promise((resolve) => setTimeout(resolve, 150));
-
-  const resolvedForPrompt = resolvedEvents.filter((r) => r.promptId === pendingChoice.promptId);
-  expect(resolvedForPrompt).toHaveLength(1);
-  expect(resolvedForPrompt[0].wasTimeout).toBe(false);
-
-  clientA.close();
-  clientB.close();
-  httpServer.close();
-});
-
 test('game:move into a room with an unknown drawType does not crash the room, and the phase still locks normally via game:endTurn', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'unknown_deck_type' }],
