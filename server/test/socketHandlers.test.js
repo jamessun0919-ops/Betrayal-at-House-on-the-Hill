@@ -1,7 +1,7 @@
 const ioClient = require('socket.io-client');
 const { createServer } = require('../src/createServer');
 const { LobbyManager } = require('../src/lobbyManager');
-const { registerSocketHandlers } = require('../src/socketHandlers');
+const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
 const { createEffectResolverManager, getResolver } = require('../src/game/effectResolverManager');
@@ -56,7 +56,7 @@ function startTestServer(content, options) {
   );
   return new Promise((resolve) => {
     httpServer.listen(0, () => {
-      resolve({ httpServer, port: httpServer.address().port, lobbyManager, gameManager, characterSelectionManager, effectResolverManager });
+      resolve({ httpServer, port: httpServer.address().port, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, io });
     });
   });
 }
@@ -2512,7 +2512,7 @@ test('game:move into a room whose card effects include a choice broadcasts game:
 });
 
 async function setUpStartedGameWithContent(content, options) {
-  const { httpServer, port, gameManager, effectResolverManager } = await startTestServer(content, options);
+  const { httpServer, port, gameManager, effectResolverManager, io } = await startTestServer(content, options);
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
@@ -2559,7 +2559,7 @@ async function setUpStartedGameWithContent(content, options) {
   const currentClient = currentPlayerId === aliceId ? clientA : clientB;
   const otherClient = currentPlayerId === aliceId ? clientB : clientA;
 
-  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager, effectResolverManager };
+  return { httpServer, clientA, clientB, roomCode, aliceId, bobId, currentClient, otherClient, currentPlayerId, startedPayload, gameManager, effectResolverManager, io };
 }
 
 // A round is 5 phases (player_move -> npc_move -> player_interact ->
@@ -2637,7 +2637,12 @@ test('game:effectPromptRespond rejects when there is no pending effect choice fo
   httpServer.close();
 });
 
-test('an effect choice that times out auto-resolves with the default option', async () => {
+// This card has no onTimeout field, so resolveEffectChoiceByTimeout must treat
+// it as the 'skip' default: unlike the old per-choice setTimeout system (which
+// always applied defaultOptionId's effects on timeout), 'skip' now does
+// nothing but clear the pending prompt -- chosenOptionId comes back as
+// '__skip__', not the card's defaultOptionId, and no stat change is applied.
+test('resolveEffectChoiceByTimeout with no onTimeout field (default skip) clears the prompt without applying any option\'s effects', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
     cards: {
@@ -2652,33 +2657,87 @@ test('an effect choice that times out auto-resolves with the default option', as
             { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
             { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
           ],
-          timeoutMs: 50,
+          timeoutMs: 20000,
           defaultOptionId: 'opt_might',
         }],
       }],
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode, effectResolverManager, io } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
 
-  const promptResolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
-  const stateUpdatePromise = new Promise((resolve) => {
-    currentClient.on('game:stateUpdate', (data) => {
-      const me = data.players.find((p) => p.playerId === currentPlayerId);
-      if (me.stats.might.currentIndex < me.stats.might.baseIndex) resolve(data);
-    });
-  });
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await pendingChoicePromise;
 
-  const resolved = await promptResolvedPromise;
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  resolveEffectChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content, 20000, 20000);
+  const resolved = await resolvedPromise;
+
   expect(resolved.wasTimeout).toBe(true);
-  expect(resolved.chosenOptionId).toBe('opt_might');
-  await stateUpdatePromise; // proves the default option's effects were actually applied
+  expect(resolved.chosenOptionId).toBe('__skip__');
+  const me = getPlayer(gameState, currentPlayerId);
+  expect(me.stats.might.currentIndex).toBe(me.stats.might.baseIndex); // neither option's effects were applied
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
   httpServer.close();
-}, 2000);
+});
+
+// event_031-style card: onTimeout:'random' picks one of the choice's own
+// options at random and actually resolves its effects (unlike the 'skip'
+// default above). Both options apply the same stat_change here so the
+// assertion is deterministic regardless of which option gets picked --
+// the point of this test is that resolveEffects DOES run for 'random',
+// contrasting with the 'skip' test above where it deliberately does not.
+test('resolveEffectChoiceByTimeout with onTimeout:"random" picks a random option and applies its effects', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
+    cards: {
+      events: [],
+      items: [{
+        id: 'item_010',
+        name: '測試random選擇道具',
+        effects: [{
+          type: 'choice',
+          description: '紅色藥丸還是藍色藥丸？',
+          timeoutMs: 20000,
+          defaultOptionId: 'give_up',
+          onTimeout: 'random',
+          options: [
+            { optionId: 'red', label: '紅色', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+            { optionId: 'blue', label: '藍色', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
+          ],
+        }],
+      }],
+      omens: [],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode, effectResolverManager, io } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await pendingChoicePromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  resolveEffectChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content, 20000, 20000);
+  const resolved = await resolvedPromise;
+
+  expect(resolved.wasTimeout).toBe(true);
+  expect(['red', 'blue']).toContain(resolved.chosenOptionId);
+  const me = getPlayer(gameState, currentPlayerId);
+  expect(me.stats.might.currentIndex).toBe(me.stats.might.baseIndex - 1); // the randomly-picked option's effect was applied
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingChoice.has(currentPlayerId)).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
 
 test('game:move that opens a room whose card requires a choice does not advance the turn, and further actions are blocked until resolved', async () => {
   const content = makeContent({
@@ -2778,7 +2837,7 @@ test('resolving a pending effect choice does not by itself advance the phase -- 
   httpServer.close();
 });
 
-test('a pending effect choice that times out still requires locking (game:endTurn) to advance the phase', async () => {
+test('an effect choice resolved via resolveEffectChoiceByTimeout still requires locking (game:endTurn) to advance the phase', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],
     cards: {
@@ -2793,24 +2852,25 @@ test('a pending effect choice that times out still requires locking (game:endTur
             { optionId: 'opt_might', label: '力量', effects: [{ type: 'stat_change', stat: 'might', delta: -1 }] },
             { optionId: 'opt_speed', label: '速度', effects: [{ type: 'stat_change', stat: 'speed', delta: -1 }] },
           ],
-          timeoutMs: 50,
+          timeoutMs: 20000,
           defaultOptionId: 'opt_might',
         }],
       }],
       omens: [],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId } = await setUpStartedGameWithContent(content);
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, gameManager, roomCode, effectResolverManager, io } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
 
-  const timedOutUpdatePromise = new Promise((resolve) => {
-    currentClient.on('game:stateUpdate', (data) => {
-      const me = data.players.find((p) => p.playerId === currentPlayerId);
-      if (me.stats.might.currentIndex < me.stats.might.baseIndex) resolve(data);
-    });
-  });
+  const pendingChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
-  const timedOutUpdate = await timedOutUpdatePromise;
-  expect(timedOutUpdate.currentPhase).toBe('player_move');
+  await pendingChoicePromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  resolveEffectChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content, 20000, 20000);
+  const resolved = await resolvedPromise;
+  expect(resolved.wasTimeout).toBe(true);
+  expect(resolved.chosenOptionId).toBe('__skip__'); // no onTimeout field on this card -- defaults to 'skip', no effects applied
 
   const firstLock = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(firstLock.error).toBeUndefined();
@@ -2823,7 +2883,7 @@ test('a pending effect choice that times out still requires locking (game:endTur
   clientA.close();
   clientB.close();
   httpServer.close();
-}, 2000);
+});
 
 test('a real effectPromptRespond before the deadline cancels the scheduled timeout so it cannot later double-resolve the choice', async () => {
   const content = makeContent({
@@ -5407,7 +5467,7 @@ test('a pending inventory choice for one player still blocks that SAME player\'s
   httpServer.close();
 });
 
-test('a roll choice that times out resolves with no item used (default skip)', async () => {
+test('resolveRollChoiceByTimeout resumes the interjected roll with no item used (default skip), completing normally', async () => {
   const content = makeContent({
     cards: {
       events: [], omens: [],
@@ -5430,7 +5490,7 @@ test('a roll choice that times out resolves with no item used (default skip)', a
       ],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } = await setUpStartedGameWithContent(content, { rollChoiceTimeoutMs: 50 });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager, io } = await setUpStartedGameWithContent(content);
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.inventory.push({ id: 'item_003' }, { id: 'item_006' });
@@ -5440,13 +5500,16 @@ test('a roll choice that times out resolves with no item used (default skip)', a
   await pendingPromise;
 
   const resolvedPromise = new Promise((resolve) => currentClient.once('game:effectResolved', resolve));
+  resolveRollChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content, 20000, 20000);
   await resolvedPromise;
   expect(player.stats.sanity.currentIndex).toBe(player.stats.sanity.baseIndex); // timed out -- no item used, no cost
+  const entry = getResolver(effectResolverManager, roomCode);
+  expect(entry.pendingRollChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
   httpServer.close();
-}, 2000);
+});
 
 test('picking up a dropped item that pushes the player over the cap opens a pendingInventoryChoice', async () => {
   const content = makeContent({
@@ -5675,7 +5738,7 @@ test('game:inventoryChoiceRespond opens a second round when still over the cap a
   httpServer.close();
 });
 
-test('a timed-out inventory choice auto-leaves the triggering item and does not affect the player\'s other items', async () => {
+test('resolveInventoryChoiceByTimeout auto-leaves the triggering item and does not affect the player\'s other items', async () => {
   const content = makeContent({
     cards: {
       events: [], omens: [],
@@ -5687,30 +5750,66 @@ test('a timed-out inventory choice auto-leaves the triggering item and does not 
       ],
     },
   });
-  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager } =
-    await setUpStartedGameWithContent(content, { inventoryChoiceTimeoutMs: 50 });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager, effectResolverManager, io } =
+    await setUpStartedGameWithContent(content);
   const gameState = getGameState(gameManager, roomCode);
   const player = getPlayer(gameState, currentPlayerId);
   player.inventory.push({ id: 'item_101' }, { id: 'item_102' }, { id: 'item_103' });
   const room = gameState.board[player.floor].get(coordKey(player.x, player.y));
   room.droppedItems.push({ id: 'item_104' });
 
-  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
   await new Promise((resolve) =>
     currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_104', mode: 'pickup' }, resolve)
   );
+  await pendingPromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  resolveInventoryChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content.cards);
   const resolved = await resolvedPromise;
   expect(resolved.wasTimeout).toBe(true);
   expect(resolved.chosenOptionId).toBe('item_104');
 
   expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_101', 'item_102', 'item_103'].sort());
   expect(room.droppedItems).toEqual([{ id: 'item_104' }]);
-  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
   httpServer.close();
-}, 5000);
+});
+
+test('resolveInventoryChoiceByTimeout applies the pickInventoryChoiceDefault item, keeping the search action already spent', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002', 'item_003', 'item_004', 'item_005']);
+  content.cards.items = [
+    { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+    { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+    { id: 'item_005', name: 'E', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode, effectResolverManager, io } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' });
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await pendingPromise;
+
+  const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
+  resolveInventoryChoiceByTimeout(io, effectResolverManager, gameState, roomCode, currentPlayerId, content.cards);
+  await resolvedPromise;
+
+  // The searched-and-picked-up item never made it into the backpack (dropped
+  // by default); the search itself still cost the action point.
+  expect(getPlayer(gameState, currentPlayerId).actionPoints).toBe(0); // 1 - 1 (room_action)
+  expect(getPlayer(gameState, currentPlayerId).inventory.length).toBe(3); // still just the 3 pre-existing items
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
 
 test('game:move into event_031 (紅藍藥丸) opens a red/blue/give-up choice, and give_up still triggers the 50/50 sanity swing', async () => {
   const content = makeContent({

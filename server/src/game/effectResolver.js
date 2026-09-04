@@ -544,6 +544,7 @@ function handleChoice(gameState, promptState, playerId, effect, context) {
     description: prompt.description,
     deadline: prompt.deadline,
     defaultOptionId: effect.defaultOptionId,
+    onTimeout: effect.onTimeout || 'skip',
     options: effect.options,
   };
 }

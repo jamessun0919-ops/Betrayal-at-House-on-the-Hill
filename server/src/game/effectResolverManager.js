@@ -13,7 +13,6 @@ function startResolver(manager, roomCode) {
     pendingChoice: new Map(),
     pendingRollChoice: new Map(),
     pendingInventoryChoice: new Map(),
-    inventoryChoiceTimeoutHandle: null,
   };
   manager.resolvers.set(roomCode, entry);
   return entry;
