@@ -174,13 +174,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!gameState) {
           return ack({ error: 'GAME_NOT_STARTED' });
         }
-        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+        if (hasPendingEffectChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingRollChoice(effectResolverManager, roomCode)) {
+        if (hasPendingRollChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'ROLL_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
+        if (hasPendingInventoryChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
         const { direction, actingAsNpcId } = payload || {};
@@ -229,13 +229,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!gameState) {
           return ack({ error: 'GAME_NOT_STARTED' });
         }
-        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+        if (hasPendingEffectChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingRollChoice(effectResolverManager, roomCode)) {
+        if (hasPendingRollChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'ROLL_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
+        if (hasPendingInventoryChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
         const { actingAsNpcId } = payload || {};
@@ -434,13 +434,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!gameState) {
           return ack({ error: 'GAME_NOT_STARTED' });
         }
-        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+        if (hasPendingEffectChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingRollChoice(effectResolverManager, roomCode)) {
+        if (hasPendingRollChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'ROLL_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
+        if (hasPendingInventoryChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
         const result = useStairs(gameState, playerId);
@@ -476,13 +476,13 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (!gameState) {
           return ack({ error: 'GAME_NOT_STARTED' });
         }
-        if (hasPendingEffectChoice(effectResolverManager, roomCode)) {
+        if (hasPendingEffectChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'EFFECT_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingRollChoice(effectResolverManager, roomCode)) {
+        if (hasPendingRollChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'ROLL_CHOICE_IN_PROGRESS' });
         }
-        if (hasPendingInventoryChoice(effectResolverManager, roomCode)) {
+        if (hasPendingInventoryChoice(effectResolverManager, roomCode, playerId)) {
           return ack({ error: 'INVENTORY_CHOICE_IN_PROGRESS' });
         }
         const { actingAsNpcId } = payload || {};
@@ -528,11 +528,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'GAME_NOT_STARTED' });
         }
         const resolverEntry = getResolver(effectResolverManager, roomCode);
-        if (!resolverEntry || !resolverEntry.pendingChoice) {
+        if (!resolverEntry || !resolverEntry.pendingChoice.has(playerId)) {
           return ack({ error: 'NO_ACTIVE_EFFECT_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied, pendingBonusEffects } = resolverEntry.pendingChoice;
+        const { playerId: choicePlayerId, sourceId, options, consumeItemIfApplied, pendingBonusEffects } = resolverEntry.pendingChoice.get(playerId);
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearEffectChoiceTimeout(roomCode, effectChoiceTimeouts);
         io.to(roomCode).emit('game:promptResolved', result);
@@ -562,15 +562,15 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'GAME_NOT_STARTED' });
         }
         const resolverEntry = getResolver(effectResolverManager, roomCode);
-        if (!resolverEntry || !resolverEntry.pendingRollChoice) {
+        if (!resolverEntry || !resolverEntry.pendingRollChoice.has(playerId)) {
           return ack({ error: 'NO_ACTIVE_ROLL_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, options, resumeKind, resumeContext } = resolverEntry.pendingRollChoice;
+        const { playerId: choicePlayerId, options, resumeKind, resumeContext } = resolverEntry.pendingRollChoice.get(playerId);
 
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         clearRollChoiceTimeout(roomCode, rollChoiceTimeouts);
-        resolverEntry.pendingRollChoice = null;
+        resolverEntry.pendingRollChoice.delete(playerId);
         io.to(roomCode).emit('game:promptResolved', result);
 
         const chosenOption = optionId === '__skip__' ? null : options.find((o) => o.itemId === optionId);
@@ -602,17 +602,17 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           return ack({ error: 'GAME_NOT_STARTED' });
         }
         const resolverEntry = getResolver(effectResolverManager, roomCode);
-        if (!resolverEntry || !resolverEntry.pendingInventoryChoice) {
+        if (!resolverEntry || !resolverEntry.pendingInventoryChoice.has(playerId)) {
           return ack({ error: 'NO_ACTIVE_INVENTORY_CHOICE' });
         }
         const { promptId, optionId } = payload || {};
-        const { playerId: choicePlayerId, newlyAcquiredItemIds } = resolverEntry.pendingInventoryChoice;
+        const { playerId: choicePlayerId, newlyAcquiredItemIds } = resolverEntry.pendingInventoryChoice.get(playerId);
         const result = respondToPrompt(resolverEntry.promptState, { promptId, playerId, optionId });
         if (resolverEntry.inventoryChoiceTimeoutHandle) {
           clearTimeout(resolverEntry.inventoryChoiceTimeoutHandle);
           resolverEntry.inventoryChoiceTimeoutHandle = null;
         }
-        resolverEntry.pendingInventoryChoice = null;
+        resolverEntry.pendingInventoryChoice.delete(playerId);
         applyInventoryLeave(gameState, choicePlayerId, result.chosenOptionId);
         io.to(roomCode).emit('game:promptResolved', result);
         openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomCode, choicePlayerId, content.cards, newlyAcquiredItemIds, inventoryChoiceTimeoutMs);
@@ -700,19 +700,19 @@ function clearCharacterSelectTimeout(roomCode, characterSelectTimeouts) {
   }
 }
 
-function hasPendingEffectChoice(effectResolverManager, roomCode) {
+function hasPendingEffectChoice(effectResolverManager, roomCode, playerId) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  return Boolean(resolverEntry && resolverEntry.pendingChoice);
+  return Boolean(resolverEntry && resolverEntry.pendingChoice.has(playerId));
 }
 
-function hasPendingRollChoice(effectResolverManager, roomCode) {
+function hasPendingRollChoice(effectResolverManager, roomCode, playerId) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  return Boolean(resolverEntry && resolverEntry.pendingRollChoice);
+  return Boolean(resolverEntry && resolverEntry.pendingRollChoice.has(playerId));
 }
 
-function hasPendingInventoryChoice(effectResolverManager, roomCode) {
+function hasPendingInventoryChoice(effectResolverManager, roomCode, playerId) {
   const resolverEntry = getResolver(effectResolverManager, roomCode);
-  return Boolean(resolverEntry && resolverEntry.pendingInventoryChoice);
+  return Boolean(resolverEntry && resolverEntry.pendingInventoryChoice.has(playerId));
 }
 
 function pickInventoryChoiceDefault(heldItemIds, newlyAcquiredItemIds) {
@@ -743,13 +743,13 @@ function openInventoryChoiceIfNeeded(io, effectResolverManager, gameState, roomC
     timeoutMs: inventoryChoiceTimeoutMs,
     now: Date.now(),
   });
-  resolverEntry.pendingInventoryChoice = {
+  resolverEntry.pendingInventoryChoice.set(playerId, {
     playerId,
     itemIds: heldItemIds,
     newlyAcquiredItemIds,
     triggeredByItemId,
     deadline: prompt.deadline,
-  };
+  });
   io.to(roomCode).emit('game:inventoryChoicePending', { playerId, promptId: prompt.promptId, itemIds: heldItemIds });
   const handle = setTimeout(() => {
     handleInventoryChoiceTimeout(io, effectResolverManager, gameState, roomCode, prompt.promptId, cardContent, inventoryChoiceTimeoutMs);
@@ -931,15 +931,15 @@ function handleLeaveCheckRollPending(io, effectResolverManager, gameState, roomC
     timeoutMs: rollChoiceTimeoutMs,
     now: Date.now(),
   });
-  resolverEntry.pendingRollChoice = {
+  resolverEntry.pendingRollChoice.set(playerId, {
     playerId,
     promptId: prompt.promptId,
     deadline: prompt.deadline,
     options: moveResult.options,
     resumeKind: 'leaveCheck',
     resumeContext: { direction: moveResult.direction, leaveCheck: moveResult.leaveCheck },
-  };
-  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
+  });
+  resolverEntry.pendingChoice.delete(playerId); // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
   io.to(roomCode).emit('game:diceChoicePending', {
     playerId,
     promptId: prompt.promptId,
@@ -964,15 +964,15 @@ function handleCollapseCheckRollPending(io, effectResolverManager, gameState, ro
     timeoutMs: rollChoiceTimeoutMs,
     now: Date.now(),
   });
-  resolverEntry.pendingRollChoice = {
+  resolverEntry.pendingRollChoice.set(playerId, {
     playerId,
     promptId: prompt.promptId,
     deadline: prompt.deadline,
     options: moveResult.options,
     resumeKind: 'collapseCheck',
     resumeContext: { pendingCardDraw: moveResult.pendingCardDraw, leaveCheckResult: moveResult.leaveCheckResult },
-  };
-  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
+  });
+  resolverEntry.pendingChoice.delete(playerId); // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
   io.to(roomCode).emit('game:diceChoicePending', {
     playerId,
     promptId: prompt.promptId,
@@ -1126,7 +1126,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     return handleRollChoicePending(io, effectResolverManager, gameState, roomCode, playerId, sourceId, effectResult, consumeItemIfApplied, rollChoiceTimeouts, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, effectChoiceTimeouts, content);
   }
   if (effectResult.pending) {
-    resolverEntry.pendingChoice = {
+    resolverEntry.pendingChoice.set(playerId, {
       promptId: effectResult.promptId,
       options: effectResult.options,
       defaultOptionId: effectResult.defaultOptionId,
@@ -1134,7 +1134,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
       sourceId,
       consumeItemIfApplied,
       pendingBonusEffects: effectResult.pendingBonusEffects || [],
-    };
+    });
     io.to(roomCode).emit('game:effectPendingChoice', {
       playerId,
       promptId: effectResult.promptId,
@@ -1148,7 +1148,7 @@ function handleEffectResolveResult(io, effectResolverManager, gameState, roomCod
     effectChoiceTimeouts.set(roomCode, handle);
     return { pending: true };
   }
-  resolverEntry.pendingChoice = null;
+  resolverEntry.pendingChoice.delete(playerId);
   const player = getPlayer(gameState, playerId);
   // Centralizing game:roomEntered broadcast here changed emission order: it now fires
   // BEFORE game:itemUseResolved (emitted by caller in game:selectAction), whereas
@@ -1213,15 +1213,15 @@ function handleRollChoicePending(io, effectResolverManager, gameState, roomCode,
     timeoutMs: rollChoiceTimeoutMs,
     now: Date.now(),
   });
-  resolverEntry.pendingRollChoice = {
+  resolverEntry.pendingRollChoice.set(playerId, {
     playerId,
     promptId: prompt.promptId,
     deadline: prompt.deadline,
     options: effectResult.options,
     resumeKind: 'diceCheck',
     resumeContext: { effect: effectResult.effect, sourceId, consumeItemIfApplied, sourceDeckType: effectResult.sourceDeckType },
-  };
-  resolverEntry.pendingChoice = null; // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
+  });
+  resolverEntry.pendingChoice.delete(playerId); // a roll choice and a plain choice can never be simultaneously pending -- opening this one invalidates any other
   io.to(roomCode).emit('game:diceChoicePending', {
     playerId,
     promptId: prompt.promptId,

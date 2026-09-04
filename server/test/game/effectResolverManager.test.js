@@ -8,9 +8,9 @@ const {
 test('startResolver creates an entry with a promptState and no pending choice', () => {
   const manager = createEffectResolverManager();
   const entry = startResolver(manager, 'ROOM1');
-  expect(entry.promptState).toEqual({ pending: null });
-  expect(entry.pendingChoice).toBeNull();
-  expect(entry.pendingRollChoice).toBeNull();
+  expect(entry.promptState).toEqual({ pending: new Map() });
+  expect(entry.pendingChoice.size).toBe(0);
+  expect(entry.pendingRollChoice.size).toBe(0);
   expect(getResolver(manager, 'ROOM1')).toBe(entry);
 });
 

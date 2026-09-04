@@ -4094,7 +4094,7 @@ test('game:selectAction room_action: a weapon plus its companion item together e
 
   expect(pending.itemIds.sort()).toEqual(['item_101', 'item_102', 'item_001', 'item_046'].sort());
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_046');
+  expect(entry.pendingInventoryChoice.get(currentPlayerId).triggeredByItemId).toBe('item_046');
 
   clientA.close();
   clientB.close();
@@ -5121,7 +5121,7 @@ test('game:diceChoiceRespond with an override interjection item auto-substitutes
   // this test's point is that the response succeeds and the item is consumed
   // without the client ever sending an overrideValue.
   expect(player.inventory).toEqual([{ id: 'item_003' }]);
-  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice).toBeNull();
+  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
@@ -5172,7 +5172,7 @@ test('opening a roll choice clears any pendingChoice left on the room entry', as
   const effectChoicePromise = new Promise((resolve) => currentClient.once('game:effectPendingChoice', resolve));
   await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_007' }, resolve));
   const effectChoice = await effectChoicePromise;
-  expect(getResolver(effectResolverManager, roomCode).pendingChoice).not.toBeNull();
+  expect(getResolver(effectResolverManager, roomCode).pendingChoice.has(currentPlayerId)).toBe(true);
 
   const rollPendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
   await new Promise((resolve) =>
@@ -5181,8 +5181,8 @@ test('opening a roll choice clears any pendingChoice left on the room entry', as
   await rollPendingPromise;
 
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingRollChoice).not.toBeNull();
-  expect(entry.pendingChoice).toBeNull();
+  expect(entry.pendingRollChoice.has(currentPlayerId)).toBe(true);
+  expect(entry.pendingChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
@@ -5234,8 +5234,8 @@ test('a grant_item effect that pushes the player over the item cap opens a pendi
   expect(pending.itemIds.sort()).toEqual(['item_101', 'item_102', 'item_103', 'item_999'].sort());
 
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingInventoryChoice).not.toBeNull();
-  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_999');
+  expect(entry.pendingInventoryChoice.has(currentPlayerId)).toBe(true);
+  expect(entry.pendingInventoryChoice.get(currentPlayerId).triggeredByItemId).toBe('item_999');
 
   const blocked = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(blocked.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
@@ -5276,7 +5276,7 @@ test('holding exactly the cap does not open a pendingInventoryChoice', async () 
   await resolvedPromise;
 
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingInventoryChoice).toBeNull(); // 剛好等於上限（might=3），不觸發
+  expect(entry.pendingInventoryChoice.has(currentPlayerId)).toBe(false); // 剛好等於上限（might=3），不觸發
 
   clientA.close();
   clientB.close();
@@ -5346,6 +5346,61 @@ test('a pending inventory choice blocks game:move/game:selectAction/game:endTurn
   expect(useStairsResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
   const endTurnResult = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
   expect(endTurnResult.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a pending inventory choice for one player does not block a different player\'s unrelated game:move', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002', 'item_003', 'item_004', 'item_005']);
+  content.cards.items = [
+    { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+    { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+    { id: 'item_005', name: 'E', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  // Might is baseIndex 2 in makeStats -- push enough held items to exceed the cap on the NEXT search.
+  player.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' });
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // enters room_new
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await pendingPromise;
+
+  // currentPlayerId now has an unresolved inventory choice -- otherClient (a
+  // different, unrelated player) must still be able to act freely.
+  const otherResult = await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve));
+  expect(otherResult.error).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a pending inventory choice for one player still blocks that SAME player\'s own further actions', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002', 'item_003', 'item_004', 'item_005']);
+  content.cards.items = [
+    { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+    { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+    { id: 'item_005', name: 'E', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } = await setUpStartedGameWithContent(content);
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' });
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await pendingPromise;
+
+  const result = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(result.error).toBe('INVENTORY_CHOICE_IN_PROGRESS');
 
   clientA.close();
   clientB.close();
@@ -5422,7 +5477,7 @@ test('picking up a dropped item that pushes the player over the cap opens a pend
   expect(pending.playerId).toBe(currentPlayerId);
 
   const entry = getResolver(effectResolverManager, roomCode);
-  expect(entry.pendingInventoryChoice.triggeredByItemId).toBe('item_104');
+  expect(entry.pendingInventoryChoice.get(currentPlayerId).triggeredByItemId).toBe('item_104');
 
   clientA.close();
   clientB.close();
@@ -5512,7 +5567,7 @@ test('game:inventoryChoiceRespond leaves the chosen item in the room and clears 
 
   expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_102', 'item_103', 'item_104'].sort());
   expect(room.droppedItems).toEqual([{ id: 'item_101' }]);
-  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(currentPlayerId)).toBe(false);
 
   // 已經解決，接下來的動作不應該再被擋
   const endTurnAck = await new Promise((resolve) => currentClient.emit('game:endTurn', {}, resolve));
@@ -5595,7 +5650,7 @@ test('game:inventoryChoiceRespond opens a second round when still over the cap a
   );
   const firstPending = await firstPendingPromise;
   // might 上限 3、目前持有 5 件（101/102/103/301/302）-> 觸發，逾時預設會是 item_302（最後抽到的）
-  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.triggeredByItemId).toBe('item_302');
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.get(currentPlayerId).triggeredByItemId).toBe('item_302');
 
   const secondPendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
   await new Promise((resolve) =>
@@ -5604,7 +5659,7 @@ test('game:inventoryChoiceRespond opens a second round when still over the cap a
   const secondPending = await secondPendingPromise;
   // 還是超過上限(4件) -> 開第二輪，這次逾時預設沿用 newlyAcquiredItemIds 找仍持有的最後一件 -> 還是 item_302（還沒被選走）
   expect(secondPending.itemIds.sort()).toEqual(['item_102', 'item_103', 'item_301', 'item_302'].sort());
-  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.triggeredByItemId).toBe('item_302');
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.get(currentPlayerId).triggeredByItemId).toBe('item_302');
 
   const resolvedPromise = new Promise((resolve) => currentClient.once('game:promptResolved', resolve));
   await new Promise((resolve) =>
@@ -5613,7 +5668,7 @@ test('game:inventoryChoiceRespond opens a second round when still over the cap a
   await resolvedPromise;
 
   expect(player.inventory.map((i) => i.id).sort()).toEqual(['item_102', 'item_103', 'item_301'].sort());
-  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice).toBeNull();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(currentPlayerId)).toBe(false);
 
   clientA.close();
   clientB.close();
