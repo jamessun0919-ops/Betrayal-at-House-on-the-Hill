@@ -2885,6 +2885,66 @@ test('an effect choice resolved via resolveEffectChoiceByTimeout still requires 
   httpServer.close();
 });
 
+test('phase auto-locks an unresolved player when the phase deadline passes, with a very short phaseTimeoutMs', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, gameManager, roomCode } =
+    await setUpStartedGameWithContent(makeContent(), { phaseTimeoutMs: 100 });
+  const gameState = getGameState(gameManager, roomCode);
+
+  // Neither player locks player_move -- just wait past the 100ms deadline, but
+  // well short of the SECOND deadline (a fresh phaseTimeoutMs window starts
+  // the moment the phase actually changes) so only one auto-lock cycle fires.
+  // Corrected from the original plan's expectation of 'npc_move': with 2 real
+  // players and 0 NPCs, npc_move always has zero participants, so
+  // phaseFlow.js's existing enterPhase cascades straight through it (see its
+  // "A phase with zero eligible participants can never receive a lock..."
+  // comment) -- npc_move can never be where this settles. It lands on
+  // player_interact, the next phase with participants to actually lock.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  expect(gameState.currentPhase).toBe('player_interact'); // player_move auto-advanced once both got force-locked, npc_move is empty so it cascades through too
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('phase timeout resolves a player\'s pending inventory choice via the default (drop newest item) before locking them', async () => {
+  const content = makeSearchRoomContent(['item_001', 'item_002', 'item_003', 'item_004', 'item_005']);
+  content.cards.items = [
+    { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+    { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+    { id: 'item_005', name: 'E', effects: [] },
+  ];
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, roomCode } =
+    await setUpStartedGameWithContent(content, { phaseTimeoutMs: 150 });
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' });
+
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  getPlayer(gameState, currentPlayerId).actionPoints = 1;
+  const pendingPromise = new Promise((resolve) => currentClient.once('game:inventoryChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  await pendingPromise;
+
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
+
+  expect(getPlayer(gameState, currentPlayerId).inventory.length).toBe(3); // newest pickup dropped, not added
+  // Corrected from the original plan's direct phaseLocked assertion: the other
+  // (second) real player never acted either, so the same deadline force-locks
+  // BOTH of them together, completing player_move and cascading (through the
+  // empty npc_move) into player_interact -- whose enterPhase unconditionally
+  // resets every real player's phaseLocked back to false for the new phase.
+  // currentPlayerId's lock is real but momentary and can never be observed as
+  // true after the wait; asserting the phase actually advanced proves the
+  // force-resolve-then-lock sequence ran (advancing past player_move is only
+  // possible once every participant, including currentPlayerId, got locked).
+  expect(gameState.currentPhase).toBe('player_interact');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('a real effectPromptRespond before the deadline cancels the scheduled timeout so it cannot later double-resolve the choice', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'item' }],

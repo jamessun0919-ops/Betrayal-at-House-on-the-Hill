@@ -140,4 +140,4 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
   return actingAsNpcId;
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked };
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants };
