@@ -17,11 +17,11 @@ function createGameManager() {
   return { games: new Map() };
 }
 
-function startGame(manager, roomCode, { startingRooms, rooms, cards, characters, players }) {
+function startGame(manager, roomCode, { startingRooms, rooms, cards, characters, players, phaseTimeoutMs }) {
   if (manager.games.has(roomCode)) {
     throw new Error('GAME_ALREADY_STARTED');
   }
-  const gameState = createGameState(startingRooms, rooms, cards);
+  const gameState = createGameState(startingRooms, rooms, cards, { phaseTimeoutMs });
   for (const player of players) {
     const character = characters.find((c) => c.id === player.characterId);
     if (!character) {

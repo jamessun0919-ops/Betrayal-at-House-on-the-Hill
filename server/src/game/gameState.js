@@ -3,7 +3,7 @@ const { createPlayer, resetActionPoints } = require('./playerEntity');
 const { createRoomDeck, isRoomDeckEmpty, getRemainingCount, hasRoomForFloor } = require('./roomDeck');
 const { createCardDeck, hasCards, getRemainingCount: getCardRemainingCount } = require('./cardDeck');
 
-function createGameState(startingRooms, rooms, cards = {}) {
+function createGameState(startingRooms, rooms, cards = {}, options = {}) {
   return {
     board: createBoard(startingRooms),
     players: new Map(),
@@ -13,6 +13,7 @@ function createGameState(startingRooms, rooms, cards = {}) {
     eventDeck: createCardDeck(cards.events || []),
     itemDeck: createCardDeck(cards.items || []),
     omenDeck: createCardDeck(cards.omens || []),
+    phaseTimeoutMs: options.phaseTimeoutMs || 30000,
   };
 }
 

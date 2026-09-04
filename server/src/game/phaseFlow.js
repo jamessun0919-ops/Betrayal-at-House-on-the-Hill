@@ -44,6 +44,7 @@ function resetPhaseLocks(gameState, phase) {
 
 function enterPhase(gameState, phase) {
   gameState.currentPhase = phase;
+  gameState.phaseDeadline = Date.now() + gameState.phaseTimeoutMs;
   resetPhaseLocks(gameState, phase);
   if (isMovePhase(phase)) {
     // Only a move phase re-rolls action points -- this is how each entity
