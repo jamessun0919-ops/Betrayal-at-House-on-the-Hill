@@ -181,3 +181,9 @@ test('createGameState accepts a custom phaseTimeoutMs via options', () => {
   const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {}, { phaseTimeoutMs: 5000 });
   expect(gameState.phaseTimeoutMs).toBe(5000);
 });
+
+test('serializeGameState includes phaseDeadline', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {});
+  gameState.phaseDeadline = 12345;
+  expect(serializeGameState(gameState).phaseDeadline).toBe(12345);
+});

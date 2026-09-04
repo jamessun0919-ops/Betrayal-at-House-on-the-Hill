@@ -88,6 +88,7 @@ function serializeGameState(gameState) {
     // Set by GameManager.startGame's enterPhase(gameState, 'player_move')
     // call; null before that, same reasoning as turnOrder above.
     currentPhase: gameState.currentPhase || null,
+    phaseDeadline: gameState.phaseDeadline || null,
   };
 }
 
