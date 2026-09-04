@@ -1368,7 +1368,7 @@ function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSe
     if (!entry) return;
     characterSelectTimeouts.delete(roomCode);
     const characterId = assignRandomCharacter(entry.characterSelectionState, playerId);
-    const result = resolvePromptTimeout(entry.promptState, { promptId, defaultOptionId: characterId });
+    const result = resolvePromptTimeout(entry.promptState, { playerId, promptId, defaultOptionId: characterId });
     if (!result) {
       return;
     }
