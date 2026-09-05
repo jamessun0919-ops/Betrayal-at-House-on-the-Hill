@@ -47,12 +47,13 @@ test('enterPhase (via resetPhaseLocks) does NOT auto-lock a connected player', (
   expect(gameState.players.get('p1').phaseLocked).toBe(false);
 });
 
-test('enterPhase (via resetPhaseLocks) auto-locks an NPC whose controller is already disconnected', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
+test('enterPhase (via resetPhaseLocks) auto-locks an NPC whose controller is already disconnected, and the round correctly cascades past both NPC phases to settlement (where a still-connected real player blocks further auto-advance)', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']); // p2 stays connected so the cascade has somewhere to stop -- with only p1 (disconnected) present, every phase in the round would be entirely disconnected participants and enterPhase would recurse forever advancing phase after phase
   gameState.players.get('p1').connected = false;
   gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false });
   enterPhase(gameState, 'npc_move');
   expect(gameState.players.get('npc_1').phaseLocked).toBe(true);
+  expect(gameState.currentPhase).toBe('settlement'); // cascaded npc_move -> npc_interact (both auto-locked, empty of connected participants) -> settlement, where p2 (connected, unlocked) stops it
 });
 
 test('enterPhase (via resetPhaseLocks) does NOT auto-lock an NPC whose controller is still connected', () => {
