@@ -12,13 +12,13 @@ const {
   getAssignments,
 } = require('./game/characterSelection');
 const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/promptState');
-const { startGame, getGameState } = require('./game/gameManager');
+const { startGame, getGameState, endGame } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
 const { lockPlayerPhase, resolveActingEntity, getParticipants } = require('./game/phaseFlow');
 const { moveNpc, npcItemAction } = require('./game/npcFlow');
 const { coordKey } = require('./game/boardGenerator');
-const { startResolver, getResolver } = require('./game/effectResolverManager');
+const { startResolver, getResolver, endResolver } = require('./game/effectResolverManager');
 const { resolveEffects, resolveChoiceOption, computeInterjectedRoll } = require('./game/effectResolver');
 const { rollDice } = require('./game/effectPipeline');
 const { hasCards, drawCard, drawFeasibleCard } = require('./game/cardDeck');
@@ -631,7 +631,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         return ack({ error: 'NOT_IN_ROOM' });
       }
       if (lobbyManager.isHost(roomCode, playerId)) {
-        await closeLobbyRoom(io, lobbyManager, roomCode);
+        await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts);
       } else {
         lobbyManager.leaveRoom(roomCode, playerId);
         socket.leave(roomCode);
@@ -646,7 +646,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       const { roomCode, playerId } = socket.data;
       if (roomCode && playerId) {
         if (lobbyManager.isHost(roomCode, playerId)) {
-          await closeLobbyRoom(io, lobbyManager, roomCode);
+          await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts);
         } else {
           lobbyManager.leaveRoom(roomCode, playerId);
           broadcastPlayers(io, lobbyManager, roomCode);
@@ -699,6 +699,21 @@ function clearCharacterSelectTimeout(roomCode, characterSelectTimeouts) {
     clearTimeout(handle);
     characterSelectTimeouts.delete(roomCode);
   }
+}
+
+function clearPhaseTimeout(roomCode, phaseTimeouts) {
+  const existing = phaseTimeouts.get(roomCode);
+  if (existing) {
+    clearTimeout(existing.handle);
+    phaseTimeouts.delete(roomCode);
+  }
+}
+
+function teardownRoom(gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts, roomCode) {
+  endGame(gameManager, roomCode);
+  endResolver(effectResolverManager, roomCode);
+  clearPhaseTimeout(roomCode, phaseTimeouts);
+  clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
 }
 
 function scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content) {
@@ -1457,7 +1472,7 @@ function serializeCharacterSelection(characterSelectionState) {
   };
 }
 
-async function closeLobbyRoom(io, lobbyManager, roomCode) {
+async function closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts) {
   const sockets = await io.in(roomCode).fetchSockets();
   // Broadcast before any socket leaves the io room: once a socket calls
   // .leave(roomCode), io.to(roomCode).emit(...) can no longer reach it, so
@@ -1469,6 +1484,11 @@ async function closeLobbyRoom(io, lobbyManager, roomCode) {
     s.leave(roomCode);
   }
   lobbyManager.closeRoom(roomCode);
+  // This function is the only place a room's io membership is guaranteed to
+  // reach zero (every socket above just got kicked, regardless of who was
+  // still connected) -- so it's the right, and only, place to release
+  // everything else this roomCode ever accumulated.
+  teardownRoom(gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts, roomCode);
 }
 
 function broadcastPlayers(io, lobbyManager, roomCode) {

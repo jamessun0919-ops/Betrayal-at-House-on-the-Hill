@@ -5,7 +5,7 @@ const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoi
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
 const { createEffectResolverManager, getResolver } = require('../src/game/effectResolverManager');
-const { getGameState } = require('../src/game/gameManager');
+const { getGameState, startGame } = require('../src/game/gameManager');
 const { getPlayer } = require('../src/game/gameState');
 const { attachModifier } = require('../src/game/modifiers');
 const { coordKey } = require('../src/game/boardGenerator');
@@ -412,6 +412,35 @@ test('the host disconnecting (not an explicit lobby:leave) also closes the room 
 
   const bobRejoin = await new Promise((resolve) => clientB.emit('lobby:create', { playerName: 'Bob2' }, resolve));
   expect(bobRejoin.error).toBeUndefined();
+
+  clientB.close();
+  httpServer.close();
+});
+
+test('closeLobbyRoom during an active game also tears down gameManager/effectResolverManager state and clears the phase timer, freeing the room code for reuse', async () => {
+  const { httpServer, clientA, clientB, roomCode, gameManager, effectResolverManager } = await setUpStartedGameWithContent(makeContent());
+
+  expect(getGameState(gameManager, roomCode)).toBeDefined();
+  expect(getResolver(effectResolverManager, roomCode)).toBeDefined();
+
+  const closedPromise = new Promise((resolve) => clientB.once('lobby:closed', resolve));
+  clientA.close(); // host disconnects mid-game, not an explicit lobby:leave
+  await closedPromise;
+
+  expect(getGameState(gameManager, roomCode)).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode)).toBeUndefined();
+
+  // Regression: before this fix, gameManager.games still held the torn-down
+  // game under this exact roomCode forever, so a brand new game reusing the
+  // same (randomly generated) room code would fail with GAME_ALREADY_STARTED.
+  const content = makeContent();
+  expect(() => startGame(gameManager, roomCode, {
+    startingRooms: content.startingRooms,
+    rooms: content.rooms,
+    cards: content.cards,
+    characters: content.characters,
+    players: [{ playerId: 'p_new', name: 'Carol', characterId: 'char_001' }],
+  })).not.toThrow();
 
   clientB.close();
   httpServer.close();
