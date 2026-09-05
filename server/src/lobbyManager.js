@@ -1,5 +1,8 @@
 const ROOM_CODE_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const MAX_PLAYER_NAME_LENGTH = 20;
+const MIN_PHASE_TIMEOUT_SECONDS = 20;
+const MAX_PHASE_TIMEOUT_SECONDS = 90;
+const DEFAULT_PHASE_TIMEOUT_SECONDS = 30;
 
 function generateRoomCode() {
   let code = '';
@@ -24,13 +27,24 @@ function normalizePlayerName(name) {
   return trimmed;
 }
 
+function normalizePhaseTimeoutSeconds(seconds) {
+  if (seconds === undefined) {
+    return DEFAULT_PHASE_TIMEOUT_SECONDS;
+  }
+  if (!Number.isInteger(seconds) || seconds < MIN_PHASE_TIMEOUT_SECONDS || seconds > MAX_PHASE_TIMEOUT_SECONDS) {
+    throw new Error('INVALID_PHASE_TIMEOUT');
+  }
+  return seconds;
+}
+
 class LobbyManager {
   constructor() {
     this.rooms = new Map(); // roomCode -> { players: Map(playerId -> { name, socketId }) }
   }
 
-  createRoom(hostName, hostSocketId) {
+  createRoom(hostName, hostSocketId, phaseTimeoutSeconds) {
     const name = normalizePlayerName(hostName);
+    const phaseTimeoutMs = normalizePhaseTimeoutSeconds(phaseTimeoutSeconds) * 1000;
     let roomCode;
     do {
       roomCode = generateRoomCode();
@@ -40,6 +54,7 @@ class LobbyManager {
     this.rooms.set(roomCode, {
       players: new Map([[playerId, { name, socketId: hostSocketId }]]),
       hostPlayerId: playerId,
+      phaseTimeoutMs,
     });
     return { roomCode, playerId };
   }
@@ -92,6 +107,11 @@ class LobbyManager {
     if (!room) return null;
     const host = room.players.get(room.hostPlayerId);
     return host ? host.name : null;
+  }
+
+  getPhaseTimeoutMs(roomCode) {
+    const room = this.rooms.get(roomCode);
+    return room ? room.phaseTimeoutMs : null;
   }
 
   closeRoom(roomCode) {

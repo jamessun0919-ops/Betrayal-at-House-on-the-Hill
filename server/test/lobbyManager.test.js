@@ -145,3 +145,36 @@ test('listJoinableRooms reports playerCount and maxPlayers for an open room', ()
   const result = manager.listJoinableRooms(() => false, 6);
   expect(result).toEqual([{ roomCode, hostName: 'Alice', playerCount: 2, maxPlayers: 6 }]);
 });
+
+test('createRoom without phaseTimeoutSeconds defaults phaseTimeoutMs to 30000', () => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1');
+  expect(manager.getPhaseTimeoutMs(roomCode)).toBe(30000);
+});
+
+test.each([
+  [20, 20000],
+  [90, 90000],
+  [45, 45000],
+])('createRoom accepts phaseTimeoutSeconds at %i seconds', (seconds, expectedMs) => {
+  const manager = new LobbyManager();
+  const { roomCode } = manager.createRoom('Alice', 'socket-1', seconds);
+  expect(manager.getPhaseTimeoutMs(roomCode)).toBe(expectedMs);
+});
+
+test.each([
+  ['below minimum', 19],
+  ['above maximum', 91],
+  ['non-integer', 30.5],
+  ['non-number', 'thirty'],
+  ['zero', 0],
+  ['negative', -20],
+])('createRoom rejects an invalid phaseTimeoutSeconds (%s)', (_label, badValue) => {
+  const manager = new LobbyManager();
+  expect(() => manager.createRoom('Alice', 'socket-1', badValue)).toThrow('INVALID_PHASE_TIMEOUT');
+});
+
+test('getPhaseTimeoutMs returns null for an unknown room code', () => {
+  const manager = new LobbyManager();
+  expect(manager.getPhaseTimeoutMs('ZZZZ')).toBeNull();
+});
