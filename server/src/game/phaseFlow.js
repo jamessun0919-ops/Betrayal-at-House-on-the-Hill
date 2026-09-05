@@ -38,7 +38,9 @@ function allParticipantsLocked(gameState, phase) {
 
 function resetPhaseLocks(gameState, phase) {
   for (const p of getParticipants(gameState, phase)) {
-    p.phaseLocked = false;
+    p.phaseLocked = p.isNPC
+      ? !(getPlayer(gameState, p.controlledBy)?.connected ?? true)
+      : !p.connected;
   }
 }
 

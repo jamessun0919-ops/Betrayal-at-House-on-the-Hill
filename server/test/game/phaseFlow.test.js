@@ -44,6 +44,37 @@ test('enterPhase resets phaseLocked to false for that phase\'s participants', ()
   expect(gameState.players.get('p1').phaseLocked).toBe(false);
 });
 
+test('enterPhase (via resetPhaseLocks) auto-locks a real player who is already disconnected when the new phase begins', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').connected = false;
+  enterPhase(gameState, 'player_interact');
+  expect(gameState.players.get('p1').phaseLocked).toBe(true);
+  expect(gameState.players.get('p2').phaseLocked).toBe(false);
+});
+
+test('enterPhase (via resetPhaseLocks) does NOT auto-lock a connected player', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  enterPhase(gameState, 'player_interact');
+  expect(gameState.players.get('p1').phaseLocked).toBe(false);
+});
+
+test('enterPhase (via resetPhaseLocks) auto-locks an NPC whose controller is already disconnected', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').connected = false;
+  const p1Stats = gameState.players.get('p1').stats;
+  gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false, stats: p1Stats });
+  enterPhase(gameState, 'npc_move');
+  expect(gameState.players.get('npc_1').phaseLocked).toBe(true);
+});
+
+test('enterPhase (via resetPhaseLocks) does NOT auto-lock an NPC whose controller is still connected', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const p1Stats = gameState.players.get('p1').stats;
+  gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false, stats: p1Stats });
+  enterPhase(gameState, 'npc_move');
+  expect(gameState.players.get('npc_1').phaseLocked).toBe(false);
+});
+
 test('enterPhase re-rolls action points for a move phase', () => {
   const gameState = makeGameStateWithPlayers(['p1']);
   const player = gameState.players.get('p1');
