@@ -447,6 +447,10 @@
 - **版權**：規則書/卡牌內容屬 Hasbro/Avalon Hill 版權，僅供私人非商業用途
 - **語言偏好**：與開發者對話一律使用繁體中文
 - **Worktree 慣例**：每個里程碑開獨立 worktree/分支，完成後合併回 `main`；`main` 分支保持乾淨可執行
+- **每次開新專案工作要建立 worktree 時的正確檢查流程（2026-09-05 記錄，查明歷次 merge 卡關的根因後訂定）**：
+  1. **一定要在「實際會執行這份工作的 session」裡呼叫 `EnterWorktree({name:...})` 自己建立**，不要手動 `git worktree add`、不要沿用其他 session 建立好的 worktree 資料夾——只有「這個 session 自己用 `EnterWorktree` 建的 worktree」，收工時 `ExitWorktree` 才會生效退回主副本做本機 merge。
+  2. 如果**接手別的 session（或前一階段）留下的既有 worktree**，先假設 `ExitWorktree` 對它是 no-op、`EnterWorktree({path:主副本路徑})` 也會被明確拒絕（「is the main working tree, not a linked worktree」）——這個 session 完全碰不到主副本。不用浪費時間先試這兩個工具，直接規劃走 `git push` + `gh pr create` + `gh pr merge`（`gh` 指令不受 worktree 沙盒限制，可在 session 內自行完成合併進遠端 `main`），並且明確告知開發者：合併只會反映在 GitHub 遠端，主副本本機 working tree 仍需要開發者（或另一個非 worktree-isolated 的 session）事後手動 `git pull` 才會同步——**不能只回報「已合併」就結束，要附上這個待辦**。
+  3. **清理已經沒用途的 worktree**：優先用 `ExitWorktree(action:"remove")`（僅對這個 session 自己建立的 worktree 有效）。如果是接手來的 worktree、`ExitWorktree` no-op，**不要在 worktree 內部對自己執行 `git worktree remove <自己的路徑>`**——2026-09-05 實測 Windows 上這樣做會先清空內容＋解除 git 註冊，但最後一步刪除資料夾本身會因為「cwd 正卡在裡面」而回報 Permission denied，留下一個空殼資料夾；更關鍵的副作用是，一旦該 worktree 自己的 `.git` link 檔案被清掉，之後在那個資料夾內執行的 git 指令會沿目錄往上找，意外直接讀寫到主副本真正的 `.git`（等於繞過了原本的沙盒隔離，但屬非預期副作用，不是設計功能）。正確做法是請開發者（或有主副本存取權的另一個 session）從**外部**（例如主副本本身）執行 `git worktree remove <worktree路徑>`，該空殼資料夾之後可直接手動刪除。
 - **大型計畫拆分**：單一里程碑若預估任務數明顯超過前一個里程碑，要主動跟開發者確認是否拆成多份計畫
 - **測試競態的處理先例**：房間廣播事件（`game:prompt`/`game:promptResolved` 等），測試裡等待「下一次廣播」時若只用單一 client 的 `.once`，可能誤收到還在飛行中的前一次廣播——已確立的修法是 `Promise.all` 等所有相關 client 的 `.once` 都先收到才繼續；同類問題以後不用再問，直接套用
 - **獨立審查慣例**：inline execution（非 subagent-driven-development）完成的里程碑，合併前應該補一次獨立整分支審查（`requesting-code-review` 技能），不能只靠自己寫的 TDD 測試就假設沒問題——M2c-2 就是靠這次審查才抓到 C1 這個 Critical bug
