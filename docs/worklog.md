@@ -1608,3 +1608,24 @@
 - 本機主副本資料夾尚未同步最新的main（PR #2、#3都是透過`gh pr merge`遠端合併，本機主副本不會自動更新），下次工作前請先在主副本執行`git checkout main && git pull`
 - 這個worktree（`.claude/worktrees/phase-countdown`，目前分支`worktree-phase-timeout-cascade-fix`）已經merge完畢可以清理，但`git worktree remove`需要在主副本執行（worktree內無法移除自己），且上次查詢顯示這個worktree目前被標記`locked`，可能需要先`git worktree unlock`——這步留給下次在主副本的session處理
 - 剩餘後續待辦：②房間/遊戲生命週期清理（`endGame()`從未被呼叫，需要先設計「房間何時算結束」）；③大廳建立時房主可調整各階段倒數秒數。下次可以繼續討論這兩項，或轉向M3戰鬥/傷害系統（Handover多處待辦的匯聚點）
+
+## 2026-09-05 第 2 次工作階段
+
+**當日工作內容**：
+- 新session一開始發現被放進上一階段清理後留下的空殼worktree資料夾（`.claude/worktrees/phase-countdown`，無檔案、未註冊），判斷不可沿用，跟開發者確認後改用`EnterWorktree`建立這個session自己的新worktree（`lobby-countdown-config`）
+- 開發者選擇接續待辦③（大廳倒數秒數可調整）。經過多輪需求釐清（開發者用具體案例`item_005`天使羽毛逼問擲骰介入逾時的現有行為），agent查證發現：擲骰介入/道具遺留/卡片效果選擇（含烹飪）三種逾時的`timeoutMs`數值其實是死資料，全伺服器只有2個真正的`setTimeout`（角色選擇、階段逾時），這三者從未被獨立計時器執行、前端也未渲染。範圍最終收斂為：房主可設定20~90秒（預設30）套用到既有`gameState.phaseTimeoutMs`（一回合5階段各自套用同一個值），順便清除那3個死逾時常數
+- 完整走完brainstorming→writing-plans→subagent-driven-development流程：設計文件、6任務實作計畫皆經開發者確認後才進行，SDD執行6個任務（LobbyManager儲存驗證、lobby:create接線、清除死參數並接通gameState、effectResolver同步、JSON資料清理、前端UI）全部一次審查通過（僅5項Minor被記錄延後，無Critical/Important，無fix round）
+- 全分支最終審查（opus）：Ready to merge，抓到2項值得修的（Task3自己新增、後來被Task4變成死資料的`timeoutMs`欄位、前端過期註解），修正後複審通過；其餘3項連同一處plan文件本身的文字矛盾記錄裁決，不擋merge
+- 收工：主副本合併（fast-forward）、769/769測試全綠、`git push origin main`
+
+**完成項目**：
+- 大廳倒數秒數可調整功能完整完成並合併進main（commit範圍`72426d9..beac36a`），含設計文件[2026-09-05-lobby-phase-timeout-config-design.md](superpowers/specs/2026-09-05-lobby-phase-timeout-config-design.md)、實作計畫[2026-09-05-lobby-phase-timeout-config.md](superpowers/plans/2026-09-05-lobby-phase-timeout-config.md)
+- 順便清除3個確認為死資料的舊逾時常數（`rollChoiceTimeoutMs`/`inventoryChoiceTimeoutMs`/卡片JSON裡的`effect.timeoutMs`），角色選擇逾時（真正運作中的機制）確認不受影響
+
+**遇到瓶頸**：
+- 又一次遇到「刪除已清理的worktree資料夾本身」的Windows檔案鎖定問題（這次是`git worktree remove`先成功解除註冊，最後一步刪資料夾報`Permission denied`/`Device or resource busy`）——查出根因是Task 3 implementer疊代測試時留下8個殘留jest/node行程未正常結束（指令列明確指向這個worktree路徑），關閉行程後仍有空殼資料夾殘留，同一類已知的暫時性鎖定，未強行處理
+
+**開發者交代備忘事項**：
+- `.claude/worktrees/lobby-countdown-config`留下一個空殼資料夾（git已完全解除註冊、分支已刪除，純粹是Windows檔案鎖定沒清乾淨），可以晚點有空時手動刪除，不影響任何功能
+- `.claude/worktrees/phase-countdown`（上一階段留下的空殼）也還沒清掉，這次同樣沒能刪除（同一類鎖定問題），跟上面那個一起處理即可
+- 剩餘後續待辦：②房間/遊戲生命週期清理（`endGame()`從未被呼叫）、轉向M3戰鬥/傷害系統，下次工作可以從這兩個方向討論
