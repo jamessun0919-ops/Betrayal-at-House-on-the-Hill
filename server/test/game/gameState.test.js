@@ -171,3 +171,19 @@ test('serializeGameState exposes remainingCount/isEmpty for the event/item/omen 
   expect(serialized.omenDeck).toEqual({ remainingCount: 2, isEmpty: false });
   expect(serialized.eventDeck.cards).toBeUndefined();
 });
+
+test('createGameState defaults phaseTimeoutMs to 30000 when not specified', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms());
+  expect(gameState.phaseTimeoutMs).toBe(30000);
+});
+
+test('createGameState accepts a custom phaseTimeoutMs via options', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {}, { phaseTimeoutMs: 5000 });
+  expect(gameState.phaseTimeoutMs).toBe(5000);
+});
+
+test('serializeGameState includes phaseDeadline', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(), {});
+  gameState.phaseDeadline = 12345;
+  expect(serializeGameState(gameState).phaseDeadline).toBe(12345);
+});

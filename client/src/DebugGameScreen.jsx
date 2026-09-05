@@ -3,6 +3,7 @@ import FocusedRoomView from './gameplay/FocusedRoomView';
 import OverviewMap from './gameplay/OverviewMap';
 import CharacterPanel from './gameplay/CharacterPanel';
 import NpcPanel from './gameplay/NpcPanel';
+import PhaseCountdownPopup from './gameplay/PhaseCountdownPopup';
 import CheckModal from './gameplay/CheckModal';
 import SimplePopup from './gameplay/SimplePopup';
 import { getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
@@ -487,6 +488,11 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                   </div>
                 );
               })()}
+              <PhaseCountdownPopup
+                phase={gameState.currentPhase}
+                deadline={gameState.phaseDeadline}
+                locked={actingAsNpcId ? activeEntity.phaseLocked : me.phaseLocked}
+              />
               {/* 四個角落浮動按鈕：不管目前是聚焦房間還是總覽地圖都要顯示 */}
               {!actingAsNpcId && (
                 <button

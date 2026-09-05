@@ -258,3 +258,12 @@ test('enterPhase does NOT reset searchedThisTurn/diceInterjectionUsedThisTurn/pe
   expect(player.pendingStatReverts).toEqual([{ stat: 'might', delta: -1 }]);
   expect(player.stats.might.currentIndex).toBe(beforeMight); // not reverted
 });
+
+test('enterPhase sets phaseDeadline to now + gameState.phaseTimeoutMs', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.phaseTimeoutMs = 12345;
+  const before = Date.now();
+  enterPhase(gameState, 'player_move');
+  expect(gameState.phaseDeadline).toBeGreaterThanOrEqual(before + 12345);
+  expect(gameState.phaseDeadline).toBeLessThanOrEqual(Date.now() + 12345);
+});

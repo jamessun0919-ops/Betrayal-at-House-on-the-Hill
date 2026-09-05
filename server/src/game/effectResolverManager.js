@@ -10,10 +10,9 @@ function startResolver(manager, roomCode) {
   }
   const entry = {
     promptState: createPromptState(),
-    pendingChoice: null,
-    pendingRollChoice: null,
-    pendingInventoryChoice: null,
-    inventoryChoiceTimeoutHandle: null,
+    pendingChoice: new Map(),
+    pendingRollChoice: new Map(),
+    pendingInventoryChoice: new Map(),
   };
   manager.resolvers.set(roomCode, entry);
   return entry;

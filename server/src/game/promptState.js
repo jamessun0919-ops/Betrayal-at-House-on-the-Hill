@@ -6,11 +6,11 @@ function generatePromptId() {
 }
 
 function createPromptState() {
-  return { pending: null };
+  return { pending: new Map() };
 }
 
 function createPrompt(container, { type, targetPlayerId, description, options, timeoutMs, now }) {
-  if (container.pending !== null) {
+  if (container.pending.has(targetPlayerId)) {
     throw new Error('PROMPT_ALREADY_PENDING');
   }
   if (!Array.isArray(options) || options.length === 0) {
@@ -27,12 +27,12 @@ function createPrompt(container, { type, targetPlayerId, description, options, t
     options,
     deadline: now + timeoutMs,
   };
-  container.pending = prompt;
+  container.pending.set(targetPlayerId, prompt);
   return prompt;
 }
 
 function respondToPrompt(container, { promptId, playerId, optionId }) {
-  const pending = container.pending;
+  const pending = container.pending.get(playerId);
   if (!pending || pending.promptId !== promptId) {
     throw new Error('PROMPT_MISMATCH');
   }
@@ -42,21 +42,21 @@ function respondToPrompt(container, { promptId, playerId, optionId }) {
   if (!pending.options.includes(optionId)) {
     throw new Error('INVALID_PROMPT_OPTION');
   }
-  container.pending = null;
+  container.pending.delete(playerId);
   return { promptId, chosenOptionId: optionId, wasTimeout: false };
 }
 
-function resolvePromptTimeout(container, { promptId, defaultOptionId }) {
-  const pending = container.pending;
+function resolvePromptTimeout(container, { playerId, promptId, defaultOptionId }) {
+  const pending = container.pending.get(playerId);
   if (!pending || pending.promptId !== promptId) {
     return null;
   }
-  container.pending = null;
+  container.pending.delete(playerId);
   return { promptId, chosenOptionId: defaultOptionId, wasTimeout: true };
 }
 
-function getPendingPrompt(container) {
-  return container.pending;
+function getPendingPrompt(container, playerId) {
+  return container.pending.get(playerId) || null;
 }
 
 module.exports = {

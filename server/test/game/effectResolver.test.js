@@ -1905,6 +1905,7 @@ test('event_031 in data/cards/event-cards.json has the expected choice+random_ef
     description: '紅色藥丸還是藍色藥丸？',
     timeoutMs: 20000,
     defaultOptionId: 'give_up',
+    onTimeout: 'random',
     options: [
       { optionId: 'red', label: '紅色', effects: [fiftyFifty] },
       { optionId: 'blue', label: '藍色', effects: [fiftyFifty] },

@@ -1563,3 +1563,27 @@
 - 下次開工可以繼續討論Handover項目14剩餘子專案：⑤互動階段結算運算規則（建議跟M3一起做）、⑦倒數計時UI（建議排最後）
 - **`data/characters/npcs.json`的`npc_001`（犬靈）仍是空佔位屬性，要實際遊玩測試NPC機制前，需要開發者手動填入`codename`/`fileicon`/`stats`等真實內容**
 - 本階段有啟動Browser pane預覽伺服器驗證NPC機制（server 3001 + client 5173，手動啟動+絕對路徑，因worktree cwd解析問題），驗證完成後已停止並確認無殘留node行程
+
+## 2026-09-04 第 1 次工作階段
+
+**當日工作內容**：
+- 讀取Handover與最近工作日誌範圍，開始討論Handover項目14最後一項子專案7（倒數計時UI與伺服器基礎建設）
+- Brainstorm過程兩度重大轉折：開發者發現原規劃（只加階段倒數、保留4套個別選擇逾時）會跟並發回合制衝突，裁示改成只留階段倒數、刪除3套個別選擇逾時（角色選擇除外）；開發者逐一裁定各卡片逾時預設行為（`event_031`因有負向效果風險改用隨機選項），並訂下「逾時後果不能比認真選更划算」的設計原則；開發者糾正agent最初對擲骰介入逾時語意的錯誤提案（介入本身不扣行動力，但被介入的原動作要照常進行）
+- 撰寫設計文件與7任務實作計畫，開發者選擇Subagent-Driven執行
+- 執行7個任務：Task1（`phaseTimeoutMs`不寫死）、Task2（`promptState.js`改分玩家Map）、Task3（待定選擇資料結構改分玩家，controller自行查證發現並修正1個計畫遺漏的測試連鎖、1個Task2造成的真實回歸）、Task4（拿掉3套獨立計時器＋新增`onTimeout`欄位）、Task5（統一階段逾時機制，implementer發現並修正2個controller自己計畫裡寫錯的測試片段，controller獨立查證確認是測試錯不是實作錯）、Task6（前端`PhaseCountdownPopup.jsx`，implementer發現並修正1個計畫測試片段的fixture錯誤）、Task7（死代碼清查，刪除1個已變空洞的既有測試）。7個任務逐一審查全數通過
+- 全分支最終審查（Opus）：確認可合併，發現的問題皆非阻擋性——1項cascade缺口（單輪次處理逾時玩家時，解決一個待定選擇又觸發新選擇的邊界情況）開發者裁示列獨立backlog；計時器生命週期清除缺口（`endGame()`從未被呼叫）開發者裁示不做局部緩解、全部併入未來的房間生命週期清理專案；2個低風險小問題（reschedule被try吞掉、一個死資料欄位）開發者確認修掉，修正後範圍審查通過
+- 手動瀏覽器驗證：真實雙人連線，倒數彈窗顯示與即時遞減、拖曳位置記憶（跨reload、跨全新對局）、鎖定文字切換皆正常，過程中第4次踩到已知的`preview_start`在worktree環境誤連主要checkout問題（這次連改絕對路徑都無效，用暫時`__dirname` debug log才確診），已記錄進Handover並存成persistent memory避免未來session再次重複排查
+- 開發者選擇合併回main，但本次worktree session被沙盒限制無法對主要checkout執行任何git操作（含唯讀查詢），開發者確認改用push+PR流程，已建立PR #2
+
+**完成項目**：
+- Handover項目14子專案7（倒數計時UI與伺服器基礎建設）——7任務全部完成，全分支審查通過，PR [#2](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/2) 已建立（尚未合併）
+- 至此Handover項目14全部7個子專案完成
+
+**遇到瓶頸**：
+- 第4次遇到`preview_start`在worktree環境下誤連主要checkout的問題（先前3次分別記錄在2026-08-25、2026-08-31、2026-09-03），這次連修改`launch.json`用絕對路徑都無法解決，最終靠暫時debug log才確診根因；已另外存成auto-memory的feedback記錄，避免未來session（尤其是不同worktree）重複同樣的排查過程
+- worktree session的沙盒限制不允許對主要checkout執行任何git操作（包括唯讀查詢），導致「合併回main」這個選項在此環境下無法真正執行，改用push+PR
+
+**開發者交代備忘事項**：
+- PR [#2](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/2) 尚待開發者本人或另一個非worktree-isolated的session執行合併
+- 已知待辦（本次子專案刻意排除、留給未來）：①大廳建立時房主可調整各階段倒數秒數；②房間/遊戲生命週期清理（`endGame()`從未被呼叫，需要先設計「房間何時算結束」）；③`handlePhaseTimeout`單輪次cascade缺口
+- 本階段有啟動Browser pane預覽伺服器驗證（server 3001 + client 5173，因worktree cwd問題改用手動Bash啟動+`url`附加分頁），驗證完成後已停止並確認無殘留node行程

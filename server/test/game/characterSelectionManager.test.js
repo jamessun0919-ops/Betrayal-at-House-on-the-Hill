@@ -18,7 +18,7 @@ test('startSelection creates an entry with a characterSelectionState and a promp
   const entry = startSelection(manager, 'ROOM1', ['p1', 'p2'], makeCharacters());
 
   expect(entry.characterSelectionState.order.slice().sort()).toEqual(['p1', 'p2']);
-  expect(entry.promptState).toEqual({ pending: null });
+  expect(entry.promptState).toEqual({ pending: new Map() });
   expect(getSelection(manager, 'ROOM1')).toBe(entry);
 });
 
