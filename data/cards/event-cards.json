@@ -134,7 +134,6 @@
         { "min": 4, "max": 8, "pass": true, "effects": [{
           "type": "choice",
           "description": "選擇一項能力提升一個級別",
-          "timeoutMs": 20000,
           "defaultOptionId": "might",
           "options": [
             { "optionId": "might", "label": "力量", "effects": [{ "type": "stat_change", "stat": "might", "delta": 1 }] },
@@ -404,7 +403,6 @@
     "effects": [{
       "type": "choice",
       "description": "紅色藥丸還是藍色藥丸？",
-      "timeoutMs": 20000,
       "defaultOptionId": "give_up",
       "onTimeout": "random",
       "options": [

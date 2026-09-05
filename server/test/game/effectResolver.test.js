@@ -1903,7 +1903,6 @@ test('event_031 in data/cards/event-cards.json has the expected choice+random_ef
   expect(event031.effects).toEqual([{
     type: 'choice',
     description: '紅色藥丸還是藍色藥丸？',
-    timeoutMs: 20000,
     defaultOptionId: 'give_up',
     onTimeout: 'random',
     options: [
