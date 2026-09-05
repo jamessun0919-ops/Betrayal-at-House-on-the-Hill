@@ -1306,10 +1306,10 @@ test('resolveEffects choice result includes description, deadline, and defaultOp
   const promptState = createPromptState();
   const options = [{ optionId: 'opt_might', effects: [] }];
   const result = resolveEffects(gameState, promptState, 'p1', [
-    { type: 'choice', description: '選擇要下降哪項', options, timeoutMs: 20000, defaultOptionId: 'opt_might' },
+    { type: 'choice', description: '選擇要下降哪項', options, defaultOptionId: 'opt_might' },
   ], { now: 1000 });
   expect(result.description).toBe('選擇要下降哪項');
-  expect(result.deadline).toBe(21000); // now(1000) + timeoutMs(20000)
+  expect(result.deadline).toBe(31000); // now(1000) + gameState.phaseTimeoutMs(30000)
   expect(result.defaultOptionId).toBe('opt_might');
 });
 

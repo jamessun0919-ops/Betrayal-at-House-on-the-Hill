@@ -523,7 +523,7 @@ function handlePreviewAndChoose(gameState, promptState, playerId, effect, contex
   options.push({ optionId: '__skip__', label: '放棄', effects: [] });
   return handleChoice(gameState, promptState, playerId, {
     description: effect.description,
-    timeoutMs: effect.timeoutMs,
+    timeoutMs: gameState.phaseTimeoutMs,
     defaultOptionId: '__skip__',
     options,
   }, context);
@@ -535,7 +535,7 @@ function handleChoice(gameState, promptState, playerId, effect, context) {
     targetPlayerId: playerId,
     description: effect.description,
     options: effect.options.map((o) => o.optionId),
-    timeoutMs: effect.timeoutMs,
+    timeoutMs: gameState.phaseTimeoutMs,
     now: context.now,
   });
   return {
