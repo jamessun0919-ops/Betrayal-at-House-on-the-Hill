@@ -630,7 +630,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       if (!roomCode || !playerId) {
         return ack({ error: 'NOT_IN_ROOM' });
       }
-      if (lobbyManager.isHost(roomCode, playerId)) {
+      const gameState = getGameState(gameManager, roomCode);
+      if (gameState) {
+        await handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId);
+      } else if (lobbyManager.isHost(roomCode, playerId)) {
         await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
       } else {
         // No teardownRoom call here: the host is never removed via this path,
@@ -648,7 +651,10 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
     socket.on('disconnect', async () => {
       const { roomCode, playerId } = socket.data;
       if (roomCode && playerId) {
-        if (lobbyManager.isHost(roomCode, playerId)) {
+        const gameState = getGameState(gameManager, roomCode);
+        if (gameState) {
+          await handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId);
+        } else if (lobbyManager.isHost(roomCode, playerId)) {
           await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
         } else {
           // No teardownRoom call here: the host is never removed via this path,
@@ -1477,6 +1483,24 @@ function serializeCharacterSelection(characterSelectionState) {
     })),
     characters: characterSelectionState.characters,
   };
+}
+
+async function handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId) {
+  const player = getPlayer(gameState, playerId);
+  if (player) {
+    player.connected = false;
+  }
+  const anyoneStillConnected = Array.from(gameState.players.values())
+    .filter((p) => !p.isNPC)
+    .some((p) => p.connected);
+  if (!anyoneStillConnected) {
+    // Every real player of this already-started game has now disconnected --
+    // closeLobbyRoom doesn't care who triggered it or how many sockets are
+    // actually still in the room (it kicks whoever's left, which is
+    // correctly zero here), so reusing it is exactly the same teardown path
+    // the host-leaves-the-lobby case already uses.
+    await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
+  }
 }
 
 async function closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts) {

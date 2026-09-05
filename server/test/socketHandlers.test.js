@@ -423,9 +423,14 @@ test('closeLobbyRoom during an active game also tears down gameManager/effectRes
   expect(getGameState(gameManager, roomCode)).toBeDefined();
   expect(getResolver(effectResolverManager, roomCode)).toBeDefined();
 
-  const closedPromise = new Promise((resolve) => clientB.once('lobby:closed', resolve));
-  clientA.close(); // host disconnects mid-game, not an explicit lobby:leave
-  await closedPromise;
+  // A mid-game host disconnect alone no longer closes the room (that's now
+  // handled the same as any other player's disconnect -- see
+  // handlePlayerDisconnectedFromGame). closeLobbyRoom only fires once every
+  // real player has disconnected, so drive both clients out to reach it.
+  clientA.close();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  clientB.close();
+  await new Promise((resolve) => setTimeout(resolve, 100));
 
   expect(getGameState(gameManager, roomCode)).toBeUndefined();
   expect(getResolver(effectResolverManager, roomCode)).toBeUndefined();
@@ -442,7 +447,6 @@ test('closeLobbyRoom during an active game also tears down gameManager/effectRes
     players: [{ playerId: 'p_new', name: 'Carol', characterId: 'char_001' }],
   })).not.toThrow();
 
-  clientB.close();
   httpServer.close();
 });
 
@@ -475,6 +479,59 @@ test('closeLobbyRoom during character selection also tears down characterSelecti
     { id: 'char_001', codename: 'X', stats: {} },
   ])).not.toThrow();
 
+  clientB.close();
+  httpServer.close();
+});
+
+test('the host disconnecting after the game has started does NOT close the room -- handled the same as any other player', async () => {
+  const { httpServer, clientA, clientB, roomCode, aliceId, gameManager } = await setUpStartedGameWithContent(makeContent());
+
+  let closedFired = false;
+  clientB.on('lobby:closed', () => { closedFired = true; });
+
+  clientA.close(); // host disconnects mid-game
+  await new Promise((resolve) => setTimeout(resolve, 100)); // give the server's disconnect handler time to run
+
+  expect(closedFired).toBe(false);
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState).toBeDefined();
+  expect(getPlayer(gameState, aliceId).connected).toBe(false);
+
+  clientB.close();
+  httpServer.close();
+});
+
+test('the last connected real player disconnecting from a started game tears everything down, same as closeLobbyRoom', async () => {
+  const { httpServer, clientA, clientB, roomCode, gameManager, effectResolverManager } = await setUpStartedGameWithContent(makeContent());
+
+  clientA.close(); // first disconnect -- game continues (Bob is still connected)
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(getGameState(gameManager, roomCode)).toBeDefined();
+
+  clientB.close(); // second (last) disconnect -- should trigger full teardown
+  await new Promise((resolve) => setTimeout(resolve, 100));
+
+  expect(getGameState(gameManager, roomCode)).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode)).toBeUndefined();
+
+  httpServer.close();
+});
+
+test('lobby:leave sent by the host after the game has started is handled the same as disconnect -- no room close, just marks them disconnected', async () => {
+  const { httpServer, clientA, clientB, roomCode, aliceId, gameManager } = await setUpStartedGameWithContent(makeContent());
+
+  let closedFired = false;
+  clientB.on('lobby:closed', () => { closedFired = true; });
+
+  const leaveResult = await new Promise((resolve) => clientA.emit('lobby:leave', {}, resolve));
+  expect(leaveResult.error).toBeUndefined();
+
+  expect(closedFired).toBe(false);
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState).toBeDefined();
+  expect(getPlayer(gameState, aliceId).connected).toBe(false);
+
+  clientA.close();
   clientB.close();
   httpServer.close();
 });
