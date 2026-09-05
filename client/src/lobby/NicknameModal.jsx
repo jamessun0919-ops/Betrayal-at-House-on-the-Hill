@@ -1,12 +1,17 @@
 import { useState } from 'react';
 
-export default function NicknameModal({ onConfirm, onCancel, error }) {
+const DEFAULT_PHASE_TIMEOUT_SECONDS = 30;
+const MIN_PHASE_TIMEOUT_SECONDS = 20;
+const MAX_PHASE_TIMEOUT_SECONDS = 90;
+
+export default function NicknameModal({ onConfirm, onCancel, error, mode }) {
   const [name, setName] = useState('');
+  const [phaseTimeoutSeconds, setPhaseTimeoutSeconds] = useState(DEFAULT_PHASE_TIMEOUT_SECONDS);
 
   function handleConfirm() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    onConfirm(trimmed);
+    onConfirm(trimmed, mode === 'create' ? phaseTimeoutSeconds : undefined);
   }
 
   return (
@@ -21,6 +26,20 @@ export default function NicknameModal({ onConfirm, onCancel, error }) {
           maxLength={20}
           autoFocus
         />
+        {mode === 'create' && (
+          <div className="lobby-modal-field">
+            <label htmlFor="phase-timeout-input">每階段秒數（{MIN_PHASE_TIMEOUT_SECONDS}~{MAX_PHASE_TIMEOUT_SECONDS}）</label>
+            <input
+              id="phase-timeout-input"
+              className="lobby-modal-input"
+              type="number"
+              min={MIN_PHASE_TIMEOUT_SECONDS}
+              max={MAX_PHASE_TIMEOUT_SECONDS}
+              value={phaseTimeoutSeconds}
+              onChange={(e) => setPhaseTimeoutSeconds(Number(e.target.value))}
+            />
+          </div>
+        )}
         {error && <p className="lobby-error">{error}</p>}
         <div className="lobby-modal-buttons">
           <button className="lobby-button" onClick={onCancel}>取消</button>

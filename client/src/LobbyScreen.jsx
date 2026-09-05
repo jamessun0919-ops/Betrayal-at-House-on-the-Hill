@@ -71,10 +71,10 @@ export default function LobbyScreen() {
     setScreen('nickname');
   }
 
-  function handleNicknameConfirm(enteredName) {
+  function handleNicknameConfirm(enteredName, phaseTimeoutSeconds) {
     setName(enteredName);
     if (nicknameFlow === 'create') {
-      socketRef.current.emit('lobby:create', { playerName: enteredName }, (res) => {
+      socketRef.current.emit('lobby:create', { playerName: enteredName, phaseTimeoutSeconds }, (res) => {
         if (res && res.error) {
           setNicknameError(translateError(res.error));
           return;
@@ -118,6 +118,7 @@ export default function LobbyScreen() {
             onConfirm={handleNicknameConfirm}
             onCancel={resetToStart}
             error={nicknameError}
+            mode={nicknameFlow}
           />
         </>
       )}
