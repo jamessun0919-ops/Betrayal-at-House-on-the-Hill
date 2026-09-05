@@ -579,7 +579,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
                 alignItems: 'center',
                 justifyContent: 'center',
                 // Must render above CheckModal's zIndex 70 -- this interjection
-                // prompt has a real 20s server-side deadline, while CheckModal
+                // prompt has a server-side deadline, while CheckModal
                 // is purely a cosmetic reveal-delay with no deadline of its own.
                 zIndex: 80,
               }}

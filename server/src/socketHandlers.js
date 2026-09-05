@@ -306,7 +306,6 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             sourceEffects = [{
               type: 'choice',
               description: '要不要進行烹飪？',
-              timeoutMs: gameState.phaseTimeoutMs,
               defaultOptionId: 'no',
               options: [
                 {
