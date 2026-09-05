@@ -1648,3 +1648,21 @@
 **開發者交代備忘事項**：
 - 房間/遊戲生命週期清理只完成了「資源回收」這一部分，其餘子項目（房主中途斷線的踢人行為、非房主斷線留下幽靈玩家、重連機制、遊戲結束判定邏輯）都還沒處理，下次可以繼續討論這些，或轉向M3戰鬥/傷害系統
 - 之前留下的空殼worktree資料夾這次清掉一半：`lobby-countdown-config`成功刪除（鎖定來源查到是這個session稍早自己留下的一個背景bash行程忘記關，補關後就刪掉了）；`phase-countdown`跟這次新產生的`phase-timeout-cleanup`一樣先卡過一次鎖定，`phase-timeout-cleanup`已排查殘留jest行程後刪除成功，但`phase-countdown`目前查不到任何殘留行程卻還是刪不掉（`Device or resource busy`），研判是另一種來源不明的Windows暫時性鎖定，之後有空可以直接手動刪除，不影響任何功能
+
+## 2026-09-05 第 4 次工作階段
+
+**當日工作內容**：
+- 開發者接續討論房間/遊戲生命週期清理待辦②的第二部分：遊戲進行中斷線視同一般玩家。開發者提出核心規則（房主等同一般玩家、斷線玩家不擋其他人推進、重連另外討論），並補充關鍵細節：玩家斷線當下所在的階段仍走既有逾時機制，只有下一個新階段才不等他——這個補充讓agent把原本打算改`allParticipantsLocked`的方向修正為只改`resetPhaseLocks`，範圍更小更精準
+- 完整走完brainstorming→writing-plans→subagent-driven-development：Task 1過程中，controller自己手寫的測試fixture連續犯了2個錯（會導致無限遞迴的情境、`PHASE_ORDER`順序記錯），都被implementer/task reviewer正確抓到並修正，沒有帶著錯誤往下走；Task 2的implementer主動發現並修正一個計畫遺漏（上一階段新增的測試直接斷言這次要改掉的舊行為），回報DONE_WITH_CONCERNS而非沉默處理
+- 全分支最終審查（opus）發現2個真實可觸及的Important（這次改動自己造成的「斷線玩家懸置提示永久卡住」迴歸；既有的角色選擇階段幽靈玩家問題，被這次新的房間回收判斷邏輯放大成真的資源洩漏）＋5個Minor。開發者裁示：全部記錄為待辦，這個分支先收工，不追加修正輪
+- 收工：更新Handover記錄2個Important＋5個Minor的具體內容與建議修法、780/780測試全綠、主副本合併、推送
+
+**完成項目**：
+- 遊戲進行中斷線視同一般玩家完整完成並合併進main（commit範圍`1d00fea..dfe47ed`），含設計文件[2026-09-05-disconnect-as-regular-player-design.md](superpowers/specs/2026-09-05-disconnect-as-regular-player-design.md)、實作計畫[2026-09-05-disconnect-as-regular-player.md](superpowers/plans/2026-09-05-disconnect-as-regular-player.md)
+- 房主中途斷線不再無條件踢光所有人；已知斷線的玩家（含操控中的NPC）從下一個新階段開始不擋其他玩家推進；最後一個真人玩家斷線時沿用既有的`closeLobbyRoom`完整回收房間
+
+**遇到瓶頸**：
+- 無新的環境瓶頸。過程中controller自己犯的2個測試fixture錯誤已如實記錄在Handover，屬於這次工作內容的一部分，不是外部環境問題
+
+**開發者交代備忘事項**：
+- 這次全分支審查發現的2個Important＋5個Minor都還沒修，已完整記錄在Handover.md本次條目裡（含具體位置跟建議修法），下次工作前可以先決定要不要優先處理這些，或繼續房間/遊戲生命週期清理剩餘子項目（遊戲何時算「結束」的判定邏輯），或轉向M3戰鬥/傷害系統
