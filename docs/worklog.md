@@ -1629,3 +1629,22 @@
 - `.claude/worktrees/lobby-countdown-config`留下一個空殼資料夾（git已完全解除註冊、分支已刪除，純粹是Windows檔案鎖定沒清乾淨），可以晚點有空時手動刪除，不影響任何功能
 - `.claude/worktrees/phase-countdown`（上一階段留下的空殼）也還沒清掉，這次同樣沒能刪除（同一類鎖定問題），跟上面那個一起處理即可
 - 剩餘後續待辦：②房間/遊戲生命週期清理（`endGame()`從未被呼叫）、轉向M3戰鬥/傷害系統，下次工作可以從這兩個方向討論
+
+## 2026-09-05 第 3 次工作階段
+
+**當日工作內容**：
+- 開發者選擇接續待辦②（房間/遊戲生命週期清理），要求先說明目前遇到什麼問題。Agent查證後發現比原記錄更廣：`endGame`/`endResolver`從未被呼叫（Map永遠不釋放）、階段逾時計時器`finally`區塊無條件永遠重新排程（房間沒人了也不會停，現在就在main上真實浪費資源）、房主中途斷線會粗暴踢出所有人但底層gameState不清、非房主斷線留下幽靈玩家、完全沒有重連機制、沒有任何「遊戲何時結束」的判定邏輯
+- 開發者選擇先處理「計時器永遠不停」這一點。討論中agent發現這跟Map洩漏可以用同一個觸發點解決，且會連帶修掉一個衍生bug（房號用完不會釋放，隨機撞號會讓新房間開不了局）。開發者確認「以socket.io房間連線數歸零」為觸發訊號後，agent推演發現只需要掛在`closeLobbyRoom`一個函式尾端即可涵蓋，不用碰非房主分支（現有架構下那是永遠不會觸發的死分支）
+- 完整走完brainstorming→writing-plans→subagent-driven-development：設計文件、單一任務實作計畫皆經開發者確認後才進行，任務審查零發現。全分支最終審查（opus）抓到2個Important：agent自己算錯需要清理的Map數量（少算了`characterSelectionManager.selections`）、原始的計時器驗證測試方向有瑕疵（controller自行推演識破後改用正確的unit test方式修正）。修正+複審通過，773/773測試全綠
+- 收工：主副本合併（fast-forward）、773/773測試全綠、`git push origin main`。清理worktree資料夾時又遇到一次同樣的殘留jest行程鎖定問題，這次直接照上次記錄的診斷方法（查殘留node行程指令列）秒解，沒有卡住
+
+**完成項目**：
+- 房間清空時資源回收完整完成並合併進main（commit範圍`d21ff8e..fa5e05e`），含設計文件[2026-09-05-room-teardown-on-close-design.md](superpowers/specs/2026-09-05-room-teardown-on-close-design.md)、實作計畫[2026-09-05-room-teardown-on-close.md](superpowers/plans/2026-09-05-room-teardown-on-close.md)
+- 修掉：階段逾時計時器永遠不停、`gameManager`/`effectResolverManager`/`characterSelectionManager`三個Map永遠不釋放、房號用完不釋放導致新房間開不了局的衍生bug
+
+**遇到瓶頸**：
+- 無新瓶頸——上次記錄的worktree資料夾殘留jest行程鎖定問題這次直接套用既有診斷方法解決，沒有卡住
+
+**開發者交代備忘事項**：
+- 房間/遊戲生命週期清理只完成了「資源回收」這一部分，其餘子項目（房主中途斷線的踢人行為、非房主斷線留下幽靈玩家、重連機制、遊戲結束判定邏輯）都還沒處理，下次可以繼續討論這些，或轉向M3戰鬥/傷害系統
+- 之前留下的空殼worktree資料夾這次清掉一半：`lobby-countdown-config`成功刪除（鎖定來源查到是這個session稍早自己留下的一個背景bash行程忘記關，補關後就刪掉了）；`phase-countdown`跟這次新產生的`phase-timeout-cleanup`一樣先卡過一次鎖定，`phase-timeout-cleanup`已排查殘留jest行程後刪除成功，但`phase-countdown`目前查不到任何殘留行程卻還是刪不掉（`Device or resource busy`），研判是另一種來源不明的Windows暫時性鎖定，之後有空可以直接手動刪除，不影響任何功能
