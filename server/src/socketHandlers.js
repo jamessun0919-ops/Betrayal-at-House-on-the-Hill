@@ -631,8 +631,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         return ack({ error: 'NOT_IN_ROOM' });
       }
       if (lobbyManager.isHost(roomCode, playerId)) {
-        await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts);
+        await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
       } else {
+        // No teardownRoom call here: the host is never removed via this path,
+        // so the room's io membership can never reach zero this way -- see
+        // closeLobbyRoom, which is the only place that can happen.
         lobbyManager.leaveRoom(roomCode, playerId);
         socket.leave(roomCode);
         socket.data.roomCode = null;
@@ -646,8 +649,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       const { roomCode, playerId } = socket.data;
       if (roomCode && playerId) {
         if (lobbyManager.isHost(roomCode, playerId)) {
-          await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts);
+          await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
         } else {
+          // No teardownRoom call here: the host is never removed via this path,
+          // so the room's io membership can never reach zero this way -- see
+          // closeLobbyRoom, which is the only place that can happen.
           lobbyManager.leaveRoom(roomCode, playerId);
           broadcastPlayers(io, lobbyManager, roomCode);
         }
@@ -709,9 +715,10 @@ function clearPhaseTimeout(roomCode, phaseTimeouts) {
   }
 }
 
-function teardownRoom(gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts, roomCode) {
+function teardownRoom(gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, roomCode) {
   endGame(gameManager, roomCode);
   endResolver(effectResolverManager, roomCode);
+  endSelection(characterSelectionManager, roomCode);
   clearPhaseTimeout(roomCode, phaseTimeouts);
   clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
 }
@@ -1472,7 +1479,7 @@ function serializeCharacterSelection(characterSelectionState) {
   };
 }
 
-async function closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts) {
+async function closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts) {
   const sockets = await io.in(roomCode).fetchSockets();
   // Broadcast before any socket leaves the io room: once a socket calls
   // .leave(roomCode), io.to(roomCode).emit(...) can no longer reach it, so
@@ -1488,11 +1495,11 @@ async function closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectRes
   // reach zero (every socket above just got kicked, regardless of who was
   // still connected) -- so it's the right, and only, place to release
   // everything else this roomCode ever accumulated.
-  teardownRoom(gameManager, effectResolverManager, phaseTimeouts, characterSelectTimeouts, roomCode);
+  teardownRoom(gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, roomCode);
 }
 
 function broadcastPlayers(io, lobbyManager, roomCode) {
   io.to(roomCode).emit('lobby:players', { players: lobbyManager.getPlayers(roomCode) });
 }
 
-module.exports = { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout };
+module.exports = { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout };

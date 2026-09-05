@@ -1,9 +1,9 @@
 const ioClient = require('socket.io-client');
 const { createServer } = require('../src/createServer');
 const { LobbyManager } = require('../src/lobbyManager');
-const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout } = require('../src/socketHandlers');
+const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
-const { createCharacterSelectionManager } = require('../src/game/characterSelectionManager');
+const { createCharacterSelectionManager, getSelection, startSelection } = require('../src/game/characterSelectionManager');
 const { createEffectResolverManager, getResolver } = require('../src/game/effectResolverManager');
 const { getGameState, startGame } = require('../src/game/gameManager');
 const { getPlayer } = require('../src/game/gameState');
@@ -444,6 +444,58 @@ test('closeLobbyRoom during an active game also tears down gameManager/effectRes
 
   clientB.close();
   httpServer.close();
+});
+
+test('closeLobbyRoom during character selection also tears down characterSelectionManager state, freeing the room code for a fresh selection', async () => {
+  const { httpServer, port, characterSelectionManager } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+
+  const firstPrompt = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  await firstPrompt; // confirm selection genuinely started before the host leaves
+
+  expect(getSelection(characterSelectionManager, roomCode)).toBeDefined();
+
+  const closedPromise = new Promise((resolve) => clientB.once('lobby:closed', resolve));
+  clientA.close(); // host disconnects mid character-selection, before the game ever starts
+  await closedPromise;
+
+  expect(getSelection(characterSelectionManager, roomCode)).toBeUndefined();
+
+  // Regression: the freed-up room code must be reusable for a brand new
+  // character selection, not permanently blocked by SELECTION_ALREADY_STARTED.
+  expect(() => startSelection(characterSelectionManager, roomCode, ['p_new1', 'p_new2'], [
+    { id: 'char_001', codename: 'X', stats: {} },
+  ])).not.toThrow();
+
+  clientB.close();
+  httpServer.close();
+});
+
+test('clearPhaseTimeout clears the real timer handle and removes the Map entry', () => {
+  const phaseTimeouts = new Map();
+  const handle = setTimeout(() => {}, 100000); // never meant to actually fire in this test
+  phaseTimeouts.set('ROOM1', { handle, deadline: Date.now() + 100000 });
+
+  const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+  clearPhaseTimeout('ROOM1', phaseTimeouts);
+
+  expect(clearTimeoutSpy).toHaveBeenCalledWith(handle);
+  expect(phaseTimeouts.has('ROOM1')).toBe(false);
+
+  clearTimeoutSpy.mockRestore();
+});
+
+test('clearPhaseTimeout is a safe no-op for an unknown roomCode', () => {
+  const phaseTimeouts = new Map();
+  expect(() => clearPhaseTimeout('NEVER_SCHEDULED', phaseTimeouts)).not.toThrow();
 });
 
 test('game:startCharacterSelect full flow: host triggers, both players get prompted in turn, game starts', async () => {
