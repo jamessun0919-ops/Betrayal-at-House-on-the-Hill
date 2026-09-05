@@ -2546,13 +2546,17 @@ test('game:move into a room whose card effects include a choice broadcasts game:
 });
 
 async function setUpStartedGameWithContent(content, options) {
-  const { httpServer, port, gameManager, effectResolverManager, io } = await startTestServer(content, options);
+  const { httpServer, port, lobbyManager, gameManager, effectResolverManager, io } = await startTestServer(content, options);
   const url = `http://localhost:${port}`;
 
   const clientA = ioClient(url);
   const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
   const roomCode = created.roomCode;
   const aliceId = created.playerId;
+
+  if (options && options.phaseTimeoutMs) {
+    lobbyManager.rooms.get(roomCode).phaseTimeoutMs = options.phaseTimeoutMs;
+  }
 
   const clientB = ioClient(url);
   const joined = await new Promise((resolve) =>
@@ -3043,6 +3047,52 @@ test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck int
   // the fix (see final-review finding 1: the room-deck override is what
   // makes this event actually get drawn via the open_door move).
   expect(cardsDrawn.some((card) => card.cardId === 'event_cascade_test')).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a game started from a room with a custom phaseTimeoutSeconds uses it as gameState.phaseTimeoutMs', async () => {
+  const { httpServer, port, gameManager } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) =>
+    clientA.emit('lobby:create', { playerName: 'Alice', phaseTimeoutSeconds: 60 }, resolve)
+  );
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+
+  const started = new Promise((resolve) => clientA.once('game:started', resolve));
+  const firstPromptA = new Promise((resolve) => clientA.once('game:prompt', resolve));
+  const firstPromptB = new Promise((resolve) => clientB.once('game:prompt', resolve));
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  const [prompt1] = await Promise.all([firstPromptA, firstPromptB]);
+  const firstPickerClient = prompt1.targetPlayerId === aliceId ? clientA : clientB;
+  const secondPickerClient = prompt1.targetPlayerId === aliceId ? clientB : clientA;
+
+  const secondPrompt = new Promise((resolve) => secondPickerClient.once('game:prompt', resolve));
+  const firstRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const firstRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
+  await new Promise((resolve) =>
+    firstPickerClient.emit('game:promptRespond', { promptId: prompt1.promptId, optionId: prompt1.options[0] }, resolve)
+  );
+  await Promise.all([firstRespondedA, firstRespondedB]);
+  const prompt2 = await secondPrompt;
+  const secondRespondedA = new Promise((resolve) => clientA.once('game:promptResolved', resolve));
+  const secondRespondedB = new Promise((resolve) => clientB.once('game:promptResolved', resolve));
+  await new Promise((resolve) =>
+    secondPickerClient.emit('game:promptRespond', { promptId: prompt2.promptId, optionId: prompt2.options[0] }, resolve)
+  );
+  await Promise.all([secondRespondedA, secondRespondedB]);
+  await started;
+
+  const gameState = getGameState(gameManager, roomCode);
+  expect(gameState.phaseTimeoutMs).toBe(60000);
 
   clientA.close();
   clientB.close();
