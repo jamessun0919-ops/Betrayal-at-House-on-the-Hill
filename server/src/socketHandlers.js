@@ -54,11 +54,11 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
     socket.on('lobby:create', (payload, callback) => {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {
-        const { playerName } = payload || {};
+        const { playerName, phaseTimeoutSeconds } = payload || {};
         if (socket.data.roomCode) {
           return ack({ error: 'ALREADY_IN_ROOM' });
         }
-        const { roomCode, playerId } = lobbyManager.createRoom(playerName, socket.id);
+        const { roomCode, playerId } = lobbyManager.createRoom(playerName, socket.id, phaseTimeoutSeconds);
         socket.data.roomCode = roomCode;
         socket.data.playerId = playerId;
         socket.join(roomCode);

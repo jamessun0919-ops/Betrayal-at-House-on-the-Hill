@@ -94,6 +94,40 @@ test('two clients can create/join a room and both see the updated player list', 
   httpServer.close();
 });
 
+test('lobby:create accepts a valid phaseTimeoutSeconds and rejects an out-of-range one', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const goodResult = await new Promise((resolve) =>
+    clientA.emit('lobby:create', { playerName: 'Alice', phaseTimeoutSeconds: 45 }, resolve)
+  );
+  expect(goodResult.error).toBeUndefined();
+  expect(goodResult.roomCode).toMatch(/^[A-Z]{4}$/);
+
+  const clientB = ioClient(url);
+  const badResult = await new Promise((resolve) =>
+    clientB.emit('lobby:create', { playerName: 'Bob', phaseTimeoutSeconds: 5 }, resolve)
+  );
+  expect(badResult.error).toBe('INVALID_PHASE_TIMEOUT');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('lobby:create without phaseTimeoutSeconds still succeeds (defaults to 30s)', async () => {
+  const { httpServer, port } = await startTestServer();
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const result = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  expect(result.error).toBeUndefined();
+
+  clientA.close();
+  httpServer.close();
+});
+
 test('joining an unknown room code returns an error to the caller', async () => {
   const { httpServer, port } = await startTestServer();
   const url = `http://localhost:${port}`;
