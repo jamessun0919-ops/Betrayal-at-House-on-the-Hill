@@ -38,7 +38,7 @@ resumeRollChoice(io, effectResolverManager, gameState, roomCode, playerId, 'dice
   { effect: effectResult.effect, sourceId, consumeItemIfApplied, sourceDeckType: effectResult.sourceDeckType },
   null, content, rollChoiceTimeoutMs, inventoryChoiceTimeoutMs, true /* isTimeoutCascade */);
 ```
-這跟`resolveRollChoiceByTimeout`本來處理「真的有玩家逾時未回應」時的做法完全一樣（`interjectionChoice: null`），差別只在於這裡沒有一個真的被建立過的`prompt`需要先結束。因為是遞迴呼叫、`isTimeoutCascade`會一路帶著往下傳，如果這次解析又冒出下一層新選擇，一樣會被同一套邏輯接住，不需要額外設遞迴次數上限——介入道具使用後會被標記為已消耗/已使用，遊戲機制本身就保證這條鏈不會無限延伸。
+這跟`resolveRollChoiceByTimeout`本來處理「真的有玩家逾時未回應」時的做法完全一樣（`interjectionChoice: null`），差別只在於這裡沒有一個真的被建立過的`prompt`需要先結束。因為是遞迴呼叫、`isTimeoutCascade`會一路帶著往下傳，如果這次解析又冒出下一層新選擇，一樣會被同一套邏輯接住，不需要額外設遞迴次數上限——這條鏈的長度是由遊戲本身的機制（例如行動點數、卡牌/房間牌堆的實際內容能連續觸發多少次擲骰檢定）自然限制住的，而不是靠介入道具被消耗來限制：被拒絕（declined）的介入道具從未被標記為已消耗，在鏈上的每一層都可能被重新提出。
 
 ### 不做的部分
 

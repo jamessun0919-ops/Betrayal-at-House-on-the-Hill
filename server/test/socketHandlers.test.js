@@ -2947,8 +2947,9 @@ test('phase timeout resolves a player\'s pending inventory choice via the defaul
 
 test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck interjection that draws a card triggering a second interjection) without leaving it pending', async () => {
   const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
     startingRooms: [
-      { id: 'room_lobby_b', name: '大門廳', floor: 'ground', drawType: 'event' },
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
       { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
       { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
       { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
@@ -2976,18 +2977,23 @@ test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck int
 
   let diceChoicePendingCount = 0;
   currentClient.on('game:diceChoicePending', () => { diceChoicePendingCount += 1; });
+  const cardsDrawn = [];
+  currentClient.on('game:cardDrawn', (data) => cardsDrawn.push(data));
+
+  // Guarantee every roll passes (custom dice faces are 0/0/1/1/2/2 -- 0.99
+  // lands on the max face) so the leaveCheck passes, the player actually
+  // moves east via open_door (which draws a fresh room_new room carrying
+  // drawType: 'event'), event_cascade_test gets drawn from it, and its own
+  // dice_check also passes. Installed before game:move -- not just before
+  // the setTimeout below -- so it's active for the leaveCheck's own roll
+  // too; otherwise a slow/CI setup could let the phase timeout race ahead
+  // of this mock and make the leaveCheck's own outcome non-deterministic.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
 
   const firstPendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
   await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
   await firstPendingPromise; // leaveCheck's own interjection prompt is open; item_005 not yet consumed
 
-  // Guarantee every roll passes (custom dice faces are 0/0/1/1/2/2 -- 0.99
-  // lands on the max face) so the leaveCheck passes, the player actually
-  // enters room_lobby_b, event_cascade_test gets drawn there, and its own
-  // dice_check also passes. The mock stays active across the real
-  // setTimeout below since it patches the global Math.random reference,
-  // not anything scoped to this synchronous block.
-  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
   await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
   rngSpy.mockRestore();
 
@@ -2998,6 +3004,11 @@ test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck int
   expect(diceChoicePendingCount).toBe(1); // only the original leaveCheck prompt, never a second one
   expect(getResolver(effectResolverManager, roomCode).pendingRollChoice.has(currentPlayerId)).toBe(false);
   expect(gameState.currentPhase).toBe('player_interact'); // both players got force-locked, npc_move cascades through (0 NPCs)
+  // Positive proof the cascade actually reached event_cascade_test -- without
+  // this, the three assertions above could all pass for reasons unrelated to
+  // the fix (see final-review finding 1: the room-deck override is what
+  // makes this event actually get drawn via the open_door move).
+  expect(cardsDrawn.some((card) => card.cardId === 'event_cascade_test')).toBe(true);
 
   clientA.close();
   clientB.close();
