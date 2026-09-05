@@ -2945,6 +2945,76 @@ test('phase timeout resolves a player\'s pending inventory choice via the defaul
   httpServer.close();
 });
 
+test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck interjection that draws a card triggering a second interjection) without leaving it pending', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],
+    startingRooms: [
+      { id: 'room_lobby_b', name: '大門廳', floor: 'ground' },
+      { id: 'room_lobby_a', name: '大門廳', floor: 'ground', leaveCheck: { stat: 'might', min: 3 } },
+      { id: 'room_lobby_c', name: '大門廳', floor: 'ground', stairsTo: 'room_upper_landing' },
+      { id: 'room_upper_landing', name: '二樓平台', floor: 'upper' },
+      { id: 'room_basement_landing', name: '地下平台', floor: 'basement' },
+    ],
+    cards: {
+      events: [{
+        id: 'event_cascade_test',
+        name: 'cascade test',
+        effects: [{ type: 'dice_check', stat: 'knowledge', tiers: [{ min: 0, max: 99, pass: true, effects: [] }] }],
+      }],
+      omens: [],
+      items: [{
+        id: 'item_005',
+        name: '天使羽毛',
+        diceInterjection: { scope: 'any', override: true, consumesItem: true },
+      }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, gameManager, effectResolverManager, roomCode } =
+    await setUpStartedGameWithContent(content, { phaseTimeoutMs: 150 });
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.inventory.push({ id: 'item_005' });
+
+  let diceChoicePendingCount = 0;
+  currentClient.on('game:diceChoicePending', () => { diceChoicePendingCount += 1; });
+  const cardsDrawn = [];
+  currentClient.on('game:cardDrawn', (data) => cardsDrawn.push(data));
+
+  // Guarantee every roll passes (custom dice faces are 0/0/1/1/2/2 -- 0.99
+  // lands on the max face) so the leaveCheck passes, the player actually
+  // moves east via open_door (which draws a fresh room_new room carrying
+  // drawType: 'event'), event_cascade_test gets drawn from it, and its own
+  // dice_check also passes. Installed before game:move -- not just before
+  // the setTimeout below -- so it's active for the leaveCheck's own roll
+  // too; otherwise a slow/CI setup could let the phase timeout race ahead
+  // of this mock and make the leaveCheck's own outcome non-deterministic.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+
+  const firstPendingPromise = new Promise((resolve) => currentClient.once('game:diceChoicePending', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  await firstPendingPromise; // leaveCheck's own interjection prompt is open; item_005 not yet consumed
+
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
+  rngSpy.mockRestore();
+
+  // The fix: event_cascade_test's own dice_check found item_005 still
+  // available (declined, never consumed, for the leaveCheck) and would
+  // have opened a SECOND interjection prompt -- it must not, since this
+  // whole resolution is happening because the phase already timed out.
+  expect(diceChoicePendingCount).toBe(1); // only the original leaveCheck prompt, never a second one
+  expect(getResolver(effectResolverManager, roomCode).pendingRollChoice.has(currentPlayerId)).toBe(false);
+  expect(gameState.currentPhase).toBe('player_interact'); // both players got force-locked, npc_move cascades through (0 NPCs)
+  // Positive proof the cascade actually reached event_cascade_test -- without
+  // this, the three assertions above could all pass for reasons unrelated to
+  // the fix (see final-review finding 1: the room-deck override is what
+  // makes this event actually get drawn via the open_door move).
+  expect(cardsDrawn.some((card) => card.cardId === 'event_cascade_test')).toBe(true);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('game:move into a room with an unknown drawType does not crash the room, and the phase still locks normally via game:endTurn', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'unknown_deck_type' }],
