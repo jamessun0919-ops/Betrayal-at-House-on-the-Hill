@@ -3121,6 +3121,64 @@ test('phase timeout resolves a player\'s pending inventory choice via the defaul
   httpServer.close();
 });
 
+test('phase timeout resolves a DISCONNECTED (already auto-locked) player\'s pending inventory choice, not just a still-unlocked one', async () => {
+  // Regression test for the disconnect-as-regular-player final review's
+  // Important finding: handlePhaseTimeout's force-resolve sweep only looked
+  // at !p.phaseLocked, so a participant auto-locked by resetPhaseLocks for
+  // being disconnected (phaseFlow.js) was permanently excluded from it --
+  // any pending choice opened for them afterward (e.g. another player giving
+  // them an item that pushes them over their inventory cap) would never get
+  // force-resolved and would wedge that player's prompt slot forever.
+  const content = makeContent({
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+        { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content, { phaseTimeoutMs: 150 });
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  // Simulate: otherPlayerId disconnected before this phase began, so
+  // resetPhaseLocks already auto-locked them for it (see phaseFlow.test.js).
+  gameState.currentPhase = 'player_interact';
+  gameState.phaseDeadline = Date.now() + 150;
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.connected = false;
+  otherPlayer.phaseLocked = true;
+  otherPlayer.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' }); // at cap (might: 3)
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  currentPlayer.inventory.push({ id: 'item_004' });
+  currentPlayer.actionPoints = 1;
+
+  // currentPlayer (still connected, still unlocked) gives item_004 to the
+  // disconnected/auto-locked otherPlayer, pushing them over cap and opening
+  // a pending inventory choice FOR otherPlayer -- this also (re)arms the
+  // phase timer via scheduleOrRefreshPhaseTimeout, since gameState.currentPhase
+  // was hand-set above rather than reached through a real enterPhase call.
+  const giveResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_004', mode: 'give', targetPlayerId: otherPlayerId }, resolve)
+  );
+  expect(giveResult.error).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(true);
+
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
+
+  // The fix: otherPlayer's pending choice gets force-resolved via the default
+  // (drop the newest item, item_004) instead of staying wedged forever.
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(false);
+  expect(otherPlayer.inventory.map((i) => i.id).sort()).toEqual(['item_001', 'item_002', 'item_003']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck interjection that draws a card triggering a second interjection) without leaving it pending', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],

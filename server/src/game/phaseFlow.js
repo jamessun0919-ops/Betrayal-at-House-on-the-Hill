@@ -36,11 +36,21 @@ function allParticipantsLocked(gameState, phase) {
   return getParticipants(gameState, phase).every((p) => p.phaseLocked);
 }
 
+// A real player is disconnected via its own connected field; an NPC has no
+// connected field of its own and is judged by its controller's instead (see
+// playerEntity.js's createNpc). Exported so any other code path that needs
+// to know "is this participant effectively disconnected" (e.g.
+// socketHandlers.js's handlePhaseTimeout sweep) uses this exact same check,
+// instead of re-deriving a second copy that can drift out of sync with it.
+function isParticipantDisconnected(gameState, p) {
+  return p.isNPC
+    ? !(getPlayer(gameState, p.controlledBy)?.connected ?? true)
+    : !p.connected;
+}
+
 function resetPhaseLocks(gameState, phase) {
   for (const p of getParticipants(gameState, phase)) {
-    p.phaseLocked = p.isNPC
-      ? !(getPlayer(gameState, p.controlledBy)?.connected ?? true)
-      : !p.connected;
+    p.phaseLocked = isParticipantDisconnected(gameState, p);
   }
 }
 
@@ -142,4 +152,4 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
   return actingAsNpcId;
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants };
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants, isParticipantDisconnected };

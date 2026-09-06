@@ -15,7 +15,7 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState, endGame } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
-const { lockPlayerPhase, resolveActingEntity, getParticipants } = require('./game/phaseFlow');
+const { lockPlayerPhase, resolveActingEntity, getParticipants, isParticipantDisconnected } = require('./game/phaseFlow');
 const { moveNpc, npcItemAction } = require('./game/npcFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver, endResolver } = require('./game/effectResolverManager');
@@ -747,7 +747,17 @@ function scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, e
 function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content) {
   try {
     const phase = gameState.currentPhase;
-    const unresolved = getParticipants(gameState, phase).filter((p) => !p.phaseLocked);
+    // Also sweep participants who are ALREADY phaseLocked because
+    // resetPhaseLocks auto-locked them for being disconnected -- they never
+    // get a chance to lock themselves, so without this they'd never enter
+    // this force-resolve pass at all, and any pending choice opened for them
+    // afterward (e.g. another player giving them an item) would wedge
+    // forever. resolveRollChoiceByTimeout/resolveInventoryChoiceByTimeout/
+    // resolveEffectChoiceByTimeout are no-ops when there's nothing pending
+    // for a given playerId, so including already-locked-and-connected
+    // participants here would be harmless too, but isParticipantDisconnected
+    // keeps this pass scoped to only the participants who actually need it.
+    const unresolved = getParticipants(gameState, phase).filter((p) => !p.phaseLocked || isParticipantDisconnected(gameState, p));
     for (const participant of unresolved) {
       const playerId = participant.playerId;
       resolveRollChoiceByTimeout(io, effectResolverManager, gameState, roomCode, playerId, content);

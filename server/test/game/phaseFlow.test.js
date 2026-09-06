@@ -1,6 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { getStatValue, changeStat } = require('../../src/game/playerEntity');
-const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity } = require('../../src/game/phaseFlow');
+const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, isParticipantDisconnected } = require('../../src/game/phaseFlow');
 
 function makeStats() {
   return {
@@ -81,6 +81,28 @@ test('enterPhase (via resetPhaseLocks) does NOT auto-lock an NPC whose controlle
   gameState.players.set('npc_1', { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false, stats: makeStats() });
   enterPhase(gameState, 'npc_move');
   expect(gameState.players.get('npc_1').phaseLocked).toBe(false);
+});
+
+// isParticipantDisconnected is the exact predicate resetPhaseLocks uses above
+// to decide auto-lock -- exported so socketHandlers.js's handlePhaseTimeout
+// can reuse the SAME source of truth (including the NPC-via-controller case)
+// when deciding which auto-locked participants still need their pending
+// choices swept, instead of re-deriving a second, easy-to-drift copy of it.
+test('isParticipantDisconnected: false for a connected real player, true for a disconnected one', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const p1 = gameState.players.get('p1');
+  expect(isParticipantDisconnected(gameState, p1)).toBe(false);
+  p1.connected = false;
+  expect(isParticipantDisconnected(gameState, p1)).toBe(true);
+});
+
+test('isParticipantDisconnected: an NPC is judged by its controller\'s connected state, not its own', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const npc = { playerId: 'npc_1', isNPC: true, controlledBy: 'p1', phaseLocked: false, stats: makeStats() };
+  gameState.players.set('npc_1', npc);
+  expect(isParticipantDisconnected(gameState, npc)).toBe(false);
+  gameState.players.get('p1').connected = false;
+  expect(isParticipantDisconnected(gameState, npc)).toBe(true);
 });
 
 test('enterPhase re-rolls action points for a move phase', () => {
