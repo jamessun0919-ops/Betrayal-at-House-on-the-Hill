@@ -1,6 +1,12 @@
 # 交接文檔 Handover
 
-最後更新：2026-09-05（第 4 次工作階段：**遊戲進行中斷線視同一般玩家（房間/遊戲生命週期清理待辦②的第二部分）完成並合併進main——房主中途斷線不再無條件踢光所有人；已知斷線的玩家不擋下一個新階段推進；全分支審查發現2個真實可觸及的Important缺口，開發者裁示先記錄為待辦，不在此分支修**）。
+最後更新：2026-09-07（**修復上次全分支審查記錄的2個Important待辦，皆已完成並直接commit在main（範圍小，開發者指示用TDD做、不開worktree/不走完整SDD）**）。
+
+**Important①：自動鎖定的斷線玩家永久卡住懸置提示——已修復（commit `0f4c04d`）**：`handlePhaseTimeout`強制決議懸置選擇的sweep原本只看`!p.phaseLocked`,`resetPhaseLocks`把斷線參與者自動鎖定後就永遠不會再被掃到。**修法**：把`resetPhaseLocks`判斷「是否斷線」的邏輯抽成共用函式`isParticipantDisconnected(gameState, p)`（`phaseFlow.js`，已export），`handlePhaseTimeout`的filter改成`!p.phaseLocked || isParticipantDisconnected(gameState, p)`，兩處共用同一套標準——**這修正了Handover原本建議修法本身的一個遺漏**：原建議只加`p.connected===false`，但NPC沒有自己的`connected`欄位（是看操控者），照原建議寫法對NPC完全無效；改用共用函式後NPC情形也一併正確涵蓋。新增2個`phaseFlow.test.js`單元測試（真人/NPC各自的斷線判定）＋1個`socketHandlers.test.js`端到端整合測試（真人玩家給斷線且已鎖定階段的玩家道具→超過負重上限→階段逾時後確認提示被強制決議而非卡死，修復前先確認RED真的重現問題）。**目前NPC還無法被`give`/可指定目標道具鎖定（`TARGET_IS_NPC`擋住）**，所以NPC那一半目前只有單元測試鎖住`isParticipantDisconnected`本身，沒有端到端整合測試（沒有可達的生產路徑可以重現），等未來NPC真的能被鎖定提示時這個共用函式已經是對的。
+
+**Important②：角色選擇階段斷線的幽靈玩家讓房間回收條件永遠不成立——已修復（commit `3069ce6`）**：`finishCharacterSelection`建立`players`清單時依`characterSelectionState.order`（選角開始當下就固定），非房主斷線只會從`lobbyManager`名單移除、不會被拿掉`order`資格，`createPlayer`的`connected:true`預設值讓這個幽靈玩家的遊戲實體永遠是`connected:true`。**修法**：`connected`欄位貫穿`createPlayer`（新增可選參數，預設`true`，其他呼叫端不受影響）→`gameState.js`的`addPlayer`→`gameManager.js`的`startGame`，`finishCharacterSelection`建立`players`時依`lobbyPlayersById.has(playerId)`帶入正確的`connected`值。新增1個`socketHandlers.test.js`整合測試（3人房，Carol選角途中斷線、她的回合靠既有選角逾時機制自動代選）：驗證①`game:started`後Carol的實體`connected===false`、Alice/Bob仍是`true`；②Alice/Bob也斷線後房間真的被完整回收（`gameManager.games`不再卡著房號）——修復前先確認RED。
+
+780→784測試全綠（含這次新增的4個測試：2個phaseFlow單元測試＋2個socketHandlers整合測試）。**尚未處理、留給未來**：全分支審查記錄的5個Minor（測試缺口、`phaseFlow.js`過期NPC註解、`lobby:leave`清理不完整、`resetPhaseLocks`真人分支fail-unsafe）；房間/遊戲生命週期清理剩餘子項目（遊戲何時算「結束」的判定邏輯）；獨立待辦「全局廣播訊息清單及UI」；重連機制；AI代管斷線玩家/NPC（長期）；M3戰鬥/傷害系統。
 
 **遊戲進行中斷線視同一般玩家（房間/遊戲生命週期清理待辦②，部分完成）**：開發者提出核心規則——進入遊戲後房主等同一般玩家，斷線玩家如果已無連線、其他玩家都確認完畢就結束該階段（不擋推進），重連機制另外討論。查證確認`isHost`整個`server/src/game/`遊戲引擎完全沒有痕跡，純粹是`lobbyManager`層概念，不需要拆解任何房主特權。開發者補充澄清一個關鍵細節：**玩家斷線當下所在的那個階段仍照舊走既有的階段逾時機制**（可能還有懸置中的道具介入選擇要靠逾時的強制決議邏輯收尾），只有**下一個新階段**開始時才不再等他——這個補充讓實作方向從「改`allParticipantsLocked`」修正為「只改`resetPhaseLocks`」（在`enterPhase`進入新階段的當下，把已知斷線的參與者直接視為已鎖定），完全不用碰`allParticipantsLocked`／`lockPlayerPhase`／逾時機制本身。操控中的NPC比照其操控者的連線狀態（開發者確認）。開發者同時確認：`disconnect`／`lobby:leave`兩個handler都要套用「遊戲是否已開始」而非「是不是房主」的判斷；斷線通知要不要廣播/UI提示——開發者要求先記錄為獨立待辦「全局廣播訊息清單及UI」，這次不做。另外記錄2項長期待辦（AI接管斷線玩家行動、凶徒玩家可選擇讓AI代管NPC）。
 

@@ -1666,3 +1666,21 @@
 
 **開發者交代備忘事項**：
 - 這次全分支審查發現的2個Important＋5個Minor都還沒修，已完整記錄在Handover.md本次條目裡（含具體位置跟建議修法），下次工作前可以先決定要不要優先處理這些，或繼續房間/遊戲生命週期清理剩餘子項目（遊戲何時算「結束」的判定邏輯），或轉向M3戰鬥/傷害系統
+
+## 2026-09-07 第 1 次工作階段
+
+**當日工作內容**：
+- 讀取Handover與最近工作日誌，開發者選擇處理上次記錄的Important①（自動鎖定的斷線玩家永久卡住懸置提示）。查證發現Handover建議的修法本身有遺漏——只加`p.connected===false`對NPC無效（NPC沒有自己的`connected`欄位，是看操控者），跟開發者說明後改用「抽共用函式`isParticipantDisconnected`」的修法，兩處判斷永遠一致。開發者選擇直接用TDD在main上做，不開worktree
+- 依序完成Important①（`0f4c04d`）與Important②（角色選擇階段幽靈玩家讓房間回收條件永遠不成立，`3069ce6`）：都先寫失敗測試確認真的重現問題（RED），再修production code，最後跑全套件確認無回歸（GREEN）
+- 兩次修復皆commit在main，開發者確認後收工
+
+**完成項目**：
+- Important①：`phaseFlow.js`新增並export`isParticipantDisconnected`，`handlePhaseTimeout`的懸置提示強制決議sweep改用它，涵蓋真人與NPC兩種情形
+- Important②：`connected`欄位貫穿`createPlayer`/`addPlayer`/`startGame`，`finishCharacterSelection`依即時大廳名單正確標記幽靈玩家的`connected:false`
+- 780→784測試全綠（4個新測試：2個phaseFlow單元測試、2個socketHandlers整合測試）
+
+**遇到瓶頸**：
+- 無
+
+**開發者交代備忘事項**：
+- 尚未處理：5個Minor（見Handover）、房間/遊戲生命週期清理剩餘子項目（遊戲何時算「結束」）、獨立待辦「全局廣播訊息清單及UI」、重連機制、AI代管斷線玩家/NPC（長期）、M3戰鬥/傷害系統
