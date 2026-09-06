@@ -1456,6 +1456,13 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
     playerId,
     name: lobbyPlayersById.has(playerId) ? lobbyPlayersById.get(playerId).name : playerId,
     characterId: assignments.get(playerId),
+    // order is captured once, at game:startCharacterSelect time, and never
+    // updated -- a player who has since left the lobby (disconnect/lobby:leave
+    // during character selection) is missing from lobbyPlayersById even
+    // though they still get a real game entity created below. Without this,
+    // that entity would default to connected:true forever, permanently
+    // blocking the "every real player disconnected" room-teardown check.
+    connected: lobbyPlayersById.has(playerId),
   }));
   const gameState = startGame(gameManager, roomCode, {
     startingRooms: content.startingRooms,

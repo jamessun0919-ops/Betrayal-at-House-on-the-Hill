@@ -450,6 +450,76 @@ test('closeLobbyRoom during an active game also tears down gameManager/effectRes
   httpServer.close();
 });
 
+test('a non-host who disconnects during character selection (before ever picking) gets connected:false on the game entity finishCharacterSelection creates for them -- and the room can now actually be torn down once the real remaining players also disconnect', async () => {
+  // Regression test for the disconnect-as-regular-player final review's
+  // second Important finding: finishCharacterSelection builds its players
+  // list from characterSelectionState.order (captured once, at
+  // game:startCharacterSelect time), not the live lobby list -- a non-host
+  // who disconnects mid-selection is removed from the LOBBY but stays in
+  // that order and still gets a real game player entity created for them,
+  // via createPlayer's connected:true default. Since room teardown (see the
+  // disconnect-as-regular-player work) now keys off "every real player's
+  // connected is false", this permanently-true ghost entity would block that
+  // condition forever, even once every actually-connected player is gone.
+  const content = makeContent({
+    characters: [
+      { id: 'char_001', codename: 'Alice-character', stats: makeStats() },
+      { id: 'char_002', codename: 'Bob-character', stats: makeStats() },
+      { id: 'char_003', codename: 'Carol-character', stats: makeStats() },
+    ],
+  });
+  const { httpServer, port, gameManager } = await startTestServer(content, { characterSelectTimeoutMs: 100 });
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  const joinedB = await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+  const bobId = joinedB.playerId;
+
+  const clientC = ioClient(url);
+  const joinedC = await new Promise((resolve) => clientC.emit('lobby:join', { roomCode, playerName: 'Carol' }, resolve));
+  const carolId = joinedC.playerId;
+
+  const liveClientsById = { [aliceId]: clientA, [bobId]: clientB };
+  const startedPromise = new Promise((resolve) => clientA.once('game:started', resolve));
+  // Respond to every prompt broadcast EXCEPT Carol's own turn -- that one is
+  // left to time out (characterSelectTimeoutMs:100) and auto-assign, the
+  // same way a real disconnected picker's turn resolves in production.
+  clientA.on('game:prompt', (prompt) => {
+    const respondingClient = liveClientsById[prompt.targetPlayerId];
+    if (respondingClient) {
+      respondingClient.emit('game:promptRespond', { promptId: prompt.promptId, optionId: prompt.options[0] }, () => {});
+    }
+  });
+
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  // order (all 3 playerIds) is captured synchronously above -- safe to
+  // disconnect Carol now, before her own turn is ever reached.
+  clientC.close();
+
+  await startedPromise;
+
+  const gameState = getGameState(gameManager, roomCode);
+  expect(getPlayer(gameState, carolId).connected).toBe(false); // the fix
+  expect(getPlayer(gameState, aliceId).connected).toBe(true);
+  expect(getPlayer(gameState, bobId).connected).toBe(true);
+
+  // With Carol's ghost entity now correctly connected:false, the "every real
+  // player disconnected" condition (handlePlayerDisconnectedFromGame) can
+  // actually be reached once the two genuinely-connected players leave too --
+  // before the fix, this would never fire and the room/its Maps would leak.
+  clientA.close();
+  clientB.close();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(getGameState(gameManager, roomCode)).toBeUndefined();
+
+  httpServer.close();
+});
+
 test('closeLobbyRoom during character selection also tears down characterSelectionManager state, freeing the room code for a fresh selection', async () => {
   const { httpServer, port, characterSelectionManager } = await startTestServer();
   const url = `http://localhost:${port}`;

@@ -17,7 +17,7 @@ function createGameState(startingRooms, rooms, cards = {}, options = {}) {
   };
 }
 
-function addPlayer(gameState, { playerId, name, characterId, stats }) {
+function addPlayer(gameState, { playerId, name, characterId, stats, connected }) {
   if (gameState.players.has(playerId)) {
     throw new Error('DUPLICATE_PLAYER_ID');
   }
@@ -30,6 +30,7 @@ function addPlayer(gameState, { playerId, name, characterId, stats }) {
     y: 1, // room_lobby_a's fixed position (see boardGenerator.js createBoard)
     stats,
     actionPoints: 0,
+    connected,
   });
   resetActionPoints(player);
   gameState.players.set(playerId, player);

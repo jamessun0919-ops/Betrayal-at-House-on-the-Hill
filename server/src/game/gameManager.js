@@ -32,6 +32,7 @@ function startGame(manager, roomCode, { startingRooms, rooms, cards, characters,
       name: player.name,
       characterId: character.id,
       stats: character.stats,
+      connected: player.connected,
     });
     if (character.itemID) {
       addItem(newPlayer, { id: character.itemID });

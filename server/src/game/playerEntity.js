@@ -41,7 +41,7 @@ function buildStatTracks(stats) {
   return statTracks;
 }
 
-function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionPoints }) {
+function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionPoints, connected = true }) {
   const statTracks = buildStatTracks(stats);
   return {
     playerId,
@@ -53,7 +53,7 @@ function createPlayer({ playerId, name, characterId, floor, x, y, stats, actionP
     stats: statTracks,
     actionPoints,
     inventory: [],
-    connected: true,
+    connected,
     visitedRooms: [{ floor, x, y }],
     enteredFromSide: null, // null = arrived by spawn/stairs (badge centered), else the door side entered through
     previousPosition: null, // {floor,x,y} snapshot of where the player was immediately before their current position, set by movePlayerTo; null until they've moved at least once
