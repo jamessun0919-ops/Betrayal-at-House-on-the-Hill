@@ -606,6 +606,28 @@ test('lobby:leave sent by the host after the game has started is handled the sam
   httpServer.close();
 });
 
+test('lobby:leave sent mid-game clears the caller\'s own socket.data, so that same socket can no longer act as that player afterward', async () => {
+  // Minor finding from the disconnect-as-regular-player final review:
+  // the lobby-phase branch of this same handler (a non-host leaving before
+  // the game starts) already does socket.leave/clears socket.data -- the
+  // in-progress-game branch (handlePlayerDisconnectedFromGame) didn't, so a
+  // socket that explicitly left mid-game could still send further game
+  // actions and have them processed as the player it just claimed to leave.
+  const { httpServer, clientA, clientB, roomCode, aliceId, gameManager } = await setUpStartedGameWithContent(makeContent());
+
+  const leaveResult = await new Promise((resolve) => clientA.emit('lobby:leave', {}, resolve));
+  expect(leaveResult.error).toBeUndefined();
+  expect(getPlayer(getGameState(gameManager, roomCode), aliceId).connected).toBe(false);
+  expect(getGameState(gameManager, roomCode)).toBeDefined(); // Bob still connected -- no teardown, so this isn't just closeLobbyRoom's own cleanup
+
+  const lockResult = await new Promise((resolve) => clientA.emit('game:lockPhase', {}, resolve));
+  expect(lockResult.error).toBe('NOT_IN_ROOM');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('clearPhaseTimeout clears the real timer handle and removes the Map entry', () => {
   const phaseTimeouts = new Map();
   const handle = setTimeout(() => {}, 100000); // never meant to actually fire in this test
@@ -3127,6 +3149,53 @@ test('an effect choice resolved via resolveEffectChoiceByTimeout still requires 
   expect(secondLock.currentPhase).toBe('player_interact');
 
   clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a player who disconnects mid-phase is NOT immediately auto-locked -- the phase they were already in still relies on the existing phase-timeout mechanism, only the NEXT phase auto-locks them via resetPhaseLocks', async () => {
+  // Regression test for a Minor finding from the disconnect-as-regular-player
+  // final review: the design's own test plan called for this exact
+  // assertion but it was never written. A generous phaseTimeoutMs (well
+  // above anything this test needs to wait for) avoids any race with the
+  // real timer -- this test is only about phaseLocked immediately after
+  // disconnect, not about the timeout firing.
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent(), { phaseTimeoutMs: 30000 });
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  otherClient.close(); // disconnects mid player_move, before ever locking it
+  await new Promise((resolve) => setTimeout(resolve, 100)); // let the server's disconnect handler run
+
+  expect(getPlayer(gameState, otherPlayerId).connected).toBe(false);
+  expect(getPlayer(gameState, otherPlayerId).phaseLocked).toBe(false); // NOT auto-locked just for disconnecting mid-phase
+  expect(gameState.currentPhase).toBe('player_move'); // hasn't advanced -- the phase they disconnected in still needs a real lock or the timeout, not an instant auto-lock
+
+  clientA.close();
+  httpServer.close();
+});
+
+test('end-to-end: once the phase timeout force-locks a disconnected host and the NEXT phase auto-locks them again via resetPhaseLocks, the remaining player locking alone immediately advances the phase with no second wait', async () => {
+  // Regression test for a Minor finding from the disconnect-as-regular-player
+  // final review: each task's own tests covered this in isolation
+  // (resetPhaseLocks auto-locking directly, and the phase-timeout sweep
+  // separately), but nothing chained the two real production paths together
+  // end-to-end the way an actual host disconnect plays out.
+  const { httpServer, clientA, clientB, aliceId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent(), { phaseTimeoutMs: 150 });
+  const gameState = getGameState(gameManager, roomCode);
+
+  clientA.close(); // host (Alice) disconnects mid player_move, before ever locking it
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms deadline: the phase timeout force-locks Alice (still unlocked when this phase began), cascading through the empty npc_move into player_interact, whose resetPhaseLocks auto-locks Alice again for being disconnected
+
+  expect(gameState.currentPhase).toBe('player_interact');
+  expect(getPlayer(gameState, aliceId).phaseLocked).toBe(true); // this time via resetPhaseLocks on phase entry, not the timeout
+
+  const lockResult = await new Promise((resolve) => clientB.emit('game:lockPhase', {}, resolve));
+  expect(lockResult.error).toBeUndefined();
+  expect(lockResult.currentPhase).toBe('settlement'); // Bob's own lock alone was enough -- Alice was already locked, so no second timeout wait was needed to reach player_interact's own advance
+
   clientB.close();
   httpServer.close();
 });

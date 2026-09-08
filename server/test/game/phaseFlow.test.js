@@ -105,6 +105,19 @@ test('isParticipantDisconnected: an NPC is judged by its controller\'s connected
   expect(isParticipantDisconnected(gameState, npc)).toBe(true);
 });
 
+// A real player's connected field is always set by createPlayer (default
+// true) in production, so this can't currently happen -- but the NPC branch
+// above already treats a missing/unresolvable controller as fail-safe
+// (?? true, i.e. "assume still connected" rather than auto-locking them).
+// The real-player branch should be consistent with that same fail-safe
+// default rather than silently treating a missing field as disconnected.
+test('isParticipantDisconnected: a real player with no connected field at all is treated as connected (fail-safe), not disconnected', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  const p1 = gameState.players.get('p1');
+  delete p1.connected;
+  expect(isParticipantDisconnected(gameState, p1)).toBe(false);
+});
+
 test('enterPhase re-rolls action points for a move phase', () => {
   const gameState = makeGameStateWithPlayers(['p1']);
   const player = gameState.players.get('p1');

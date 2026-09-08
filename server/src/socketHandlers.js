@@ -633,6 +633,14 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
       const gameState = getGameState(gameManager, roomCode);
       if (gameState) {
         await handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId);
+        // Unlike a real disconnect, this socket is still alive and would
+        // otherwise keep socket.data pointing at the room/player it just
+        // explicitly left -- redundant (but harmless) if
+        // handlePlayerDisconnectedFromGame already tore the room down via
+        // closeLobbyRoom, which does the same cleanup for every socket.
+        socket.leave(roomCode);
+        socket.data.roomCode = null;
+        socket.data.playerId = null;
       } else if (lobbyManager.isHost(roomCode, playerId)) {
         await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
       } else {

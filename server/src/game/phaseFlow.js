@@ -20,10 +20,9 @@ function isMovePhase(phase) {
 }
 
 // Real players participate in player_move/player_interact/settlement; NPCs
-// (Handover item 8 -- not implemented in this codebase yet, so this always
-// returns an empty array for npc_move/npc_interact today) participate in
-// npc_move/npc_interact. There is no independent NPC confirmation step for
-// settlement -- see the 2026-09-02 design doc's "結算階段" section.
+// (Handover item 8) participate in npc_move/npc_interact. There is no
+// independent NPC confirmation step for settlement -- see the 2026-09-02
+// design doc's "結算階段" section.
 function getParticipants(gameState, phase) {
   const allPlayers = Array.from(gameState.players.values());
   if (isNpcPhase(phase)) {
@@ -45,7 +44,7 @@ function allParticipantsLocked(gameState, phase) {
 function isParticipantDisconnected(gameState, p) {
   return p.isNPC
     ? !(getPlayer(gameState, p.controlledBy)?.connected ?? true)
-    : !p.connected;
+    : !(p.connected ?? true);
 }
 
 function resetPhaseLocks(gameState, phase) {
