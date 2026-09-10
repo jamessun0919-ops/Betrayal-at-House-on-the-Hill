@@ -678,6 +678,12 @@ async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effe
     return;
   }
   const toRemove = Array.from(gameState.players.values()).filter((p) => !p.isNPC && p.isDead && p.connected);
+  // Sequential on purpose, not Promise.all: removePlayerFromGame ->
+  // handlePlayerDisconnectedFromGame re-checks "is anyone still connected"
+  // against the CURRENT state each time. Running these concurrently would
+  // let every iteration see the others' not-yet-applied connected:false,
+  // so closeLobbyRoom either fires multiple times or never fires at all.
+  // One at a time, it correctly fires exactly once, on the last removal.
   for (const player of toRemove) {
     // 未來勝利條件系統要掛在這裡：許多劇本的勝利條件是「另一陣營全滅」，
     // 這個移出動作發生的當下就是檢查這類條件的正確時機點。
