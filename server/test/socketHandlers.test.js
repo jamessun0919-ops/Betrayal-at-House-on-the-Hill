@@ -3318,6 +3318,48 @@ test('phase timeout resolves a DISCONNECTED (already auto-locked) player\'s pend
   httpServer.close();
 });
 
+test('phase timeout resolves a DEAD (auto-locked) player\'s pending inventory choice too, same as a disconnected one', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+        { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content, { phaseTimeoutMs: 150 });
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  gameState.currentPhase = 'player_interact';
+  gameState.phaseDeadline = Date.now() + 150;
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.isDead = true;
+  otherPlayer.phaseLocked = true;
+  otherPlayer.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' }); // at cap (might: 3)
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  currentPlayer.inventory.push({ id: 'item_004' });
+  currentPlayer.actionPoints = 1;
+
+  const giveResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_004', mode: 'give', targetPlayerId: otherPlayerId }, resolve)
+  );
+  expect(giveResult.error).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(true);
+
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
+
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(false);
+  expect(otherPlayer.inventory.map((i) => i.id).sort()).toEqual(['item_001', 'item_002', 'item_003']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('phase timeout resolves a cascading roll choice (a timed-out leaveCheck interjection that draws a card triggering a second interjection) without leaving it pending', async () => {
   const content = makeContent({
     rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'event' }],

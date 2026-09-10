@@ -32,7 +32,7 @@ function getParticipants(gameState, phase) {
 }
 
 function allParticipantsLocked(gameState, phase) {
-  return getParticipants(gameState, phase).every((p) => p.phaseLocked);
+  return getParticipants(gameState, phase).every((p) => p.phaseLocked || (p.isDead ?? false));
 }
 
 // A real player is disconnected via its own connected field; an NPC has no
@@ -49,7 +49,7 @@ function isParticipantDisconnected(gameState, p) {
 
 function resetPhaseLocks(gameState, phase) {
   for (const p of getParticipants(gameState, phase)) {
-    p.phaseLocked = isParticipantDisconnected(gameState, p);
+    p.phaseLocked = isParticipantDisconnected(gameState, p) || (p.isDead ?? false);
   }
 }
 

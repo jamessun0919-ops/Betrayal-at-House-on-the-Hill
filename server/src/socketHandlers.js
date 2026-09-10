@@ -765,7 +765,9 @@ function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolv
     // for a given playerId, so including already-locked-and-connected
     // participants here would be harmless too, but isParticipantDisconnected
     // keeps this pass scoped to only the participants who actually need it.
-    const unresolved = getParticipants(gameState, phase).filter((p) => !p.phaseLocked || isParticipantDisconnected(gameState, p));
+    const unresolved = getParticipants(gameState, phase).filter(
+      (p) => !p.phaseLocked || isParticipantDisconnected(gameState, p) || (p.isDead ?? false)
+    );
     for (const participant of unresolved) {
       const playerId = participant.playerId;
       resolveRollChoiceByTimeout(io, effectResolverManager, gameState, roomCode, playerId, content);

@@ -1,6 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { getStatValue, changeStat } = require('../../src/game/playerEntity');
-const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, isParticipantDisconnected } = require('../../src/game/phaseFlow');
+const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, isParticipantDisconnected, allParticipantsLocked } = require('../../src/game/phaseFlow');
 
 function makeStats() {
   return {
@@ -119,30 +119,35 @@ test('isParticipantDisconnected: a real player with no connected field at all is
 });
 
 test('enterPhase, entering settlement with pendingHauntGraceCheck true, marks isDead for a real player still stuck at skullIndex+1', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   gameState.hauntStarted = true;
   gameState.pendingHauntGraceCheck = true;
   gameState.players.get('p1').stats.might.currentIndex = 1; // skullIndex(0) + 1, the pre-haunt floor
+  // p2 stays connected and above the floor for all stats so cascade doesn't loop forever
+  // (knowledge default is at baseIndex 1, which equals floor 1, so need to bump it)
+  gameState.players.get('p2').stats.knowledge.currentIndex = 2;
   enterPhase(gameState, 'settlement');
   expect(gameState.players.get('p1').isDead).toBe(true);
   expect(gameState.pendingHauntGraceCheck).toBe(false); // consumed, one-time only
 });
 
 test('enterPhase, entering settlement with pendingHauntGraceCheck true, does NOT mark isDead for a player whose stats are all above skullIndex+1', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   gameState.hauntStarted = true;
   gameState.pendingHauntGraceCheck = true;
   // Ensure all stats are above the floor (skullIndex+1): knowledge starts at baseIndex 1, which equals floor 1, so bump it up
   gameState.players.get('p1').stats.knowledge.currentIndex = 2;
+  // p2 stays connected so cascade doesn't loop forever
   enterPhase(gameState, 'settlement'); // p1's stats are all now strictly above the floor
   expect(gameState.players.get('p1').isDead).toBe(false);
   expect(gameState.pendingHauntGraceCheck).toBe(false); // still consumed even when nobody matched
 });
 
 test('enterPhase entering settlement does nothing extra when pendingHauntGraceCheck is false', () => {
-  const gameState = makeGameStateWithPlayers(['p1']);
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   gameState.hauntStarted = true;
   gameState.players.get('p1').stats.might.currentIndex = 1; // would match the floor check, but the flag is off
+  // p2 stays connected so cascade doesn't loop forever
   enterPhase(gameState, 'settlement');
   expect(gameState.players.get('p1').isDead).toBe(false);
 });
@@ -154,6 +159,8 @@ test('enterPhase\'s settlement grace check skips a player already marked isDead'
   const p1 = gameState.players.get('p1');
   p1.isDead = true;
   p1.stats.might.currentIndex = 1; // would also match -- confirms no crash/double-processing on an already-dead player
+  // p2 needs to be above the floor for all stats to avoid cascade loop
+  gameState.players.get('p2').stats.knowledge.currentIndex = 2;
   enterPhase(gameState, 'settlement');
   expect(p1.isDead).toBe(true); // unchanged
   expect(gameState.pendingHauntGraceCheck).toBe(false);
@@ -381,4 +388,26 @@ test('enterPhase sets phaseDeadline to now + gameState.phaseTimeoutMs', () => {
   enterPhase(gameState, 'player_move');
   expect(gameState.phaseDeadline).toBeGreaterThanOrEqual(before + 12345);
   expect(gameState.phaseDeadline).toBeLessThanOrEqual(Date.now() + 12345);
+});
+
+test('allParticipantsLocked treats a dead participant as satisfying the lock requirement, even if phaseLocked is still false', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  gameState.players.get('p2').phaseLocked = true;
+  expect(allParticipantsLocked(gameState, 'player_move')).toBe(true);
+});
+
+test('allParticipantsLocked still requires a lock from a participant who is neither locked nor dead', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p2').phaseLocked = true;
+  expect(allParticipantsLocked(gameState, 'player_move')).toBe(false); // p1 neither locked nor dead
+});
+
+test('resetPhaseLocks auto-locks a dead real player entering a new phase (display consistency, matching the disconnected case)', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  // p2 stays connected so the cascade stops -- like the disconnected case test above
+  enterPhase(gameState, 'player_interact');
+  expect(gameState.players.get('p1').phaseLocked).toBe(true);
+  expect(gameState.players.get('p2').phaseLocked).toBe(false);
 });
