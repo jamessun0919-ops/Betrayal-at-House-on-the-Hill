@@ -1,6 +1,26 @@
 # 交接文檔 Handover
 
-最後更新：2026-09-07（**修復上次全分支審查記錄的2個Important＋5個Minor待辦，全部完成並直接commit在main（範圍小，開發者指示用TDD做、不開worktree/不走完整SDD）**）。
+最後更新：2026-09-10（**角色死亡判定機制完整完成並合併進main（PR [#5](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/5)）——房間/遊戲生命週期清理三個結束條件（斷線／死亡／勝利）之一，走完整brainstorming→writing-plans→subagent-driven-development，5任務（含最終審查修正輪），810/810測試全綠**）。
+
+**角色死亡判定機制（房間/遊戲生命週期清理最後討論的三個「遊戲何時結束」條件之一，②已完成）**：查證後發現三個條件成熟度差很多——①所有玩家斷線：已完成（上次的斷線回收機制）；③任一陣營達成勝利條件：本質是整個劇本/陣營模組系統（叛徒生還者分配、私密勝利條件、`checkVictory()`掛鉤），等同M3核心骨架，列入未來待辦，這次不做；②所有玩家角色死亡：完全沒有機制、可獨立建置，選定為本次範圍。死亡規則確認自實體版：邪祟降臨後，任一能力刻度降到骷髏頭刻度即死亡；降臨當下若剛好卡在降臨前的最低格（不是新的扣血事件），不會立刻死，要等到那個回合的`settlement`階段還是卡在那格才死（給互動階段治療的機會）；降臨之後任何新的扣血直接命中骷髏頭刻度都是立即死亡。
+
+**核心設計（[phaseFlow.js](server/src/game/phaseFlow.js)／[playerEntity.js](server/src/game/playerEntity.js)／[socketHandlers.js](server/src/socketHandlers.js)）**：
+- 死亡判定集中在`changeStat`（唯一的屬性mutate入口）：`hauntStarted && !player.isNPC && currentIndex === skullIndex`時標記`player.isDead = true`
+- 邪祟降臨當下的一次性補判：`gameState.pendingHauntGraceCheck`，`enterPhase`進入`settlement`時消費
+- 死亡角色立即不擋任何階段推進，**跟斷線刻意採不同時機**——斷線只在下一個新階段才不等（`resetPhaseLocks`），死亡是`allParticipantsLocked`直接OR-bypass、當下階段就不等（`p.phaseLocked || p.isDead`），因為死亡不像斷線有重連可能性
+- 回合結束（階段推進回`player_move`）時系統主動把死亡玩家移出遊戲：`removeDeadPlayersAtRoundStart`重用既有的`handlePlayerDisconnectedFromGame`（標記`connected:false`＋檢查房間是否該回收），額外做socket離開房間＋清`socket.data`＋推播新事件`game:removedFromGame`
+- 全員陣亡（沒有任何真人`connected && !isDead`）時提前回收房間，不等`player_move`：`hasAnyViableRealPlayer`即時檢查，比照斷線既有的`anyoneStillConnected`概念延伸；同時修好一個**這次才被踩到的既有bug**——全員陣亡且無NPC時，`enterPhase`/`advancePhase`的級聯機制會無限遞迴（每個階段的參與者都被自動視為已鎖定，`allParticipantsLocked`永遠true，五階段繞圈子繞不停），修法是`enterPhase`新增第三參數`visitedPhases`追蹤同一輪同步級聯鏈裡已經進入過的階段，繞完一圈沒有真正進展就停止
+- 死亡玩家移出前不能再行動：`game:move`/`game:selectAction`/`game:useStairs`/`game:lockPhase`統一擋`{error:'PLAYER_IS_DEAD'}`（**前端的黑幕彈窗＋確認回選單UI不在這次範圍，只做了後端擋下行動的部分**）
+- `removeDeadPlayersAtRoundStart`實際掛在全部11個能讓階段推進到`player_move`的`scheduleOrRefreshPhaseTimeout`呼叫點（不是只有原本設計文件以為的2處——全分支審查抓到`effectResolver.js`的imprint卡NPC移除級聯是第3個能推進階段的地方，修正輪追加時發現其實共有11處，統一補齊避免未來又漏）
+
+**SDD執行過程的3次正確escalation（供未來參考）**：
+1. Task 4 implementer自己pre-edit grep發現計畫列的10個`scheduleOrRefreshPhaseTimeout`呼叫點漏了第11個（`finishCharacterSelection`），正確停下回報而非猜測——這是這個專案第二次因為「只搜尋了部分範圍」漏掉呼叫點（第一次是11月?不，是這次全分支審查又抓到第12類，修正輪時發現其實是9個新增+3個既有=12個），確認了「機械性取代要用grep驗證真正的0殘留，不能只信計畫文件列的數字」這個教訓值得反覆提醒
+2. 同一個Task 4，implementer新寫的「兩位玩家同一輪雙雙死亡」測試踩到Task 3遺留、當時全分支審查已經記錄為Minor deferred的無限遞迴風險——這次證明了「跟既有風險同一類、機率沒有升高」這個判斷本身可能是誤判的：Task 3的斷線案例從未真的觸發這個風險（因為斷線有自己的即時回收檢查，根本不會讓階段引擎走到全員陣亡的級聯），死亡機制的「回合結束才移出」設計才第一次讓這個風險變得可達。三個候選方案（通用循環防呆／即時偵測全滅提前回收／這次先不修）都先列出來讓開發者裁示，不自行決定
+3. 全分支最終審查（opus）的scoped re-review本身又抓到修正輪自己引入的新問題（`advanceCharacterSelection`轉`async`後3個呼叫端沒接`.catch()`，變成未處理的Promise rejection、可能讓整個Node行程crash，不是只影響單一房間）——規模小（3行、比照既有`.catch()`慣例）確認後controller直接修正，不再開一輪subagent增加流程成本
+
+**worktree session操作主副本的已知限制**：這次依然無法直接對主要checkout執行git操作（連`git -C <主副本路徑>`重導向都被沙盒擋下），沿用`git push`+`gh pr create`+`gh pr merge`的既有解法（PR [#5](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/5)）。`ExitWorktree`清除已合併worktree時，工具本身偵測不到「已透過gh遠端合併」這件事（只看得到本機`main`分支沒有這些commit的祖先關係），會拒絕直接刪除、需要開發者額外確認`discard_changes:true`——這是`gh`合併解法的已知副作用，非bug。
+
+810/810測試全綠，commit範圍`df3a7f3..bf3c998`。**尚未處理、留給未來**：房間/遊戲生命週期清理最後一個子項目（任一陣營達成勝利條件，M3範圍）；死亡玩家的前端UI（黑幕彈窗、確認回選單）；全分支審查記錄的5個Minor（全員陣亡的併發窄視窗——`removePlayerFromGame`在await期間`connected`還沒更新，3人以上房間可能收到2次`game:removedFromGame`；死亡當下那個階段的`phaseLocked`廣播值有短暫延遲顯示；遞迴防護的回歸測試斷言偏弱；幾處過期註解；`?? false`跟`!x`兩種風格並存）；獨立待辦「全局廣播訊息清單及UI」；重連機制；AI代管斷線玩家/NPC（長期）；M3戰鬥/傷害系統。
 
 **Important①：自動鎖定的斷線玩家永久卡住懸置提示——已修復（commit `0f4c04d`）**：`handlePhaseTimeout`強制決議懸置選擇的sweep原本只看`!p.phaseLocked`,`resetPhaseLocks`把斷線參與者自動鎖定後就永遠不會再被掃到。**修法**：把`resetPhaseLocks`判斷「是否斷線」的邏輯抽成共用函式`isParticipantDisconnected(gameState, p)`（`phaseFlow.js`，已export），`handlePhaseTimeout`的filter改成`!p.phaseLocked || isParticipantDisconnected(gameState, p)`，兩處共用同一套標準——**這修正了Handover原本建議修法本身的一個遺漏**：原建議只加`p.connected===false`，但NPC沒有自己的`connected`欄位（是看操控者），照原建議寫法對NPC完全無效；改用共用函式後NPC情形也一併正確涵蓋。新增2個`phaseFlow.test.js`單元測試（真人/NPC各自的斷線判定）＋1個`socketHandlers.test.js`端到端整合測試（真人玩家給斷線且已鎖定階段的玩家道具→超過負重上限→階段逾時後確認提示被強制決議而非卡死，修復前先確認RED真的重現問題）。**目前NPC還無法被`give`/可指定目標道具鎖定（`TARGET_IS_NPC`擋住）**，所以NPC那一半目前只有單元測試鎖住`isParticipantDisconnected`本身，沒有端到端整合測試（沒有可達的生產路徑可以重現），等未來NPC真的能被鎖定提示時這個共用函式已經是對的。
 

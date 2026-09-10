@@ -1702,3 +1702,27 @@
 **開發者交代備忘事項**：
 - 2026-09-10開場先補完這次的收工缺口（push `45c17d0`＋補寫這份entry與對應chatlog、更新Handover），再繼續討論下一步
 - 尚未處理：房間/遊戲生命週期清理剩餘子項目（遊戲何時算「結束」）、獨立待辦「全局廣播訊息清單及UI」、重連機制、AI代管斷線玩家/NPC（長期）、M3戰鬥/傷害系統
+
+## 2026-09-10 第 1 次工作階段
+
+**當日工作內容**：
+- 開場補完上次的收工缺口（push `45c17d0`、補寫2026-09-07第2次工作階段的worklog/chatlog、更新Handover）
+- 接續討論「房間/遊戲生命週期清理」剩餘子項目：遊戲何時算「結束」。開發者提出三個結束條件（所有玩家斷線／所有玩家角色死亡／任一陣營達成勝利條件），查證後發現三者成熟度差很多：條件①已完成（斷線回收機制）；條件③本質是整個劇本/陣營模組（等同M3核心骨架），列入未來待辦；條件②（角色死亡判定）完全沒有機制，可獨立建置，選定為本次範圍
+- 走完整`brainstorming`→`writing-plans`→`subagent-driven-development`流程：設計文件、4任務實作計畫皆經開發者確認後才進行
+- Task 1-4依序完成，各自任務審查通過（Task 1/2各1個Minor記錄延後；Task 3一開始implementer用`?? false`偏離計畫字面程式碼，經審查確認是合理修正非scope creep；Task 4執行期間implementer連續兩輪正確辨識並回報BLOCKED，不猜測繞過——第一輪抓到計畫漏掉的第11個`scheduleOrRefreshPhaseTimeout`呼叫點（`finishCharacterSelection`），第二輪抓到自己新增的測試踩到Task 3遺留、既有記錄為Minor的無限遞迴風險（全員陣亡時階段級聯不會停），兩輪都提出方案讓controller跟開發者確認方向後才繼續）
+- 全分支最終審查（opus）：無Critical，4個Important（imprint卡NPC移除級聯漏了移出檢查、全員陣亡時個別死亡通知沒送、邪祟寬限期機制零測試覆蓋、死亡玩家移出前仍可完整行動）、5個Minor。開發者逐一裁示後，開新的Task 5（修正輪）處理全部4個Important，scoped re-review確認4項全部addressed，但re-review另外抓到修正本身引入的1個新Important（`advanceCharacterSelection`轉`async`後3個呼叫端沒接`.catch()`，變成未處理的Promise rejection、可能讓整個Node行程crash）——這個規模很小（3行，比照既有慣例），跟開發者確認後controller直接修正，不再開一輪subagent
+- 收工：810/810測試全綠，PR #5建立並透過`gh pr merge`合併進main（worktree session無法直接操作主副本，沿用已知解法）；清理已合併的worktree與遠端分支；回到主副本`git pull`同步、再次確認810/810全綠
+
+**完成項目**：
+- 角色死亡判定機制完整完成並合併進main（PR [#5](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/5)），含設計文件[2026-09-10-character-death-design.md](superpowers/specs/2026-09-10-character-death-design.md)、實作計畫[2026-09-10-character-death.md](superpowers/plans/2026-09-10-character-death.md)（5任務，含最終審查修正輪）
+- 核心機制：邪祟降臨後能力刻度降到骷髏頭刻度即死亡（`changeStat`唯一入口判定）；邪祟降臨當下卡在最低格的一次性寬限期（`settlement`階段補判）；死亡角色立即不擋任何階段推進（跟斷線刻意採不同時機）；回合結束時系統主動移出死亡玩家（重用既有斷線/房間回收機制）；全員陣亡時提前回收房間並個別發送死亡通知；死亡玩家移出前不能再行動
+- 修好一個Task 3遺留、這次才真正被踩到的既有bug：全員陣亡且無NPC時，階段級聯機制會無限遞迴
+- 788→810測試全綠（22個新測試）
+
+**遇到瓶頸**：
+- 無程式碼面瓶頸。過程中connector正確示範了「發現計畫本身有漏洞時,回報BLOCKED而非自行猜測」的紀律（兩輪，皆由controller查證確認方向後才繼續，其中一次牽涉到跟開發者當場確認3個技術方案的裁示）
+- worktree session依然無法直接操作主副本（已知限制），沿用`gh pr create`+`gh pr merge`解法；`ExitWorktree`清除已合併worktree時，工具本身偵測不到「已透過gh合併」這件事，需要開發者額外確認`discard_changes:true`
+
+**開發者交代備忘事項**：
+- 尚未處理：房間/遊戲生命週期清理最後一個子項目（任一陣營達成勝利條件，本質是M3劇本/陣營模組）；死亡玩家的前端UI（黑幕彈窗＋按確認回開頭選單，這次只做了後端擋下行動的部分）；獨立待辦「全局廣播訊息清單及UI」；重連機制；AI代管斷線玩家/NPC（長期）；M3戰鬥/傷害系統
+- 全分支審查記錄的5個Minor（全員陣亡的併發窄視窗、死亡當下階段的phaseLocked顯示延遲、遞迴防護測試斷言偏弱、過期註解、`?? false`風格不一致）尚未處理，已記錄在ledger（已隨worktree清除，細節見PR #5的審查對話紀錄）
