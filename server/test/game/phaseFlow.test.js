@@ -1,6 +1,6 @@
 const { createGameState, addPlayer } = require('../../src/game/gameState');
 const { getStatValue, changeStat } = require('../../src/game/playerEntity');
-const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, isParticipantDisconnected, allParticipantsLocked } = require('../../src/game/phaseFlow');
+const { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, isParticipantDisconnected, allParticipantsLocked, hasAnyViableRealPlayer } = require('../../src/game/phaseFlow');
 
 function makeStats() {
   return {
@@ -410,4 +410,25 @@ test('resetPhaseLocks auto-locks a dead real player entering a new phase (displa
   enterPhase(gameState, 'player_interact');
   expect(gameState.players.get('p1').phaseLocked).toBe(true);
   expect(gameState.players.get('p2').phaseLocked).toBe(false);
+});
+
+test('enterPhase does not recurse forever when every real participant is dead and there are 0 NPCs -- it stops after one full lap with the phase left wherever it landed', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  gameState.players.get('p2').isDead = true;
+  expect(() => enterPhase(gameState, 'player_move')).not.toThrow();
+  expect(PHASE_ORDER).toContain(gameState.currentPhase); // landed somewhere valid, didn't crash
+});
+
+test('hasAnyViableRealPlayer is true when at least one real player is connected and not dead', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  expect(hasAnyViableRealPlayer(gameState)).toBe(true); // p2 still viable
+});
+
+test('hasAnyViableRealPlayer is false when every real player is dead or disconnected', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  gameState.players.get('p2').connected = false;
+  expect(hasAnyViableRealPlayer(gameState)).toBe(false);
 });

@@ -47,13 +47,17 @@ function isParticipantDisconnected(gameState, p) {
     : !(p.connected ?? true);
 }
 
+function hasAnyViableRealPlayer(gameState) {
+  return Array.from(gameState.players.values()).some((p) => !p.isNPC && p.connected && !p.isDead);
+}
+
 function resetPhaseLocks(gameState, phase) {
   for (const p of getParticipants(gameState, phase)) {
     p.phaseLocked = isParticipantDisconnected(gameState, p) || (p.isDead ?? false);
   }
 }
 
-function enterPhase(gameState, phase) {
+function enterPhase(gameState, phase, visitedPhases = new Set()) {
   gameState.currentPhase = phase;
   gameState.phaseDeadline = Date.now() + gameState.phaseTimeoutMs;
   resetPhaseLocks(gameState, phase);
@@ -110,14 +114,24 @@ function enterPhase(gameState, phase) {
   // must auto-advance immediately -- this cascades through consecutive empty
   // phases (e.g. npc_move directly into npc_interact) via the recursive call.
   if (allParticipantsLocked(gameState, phase)) {
-    advancePhase(gameState);
+    if (visitedPhases.has(phase)) {
+      // Already cascaded through this exact phase once in this same
+      // synchronous chain, with zero real progress -- every remaining
+      // participant is dead/disconnected-bypassed, so nobody can ever
+      // genuinely lock anything and this would recurse forever. Stop here;
+      // socketHandlers.js's hasAnyViableRealPlayer check is what actually
+      // tears the room down when this happens.
+      return;
+    }
+    visitedPhases.add(phase);
+    advancePhase(gameState, visitedPhases);
   }
 }
 
-function advancePhase(gameState) {
+function advancePhase(gameState, visitedPhases = new Set()) {
   const currentIndex = PHASE_ORDER.indexOf(gameState.currentPhase);
   const nextPhase = PHASE_ORDER[(currentIndex + 1) % PHASE_ORDER.length];
-  enterPhase(gameState, nextPhase);
+  enterPhase(gameState, nextPhase, visitedPhases);
 }
 
 function lockPlayerPhase(gameState, playerId) {
@@ -170,4 +184,4 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
   return actingAsNpcId;
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants, isParticipantDisconnected };
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants, isParticipantDisconnected, hasAnyViableRealPlayer };

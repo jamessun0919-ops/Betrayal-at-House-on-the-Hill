@@ -15,7 +15,7 @@ const { createPrompt, respondToPrompt, resolvePromptTimeout } = require('./game/
 const { startGame, getGameState, endGame } = require('./game/gameManager');
 const { serializeGameState, getPlayer } = require('./game/gameState');
 const { moveToRoom, selectAction, useStairs, resumeCollapseCheck, performTeleport, resolveTeleportDestination } = require('./game/turnFlow');
-const { lockPlayerPhase, resolveActingEntity, getParticipants, isParticipantDisconnected } = require('./game/phaseFlow');
+const { lockPlayerPhase, resolveActingEntity, getParticipants, isParticipantDisconnected, hasAnyViableRealPlayer } = require('./game/phaseFlow');
 const { moveNpc, npcItemAction } = require('./game/npcFlow');
 const { coordKey } = require('./game/boardGenerator');
 const { startResolver, getResolver, endResolver } = require('./game/effectResolverManager');
@@ -1531,6 +1531,14 @@ async function removePlayerFromGame(io, lobbyManager, gameManager, effectResolve
 }
 
 async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode) {
+  if (!hasAnyViableRealPlayer(gameState)) {
+    // Nobody left who could ever lock another phase again (everyone's dead
+    // and/or disconnected) -- don't wait for player_move, which may never
+    // be reached (see phaseFlow.js's enterPhase/advancePhase recursion
+    // guard). Tear down now, the same way the last real disconnect already does.
+    await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
+    return;
+  }
   if (gameState.currentPhase !== 'player_move') {
     return;
   }
