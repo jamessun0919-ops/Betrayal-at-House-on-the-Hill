@@ -813,6 +813,131 @@ git commit -m "feat: remove dead players from the game when the next round's pla
 Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 ```
 
+### Task 4修正：全員陣亡時的無限遞迴（實作期間發現，開發者已核准納入Task 4範圍）
+
+執行Step 8時，「兩位真人玩家同一輪雙雙死亡」這個測試觸發了一個`phaseFlow.js`既有的、Task 3引入但這次才第一次被測試踩到的bug：當房間裡所有真人玩家都死亡（且沒有NPC）時，每個階段的參與者都因為死亡被`resetPhaseLocks`自動視為已鎖定，`allParticipantsLocked`在每個階段都立即為true，`enterPhase`／`advancePhase`會不斷級聯下去，五個階段繞圈子，永遠不會停——因為根本沒有一個「真的還活著、還沒鎖定」的參與者能停下這個級聯。最終`RangeError: Maximum call stack size exceeded`，被`handlePhaseTimeout`既有的try/catch吞掉、只印log，房間永久卡死、不會被回收。
+
+這不是Task 4的檔案範圍（`phaseFlow.js`完全不在Task 4的檔案清單裡），但開發者已確認這個修法要納入Task 4一起做，不要另開任務或跳過測試。修法分兩部分：
+
+**Part A：`phaseFlow.js`加一個級聯遞迴的安全閥（防止當機，不管觸發原因是什麼）**
+
+`enterPhase`／`advancePhase`（[phaseFlow.js:56](../../../server/src/game/phaseFlow.js)、[phaseFlow.js:99](../../../server/src/game/phaseFlow.js)）新增第三個參數`visitedPhases`，追蹤「這一輪同步級聯鏈裡已經進入過哪些階段名稱」——如果級聯要再次進入一個已經進入過的階段，代表已經繞完一整圈、完全沒有真正的進展，就停止繼續級聯（不再呼叫`advancePhase`），把`gameState.currentPhase`留在目前這個階段：
+
+```javascript
+function enterPhase(gameState, phase, visitedPhases = new Set()) {
+  gameState.currentPhase = phase;
+  gameState.phaseDeadline = Date.now() + gameState.phaseTimeoutMs;
+  resetPhaseLocks(gameState, phase);
+  if (isMovePhase(phase)) {
+    // ...既有的行動力重置區塊，不動...
+  }
+  if (phase === 'player_move') {
+    // ...既有的每回合重置區塊，不動...
+  }
+  // ...Task 2新增的settlement grace-check區塊，不動...
+  // A phase with zero eligible participants can never receive a lock, so it
+  // must auto-advance immediately -- this cascades through consecutive empty
+  // phases (e.g. npc_move directly into npc_interact) via the recursive call.
+  if (allParticipantsLocked(gameState, phase)) {
+    if (visitedPhases.has(phase)) {
+      // Already cascaded through this exact phase once in this same
+      // synchronous chain, with zero real progress -- every remaining
+      // participant is dead/disconnected-bypassed, so nobody can ever
+      // genuinely lock anything and this would recurse forever. Stop here;
+      // socketHandlers.js's closeRoomIfNoViablePlayersRemain (see Part B) is
+      // what actually tears the room down when this happens.
+      return;
+    }
+    visitedPhases.add(phase);
+    advancePhase(gameState, visitedPhases);
+  }
+}
+
+function advancePhase(gameState, visitedPhases = new Set()) {
+  const currentIndex = PHASE_ORDER.indexOf(gameState.currentPhase);
+  const nextPhase = PHASE_ORDER[(currentIndex + 1) % PHASE_ORDER.length];
+  enterPhase(gameState, nextPhase, visitedPhases);
+}
+```
+
+（上面省略號部分是既有程式碼，原封不動——只是標示新參數穿過去的地方。`visitedPhases`預設`new Set()`，所有既有呼叫端（`lockPlayerPhase`呼叫`advancePhase(gameState)`、`handlePhaseTimeout`呼叫`lockPlayerPhase`等）完全不用改，因為每次從外部呼叫都會拿到一個全新的追蹤集合，只有遞迴呼叫自己時才會把同一個集合傳下去。）
+
+**Part B：`socketHandlers.js`加一個「這個房間還有沒有活人」的即時檢查，取代「等到回合結束才移出」在全員陣亡時的失效**
+
+斷線的情況已經有即時檢查（`handlePlayerDisconnectedFromGame`的`anyoneStillConnected`，斷線當下就查、不等回合結束）——死亡原本刻意設計成「回合結束才移出」（開發者的原始需求，正常情況下這樣沒問題，因為房間裡還有其他活人可以讓回合正常走完）。但「全員陣亡」是特殊情況：沒有任何人能再讓回合往下走，這時候不能再等「回合結束」，因為回合根本走不完（Part A的安全閥只是防止當機，並不會讓房間被回收）。
+
+新增一個檢查「這個房間是否還有任何一個真人是connected且沒死亡」，只要沒有，就不等`player_move`了，直接比照斷線的方式回收房間：
+
+```javascript
+function hasAnyViableRealPlayer(gameState) {
+  return Array.from(gameState.players.values()).some((p) => !p.isNPC && p.connected && !p.isDead);
+}
+```
+
+這個函式放在`phaseFlow.js`（純函式、不需要io，跟`isParticipantDisconnected`放在一起），並加進`module.exports`。`socketHandlers.js`頂端`require('./game/phaseFlow')`那一行加入`hasAnyViableRealPlayer`。
+
+`removeDeadPlayersAtRoundStart`（原本Step 6寫的那個函式）開頭插入這個檢查，比原本「只在`player_move`才處理」的邏輯優先：
+
+```javascript
+async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode) {
+  if (!hasAnyViableRealPlayer(gameState)) {
+    // Nobody left who could ever lock another phase again (everyone's dead
+    // and/or disconnected) -- don't wait for player_move, which may never
+    // be reached (see Part A's recursion guard). Tear down now, the same
+    // way the last real disconnect already does.
+    await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
+    return;
+  }
+  if (gameState.currentPhase !== 'player_move') {
+    return;
+  }
+  const toRemove = Array.from(gameState.players.values()).filter((p) => !p.isNPC && p.isDead && p.connected);
+  // ...既有的sequential迴圈，不動...
+}
+```
+
+（`toRemove`的迴圈只會在「至少還有一個活人」的情況下才執行到——這時候`hasAnyViableRealPlayer`一定是true，所以不會跟上面新加的分支衝突。）
+
+**這個修正需要的測試（TDD，先RED再GREEN）**：
+
+`server/test/game/phaseFlow.test.js`：
+
+```javascript
+test('enterPhase does not recurse forever when every real participant is dead and there are 0 NPCs -- it stops after one full lap with the phase left wherever it landed', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  gameState.players.get('p2').isDead = true;
+  expect(() => enterPhase(gameState, 'player_move')).not.toThrow();
+  expect(PHASE_ORDER).toContain(gameState.currentPhase); // landed somewhere valid, didn't crash
+});
+
+test('hasAnyViableRealPlayer is true when at least one real player is connected and not dead', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  expect(hasAnyViableRealPlayer(gameState)).toBe(true); // p2 still viable
+});
+
+test('hasAnyViableRealPlayer is false when every real player is dead or disconnected', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.players.get('p1').isDead = true;
+  gameState.players.get('p2').connected = false;
+  expect(hasAnyViableRealPlayer(gameState)).toBe(false);
+});
+```
+
+`phaseFlow.test.js`頂端的`require`加入`hasAnyViableRealPlayer`（跟現有的`isParticipantDisconnected`同一行）。
+
+`server/test/socketHandlers.test.js`裡Step 4寫的「兩位真人玩家同一輪雙雙死亡」測試不用改內容——它本來就是在驗證這個修正後的最終行為（`getGameState`變成`undefined`），只是在這個修正之前會因為上述bug而失敗，修正後應該直接變成GREEN，不需要調整斷言。
+
+**Commit（獨立一個commit，接在原本Task 4 commit的規劃之後）**：
+
+```bash
+git add server/src/game/phaseFlow.js server/src/socketHandlers.js server/test/game/phaseFlow.test.js server/test/socketHandlers.test.js
+git commit -m "fix: stop the phase cascade from recursing forever when every real player is dead, and tear the room down immediately when nobody viable remains
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+```
+
 ---
 
 ## 自我檢查（Plan Self-Review）
