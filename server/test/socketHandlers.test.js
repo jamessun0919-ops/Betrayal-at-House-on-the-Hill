@@ -628,6 +628,74 @@ test('lobby:leave sent mid-game clears the caller\'s own socket.data, so that sa
   httpServer.close();
 });
 
+test('a player marked isDead does not block the rest of the round it dies in from advancing -- the remaining connected player alone is enough', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent());
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, otherPlayerId).isDead = true; // died mid player_move, e.g. from a room effect -- never locks anything itself
+
+  const lockResult = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(lockResult.error).toBeUndefined();
+  expect(lockResult.currentPhase).toBe('player_interact'); // otherPlayerId's death alone satisfied the lock, npc_move cascades through (0 NPCs)
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a dead player gets removed from the game exactly when the next round\'s player_move begins, via game:lockPhase', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager, io } =
+    await setUpStartedGameWithContent(makeContent());
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, otherPlayerId).isDead = true; // died mid player_move
+
+  const removedPromise = new Promise((resolve) => otherClient.once('game:removedFromGame', resolve));
+
+  // Drive a full round: currentClient alone is enough to satisfy every
+  // phase (otherPlayerId is dead-bypassed throughout) -- 3 locks reaches
+  // settlement, the 3rd lock's cascade (empty npc_interact) wraps back to
+  // a fresh player_move, which is where removal happens.
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> settlement
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> wraps to a fresh player_move
+
+  const removedPayload = await removedPromise;
+  expect(removedPayload.reason).toBe('died');
+  expect(getPlayer(gameState, otherPlayerId).connected).toBe(false);
+
+  const socketsInRoom = await io.in(roomCode).fetchSockets();
+  expect(socketsInRoom.some((s) => s.data.playerId === otherPlayerId)).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('both real players dying in the same round tears the room down once the second is removed at the next round start', async () => {
+  const { httpServer, clientA, clientB, aliceId, bobId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(makeContent(), { phaseTimeoutMs: 150 });
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, aliceId).isDead = true;
+  getPlayer(gameState, bobId).isDead = true;
+  // Neither client ever locks anything -- with both dead-bypassed, nothing
+  // triggers allParticipantsLocked until the phase timeout itself force-locks
+  // them (see handlePhaseTimeout's unresolved sweep from Task 3), cascading
+  // the whole way around back to a fresh player_move synchronously.
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms deadline
+
+  expect(getGameState(gameManager, roomCode)).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode)).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('clearPhaseTimeout clears the real timer handle and removes the Map entry', () => {
   const phaseTimeouts = new Map();
   const handle = setTimeout(() => {}, 100000); // never meant to actually fire in this test

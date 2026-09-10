@@ -185,7 +185,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           const npcId = resolveActingEntity(gameState, playerId, actingAsNpcId);
           const result = moveNpc(gameState, npcId, direction);
           ack(result);
-          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
         }
@@ -209,7 +209,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 
         ack(result);
         finishMoveResult(io, socket, gameState, roomCode, playerId, result, effectResolverManager, content);
-        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:move error', err);
@@ -246,7 +246,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           }
           const result = npcItemAction(gameState, npcId, itemId, mode);
           ack(result);
-          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
         }
@@ -334,7 +334,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             ack(result);
             const enteredRoom = gameState.board[destination.floor].get(coordKey(destination.x, destination.y));
             io.to(roomCode).emit('game:roomEntered', { playerId, roomId: enteredRoom.roomId, enteredNewRoom: destination.enteredNewRoom });
-            scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+            scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
             io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
             return;
           } else {
@@ -360,7 +360,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
             } else {
               io.to(roomCode).emit('game:searchEmpty', { playerId, roomId: placedRoom.roomId });
             }
-            scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+            scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
             io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
             return;
           }
@@ -417,7 +417,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           io.to(roomCode).emit('game:pendingAction', { playerId, actionType: result.kind });
         }
 
-        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
         console.error('game:selectAction error', err);
@@ -467,7 +467,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
     // room onceOnlyPerPlayer bonus and the pending-choice/summon guards on
     // whichever event name the client didn't happen to use. Fixed here by
     // making both names call this single implementation.
-    function handleLockPhase(eventName, payload, callback) {
+    async function handleLockPhase(eventName, payload, callback) {
       const ack = typeof callback === 'function' ? callback : () => {};
       try {
         const { roomCode, playerId } = socket.data;
@@ -491,7 +491,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (actingAsNpcId) {
           const npcId = resolveActingEntity(gameState, playerId, actingAsNpcId);
           lockPlayerPhase(gameState, npcId);
-          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
+          await removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode);
           ack({ currentPhase: gameState.currentPhase });
           io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
           return;
@@ -508,7 +509,8 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           // locked, or skip the state broadcast.
           console.error('applyRoomEndTurnBonus error', bonusErr);
         }
-        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
+        await removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode);
         ack({ currentPhase: gameState.currentPhase });
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
       } catch (err) {
@@ -545,7 +547,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (resolveOutcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: resolveOutcome.drawnCards });
         }
-        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
         ack({});
       } catch (err) {
@@ -585,7 +587,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         if (outcome.drawnCards) {
           socket.emit('game:cardsDrawn', { cards: outcome.drawnCards });
         }
-        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+        scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
         io.to(roomCode).emit('game:stateUpdate', serializeGameState(gameState));
         ack({});
       } catch (err) {
@@ -679,7 +681,7 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
 function advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts) {
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   if (isCharacterSelectionComplete(entry.characterSelectionState)) {
-    finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts);
+    finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts);
     return;
   }
   const picker = getCurrentPicker(entry.characterSelectionState);
@@ -737,7 +739,7 @@ function teardownRoom(gameManager, effectResolverManager, characterSelectionMana
   clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
 }
 
-function scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content) {
+function scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts) {
   const existing = phaseTimeouts.get(roomCode);
   if (existing && existing.deadline === gameState.phaseDeadline) {
     return; // already scheduled for this exact phase entry, nothing changed
@@ -747,12 +749,12 @@ function scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, e
   }
   const delayMs = Math.max(gameState.phaseDeadline - Date.now(), 0);
   const handle = setTimeout(() => {
-    handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+    handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
   }, delayMs);
   phaseTimeouts.set(roomCode, { handle, deadline: gameState.phaseDeadline });
 }
 
-function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content) {
+function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts) {
   try {
     const phase = gameState.currentPhase;
     // Also sweep participants who are ALREADY phaseLocked because
@@ -788,8 +790,11 @@ function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolv
     // Always re-arm, even if something above threw -- otherwise a single
     // unexpected error permanently stops this room's phase clock, wedging
     // it in place instead of just losing one timeout cycle.
-    scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+    scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
   }
+  removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode).catch((err) => {
+    console.error('removeDeadPlayersAtRoundStart error', err);
+  });
 }
 
 function hasPendingEffectChoice(effectResolverManager, roomCode, playerId) {
@@ -1458,7 +1463,7 @@ function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSe
   }
 }
 
-function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts) {
+function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts) {
   const phaseTimeoutMs = lobbyManager.getPhaseTimeoutMs(roomCode);
   const entry = getCharacterSelection(characterSelectionManager, roomCode);
   const lobbyPlayersById = new Map(lobbyManager.getPlayers(roomCode).map((p) => [p.playerId, p]));
@@ -1485,7 +1490,7 @@ function finishCharacterSelection(io, lobbyManager, gameManager, characterSelect
   });
   startResolver(effectResolverManager, roomCode);
   endSelection(characterSelectionManager, roomCode);
-  scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);
+  scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
   // roomContent/cardContent/characterContent are only sent here (once) -- if
   // a reconnect/resync event is ever added, it must also resend them, or
   // reconnecting clients will have no room/card/character names or icons.
@@ -1513,11 +1518,42 @@ function serializeCharacterSelection(characterSelectionState) {
   };
 }
 
+async function removePlayerFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId, reason) {
+  const sockets = await io.in(roomCode).fetchSockets();
+  const targetSocket = sockets.find((s) => s.data.playerId === playerId);
+  if (targetSocket) {
+    targetSocket.emit('game:removedFromGame', { reason });
+    targetSocket.leave(roomCode);
+    targetSocket.data.roomCode = null;
+    targetSocket.data.playerId = null;
+  }
+  await handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId);
+}
+
+async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode) {
+  if (gameState.currentPhase !== 'player_move') {
+    return;
+  }
+  const toRemove = Array.from(gameState.players.values()).filter((p) => !p.isNPC && p.isDead && p.connected);
+  // Sequential on purpose, not Promise.all: removePlayerFromGame ->
+  // handlePlayerDisconnectedFromGame re-checks "is anyone still connected"
+  // against the CURRENT state each time. Running these concurrently would
+  // let every iteration see the others' not-yet-applied connected:false,
+  // so closeLobbyRoom either fires multiple times or never fires at all.
+  // One at a time, it correctly fires exactly once, on the last removal.
+  for (const player of toRemove) {
+    // 未來勝利條件系統要掛在這裡：許多劇本的勝利條件是「另一陣營全滅」，
+    // 這個移出動作發生的當下就是檢查這類條件的正確時機點。
+    await removePlayerFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, player.playerId, 'died');
+  }
+}
+
 async function handlePlayerDisconnectedFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, playerId) {
   const player = getPlayer(gameState, playerId);
   if (player) {
     player.connected = false;
   }
+  // 未來勝利條件系統也要掛在這裡：偵測到玩家斷線是開發者指定的另一個檢查觸發點。
   const anyoneStillConnected = Array.from(gameState.players.values())
     .filter((p) => !p.isNPC)
     .some((p) => p.connected);
