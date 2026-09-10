@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { resetActionPoints, changeStat } = require('./playerEntity');
+const { resetActionPoints, changeStat, STATS } = require('./playerEntity');
 
 const PHASE_ORDER = ['player_move', 'npc_move', 'player_interact', 'npc_interact', 'settlement'];
 
@@ -32,7 +32,7 @@ function getParticipants(gameState, phase) {
 }
 
 function allParticipantsLocked(gameState, phase) {
-  return getParticipants(gameState, phase).every((p) => p.phaseLocked);
+  return getParticipants(gameState, phase).every((p) => p.phaseLocked || (p.isDead ?? false));
 }
 
 // A real player is disconnected via its own connected field; an NPC has no
@@ -47,13 +47,17 @@ function isParticipantDisconnected(gameState, p) {
     : !(p.connected ?? true);
 }
 
+function hasAnyViableRealPlayer(gameState) {
+  return Array.from(gameState.players.values()).some((p) => !p.isNPC && p.connected && !p.isDead);
+}
+
 function resetPhaseLocks(gameState, phase) {
   for (const p of getParticipants(gameState, phase)) {
-    p.phaseLocked = isParticipantDisconnected(gameState, p);
+    p.phaseLocked = isParticipantDisconnected(gameState, p) || (p.isDead ?? false);
   }
 }
 
-function enterPhase(gameState, phase) {
+function enterPhase(gameState, phase, visitedPhases = new Set()) {
   gameState.currentPhase = phase;
   gameState.phaseDeadline = Date.now() + gameState.phaseTimeoutMs;
   resetPhaseLocks(gameState, phase);
@@ -87,18 +91,47 @@ function enterPhase(gameState, phase) {
       p.searchedThisTurn = false;
     }
   }
+  // The haunt-transition grace period (physical-game rule): the instant the
+  // haunt begins isn't itself a stat-reduction event, so a player already
+  // sitting at the pre-haunt floor (skullIndex+1) doesn't die immediately --
+  // they get one round (this flag only fires once, right after
+  // gameState.hauntStarted flips true) to be healed back up before this
+  // settlement phase decides they're still stuck there.
+  if (phase === 'settlement' && gameState.pendingHauntGraceCheck) {
+    for (const p of gameState.players.values()) {
+      if (p.isNPC || p.isDead) continue;
+      for (const stat of STATS) {
+        const track = p.stats[stat];
+        if (track.currentIndex === track.skullIndex + 1) {
+          p.isDead = true;
+          break;
+        }
+      }
+    }
+    gameState.pendingHauntGraceCheck = false;
+  }
   // A phase with zero eligible participants can never receive a lock, so it
   // must auto-advance immediately -- this cascades through consecutive empty
   // phases (e.g. npc_move directly into npc_interact) via the recursive call.
   if (allParticipantsLocked(gameState, phase)) {
-    advancePhase(gameState);
+    if (visitedPhases.has(phase)) {
+      // Already cascaded through this exact phase once in this same
+      // synchronous chain, with zero real progress -- every remaining
+      // participant is dead/disconnected-bypassed, so nobody can ever
+      // genuinely lock anything and this would recurse forever. Stop here;
+      // socketHandlers.js's hasAnyViableRealPlayer check is what actually
+      // tears the room down when this happens.
+      return;
+    }
+    visitedPhases.add(phase);
+    advancePhase(gameState, visitedPhases);
   }
 }
 
-function advancePhase(gameState) {
+function advancePhase(gameState, visitedPhases = new Set()) {
   const currentIndex = PHASE_ORDER.indexOf(gameState.currentPhase);
   const nextPhase = PHASE_ORDER[(currentIndex + 1) % PHASE_ORDER.length];
-  enterPhase(gameState, nextPhase);
+  enterPhase(gameState, nextPhase, visitedPhases);
 }
 
 function lockPlayerPhase(gameState, playerId) {
@@ -151,4 +184,4 @@ function resolveActingEntity(gameState, callerId, actingAsNpcId) {
   return actingAsNpcId;
 }
 
-module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants, isParticipantDisconnected };
+module.exports = { PHASE_ORDER, enterPhase, advancePhase, lockPlayerPhase, requirePhase, resolveActingEntity, allParticipantsLocked, getParticipants, isParticipantDisconnected, hasAnyViableRealPlayer };

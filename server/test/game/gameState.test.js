@@ -35,6 +35,11 @@ test('createGameState builds a board, an empty player map, and a room deck', () 
   expect(gameState.roomDeck.cards).toHaveLength(3);
 });
 
+test('createGameState defaults pendingHauntGraceCheck to false', () => {
+  const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms(3));
+  expect(gameState.pendingHauntGraceCheck).toBe(false);
+});
+
 test('addPlayer places the new player at room_lobby_a with action points set', () => {
   const gameState = createGameState(STARTING_ROOMS, makeDrawableRooms());
   const player = addPlayer(gameState, { playerId: 'p1', name: 'Alice', stats: makeStats() });

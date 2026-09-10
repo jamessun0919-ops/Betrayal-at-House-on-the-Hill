@@ -628,6 +628,74 @@ test('lobby:leave sent mid-game clears the caller\'s own socket.data, so that sa
   httpServer.close();
 });
 
+test('a player marked isDead does not block the rest of the round it dies in from advancing -- the remaining connected player alone is enough', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent());
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, otherPlayerId).isDead = true; // died mid player_move, e.g. from a room effect -- never locks anything itself
+
+  const lockResult = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(lockResult.error).toBeUndefined();
+  expect(lockResult.currentPhase).toBe('player_interact'); // otherPlayerId's death alone satisfied the lock, npc_move cascades through (0 NPCs)
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a dead player gets removed from the game exactly when the next round\'s player_move begins, via game:lockPhase', async () => {
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager, io } =
+    await setUpStartedGameWithContent(makeContent());
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, otherPlayerId).isDead = true; // died mid player_move
+
+  const removedPromise = new Promise((resolve) => otherClient.once('game:removedFromGame', resolve));
+
+  // Drive a full round: currentClient alone is enough to satisfy every
+  // phase (otherPlayerId is dead-bypassed throughout) -- 3 locks reaches
+  // settlement, the 3rd lock's cascade (empty npc_interact) wraps back to
+  // a fresh player_move, which is where removal happens.
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> settlement
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // -> wraps to a fresh player_move
+
+  const removedPayload = await removedPromise;
+  expect(removedPayload.reason).toBe('died');
+  expect(getPlayer(gameState, otherPlayerId).connected).toBe(false);
+
+  const socketsInRoom = await io.in(roomCode).fetchSockets();
+  expect(socketsInRoom.some((s) => s.data.playerId === otherPlayerId)).toBe(false);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('both real players dying in the same round tears the room down once the second is removed at the next round start', async () => {
+  const { httpServer, clientA, clientB, aliceId, bobId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(makeContent(), { phaseTimeoutMs: 150 });
+  const gameState = getGameState(gameManager, roomCode);
+
+  getPlayer(gameState, aliceId).isDead = true;
+  getPlayer(gameState, bobId).isDead = true;
+  // Neither client ever locks anything -- with both dead-bypassed, nothing
+  // triggers allParticipantsLocked until the phase timeout itself force-locks
+  // them (see handlePhaseTimeout's unresolved sweep from Task 3), cascading
+  // the whole way around back to a fresh player_move synchronously.
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms deadline
+
+  expect(getGameState(gameManager, roomCode)).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode)).toBeUndefined();
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
 test('clearPhaseTimeout clears the real timer handle and removes the Map entry', () => {
   const phaseTimeouts = new Map();
   const handle = setTimeout(() => {}, 100000); // never meant to actually fire in this test
@@ -3310,6 +3378,48 @@ test('phase timeout resolves a DISCONNECTED (already auto-locked) player\'s pend
 
   // The fix: otherPlayer's pending choice gets force-resolved via the default
   // (drop the newest item, item_004) instead of staying wedged forever.
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(false);
+  expect(otherPlayer.inventory.map((i) => i.id).sort()).toEqual(['item_001', 'item_002', 'item_003']);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('phase timeout resolves a DEAD (auto-locked) player\'s pending inventory choice too, same as a disconnected one', async () => {
+  const content = makeContent({
+    cards: {
+      events: [],
+      omens: [],
+      items: [
+        { id: 'item_001', name: 'A', effects: [] }, { id: 'item_002', name: 'B', effects: [] },
+        { id: 'item_003', name: 'C', effects: [] }, { id: 'item_004', name: 'D', effects: [] },
+      ],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, aliceId, bobId, roomCode, gameManager, effectResolverManager } =
+    await setUpStartedGameWithContent(content, { phaseTimeoutMs: 150 });
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+
+  gameState.currentPhase = 'player_interact';
+  gameState.phaseDeadline = Date.now() + 150;
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.isDead = true;
+  otherPlayer.phaseLocked = true;
+  otherPlayer.inventory.push({ id: 'item_001' }, { id: 'item_002' }, { id: 'item_003' }); // at cap (might: 3)
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  currentPlayer.inventory.push({ id: 'item_004' });
+  currentPlayer.actionPoints = 1;
+
+  const giveResult = await new Promise((resolve) =>
+    currentClient.emit('game:selectAction', { actionType: 'item', itemId: 'item_004', mode: 'give', targetPlayerId: otherPlayerId }, resolve)
+  );
+  expect(giveResult.error).toBeUndefined();
+  expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(true);
+
+  await new Promise((resolve) => setTimeout(resolve, 250)); // past the 150ms phase deadline
+
   expect(getResolver(effectResolverManager, roomCode).pendingInventoryChoice.has(otherPlayerId)).toBe(false);
   expect(otherPlayer.inventory.map((i) => i.id).sort()).toEqual(['item_001', 'item_002', 'item_003']);
 
@@ -6354,6 +6464,101 @@ test('game:move into event_031 (紅藍藥丸) opens a red/blue/give-up choice, a
 
   const me = update.players.find((p) => p.playerId === currentPlayerId);
   expect(me.stats.sanity.currentIndex).toBe(me.stats.sanity.baseIndex + 1); // give_up still triggered the 50/50, landed on +1
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('haunt-transition grace period end-to-end: a player already at the pre-haunt floor when the haunt starts is NOT healed -> dies at settlement -> gets removed next round with game:removedFromGame', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_haunt_test', name: '測試預兆', effects: [] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.stats.might.currentIndex = otherPlayer.stats.might.skullIndex + 1; // sitting at the pre-haunt floor
+  // This fixture's default knowledge stat (baseIndex 1, skullIndex 0) puts
+  // EVERY new player's knowledge.currentIndex exactly at skullIndex+1 too
+  // (currentIndex inits to baseIndex) -- without this, the grace check below
+  // would also kill currentPlayer via knowledge, not just otherPlayer via
+  // might, cascading straight past settlement instead of landing there.
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  currentPlayer.stats.knowledge.currentIndex = currentPlayer.stats.knowledge.baseIndex + 1;
+
+  // Force the haunt to start: same proven technique as the existing "a haunt
+  // check summing over 5 sets hauntStarted" test above -- preset omenCount to
+  // 2 so this draw brings it to 3 (3 dice rolled), then mock Math.random to
+  // its max so 3 dice * max face 2 = 6 > 5 is guaranteed. (A single die's max
+  // face is only 2, so without presetting omenCount the sum could never
+  // exceed 5 no matter how Math.random is mocked.)
+  gameState.omenCount = 2;
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  const hauntStartedPromise = new Promise((resolve) => currentClient.once('game:hauntStarted', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // draws omen_haunt_test
+  await hauntStartedPromise;
+  rngSpy.mockRestore();
+
+  expect(gameState.hauntStarted).toBe(true);
+  expect(gameState.pendingHauntGraceCheck).toBe(true); // the flag this test exists to cover
+  expect(otherPlayer.isDead).toBe(false); // not dead yet -- haunt just started, no grace check run yet this round
+
+  // No healing happens -- drive the round to settlement without touching
+  // otherPlayer's stats. currentClient alone is enough (otherPlayerId isn't
+  // locked yet at this point, but is real/connected/not-dead, so the normal
+  // per-phase lock requirement still applies to them like anyone else until
+  // the grace check actually marks them dead).
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  const otherLockResult = await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_move -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_interact -> settlement, grace check runs here
+
+  expect(gameState.pendingHauntGraceCheck).toBe(false); // consumed
+  expect(otherPlayer.isDead).toBe(true); // still at the floor, no healing -> died
+
+  const removedPromise = new Promise((resolve) => otherClient.once('game:removedFromGame', resolve));
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // settlement -> wraps to a fresh player_move, removal happens here
+  const removedPayload = await removedPromise;
+  expect(removedPayload.reason).toBe('died');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a dead player is rejected with PLAYER_IS_DEAD by game:move/game:selectAction/game:useStairs/game:lockPhase, with no side effects', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent());
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.isDead = true;
+  const { x: startX, y: startY, floor: startFloor, actionPoints: startActionPoints, phaseLocked: startPhaseLocked } = player;
+
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(moveResult.error).toBe('PLAYER_IS_DEAD');
+
+  const selectActionResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(selectActionResult.error).toBe('PLAYER_IS_DEAD');
+
+  const useStairsResult = await new Promise((resolve) => currentClient.emit('game:useStairs', {}, resolve));
+  expect(useStairsResult.error).toBe('PLAYER_IS_DEAD');
+
+  const lockPhaseResult = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(lockPhaseResult.error).toBe('PLAYER_IS_DEAD');
+
+  // None of the four rejected calls had any side effect on the player.
+  expect(player.x).toBe(startX);
+  expect(player.y).toBe(startY);
+  expect(player.floor).toBe(startFloor);
+  expect(player.actionPoints).toBe(startActionPoints);
+  expect(player.phaseLocked).toBe(startPhaseLocked);
 
   clientA.close();
   clientB.close();
