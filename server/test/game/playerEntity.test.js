@@ -160,6 +160,39 @@ test('changeStat throws INVALID_HAUNT_FLAG for a missing or non-boolean hauntSta
   expect(() => changeStat(player, 'might', 1, 0)).toThrow('INVALID_HAUNT_FLAG');
 });
 
+test('changeStat marks isDead when the haunt has started and a stat drops to skullIndex', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  changeStat(player, 'knowledge', -10, true);
+  expect(player.stats.knowledge.currentIndex).toBe(0); // skullIndex itself
+  expect(player.isDead).toBe(true);
+});
+
+test('changeStat does not mark isDead when a stat drops but stays above skullIndex, even after the haunt starts', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  changeStat(player, 'might', -1, true); // baseIndex 2 -> currentIndex 1, still above skullIndex 0
+  expect(player.stats.might.currentIndex).toBe(1);
+  expect(player.isDead).toBe(false);
+});
+
+test('changeStat does not mark isDead before the haunt starts, since the floor prevents reaching skullIndex', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  changeStat(player, 'knowledge', -10, false);
+  expect(player.stats.knowledge.currentIndex).toBe(1); // floored at skullIndex(0)+1, never reaches skullIndex
+  expect(player.isDead).toBe(false);
+});
+
+test('changeStat does not mark isDead for an NPC, even if the haunt has started and its stat reaches skullIndex', () => {
+  const npc = createNpc({ npcID: 'npc_001', controlledBy: 'p1', floor: 'ground', x: 0, y: 0, stats: makeNpcStats() });
+  changeStat(npc, 'knowledge', -10, true);
+  expect(npc.stats.knowledge.currentIndex).toBe(0); // skullIndex itself
+  expect(npc.isDead).toBeUndefined(); // death mechanic doesn't apply to NPCs at all
+});
+
+test('createPlayer defaults isDead to false', () => {
+  const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
+  expect(player.isDead).toBe(false);
+});
+
 test('resetActionPoints sets action points to the current speed value', () => {
   const player = createPlayer({ playerId: 'p1', name: 'Alice', floor: 'ground', x: 0, y: 0, stats: makeStats(), actionPoints: 0 });
   changeStat(player, 'speed', 1, false); // index 2 -> 3, value stays 4 (repeated track entry)
