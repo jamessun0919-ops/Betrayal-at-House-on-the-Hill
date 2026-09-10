@@ -6469,3 +6469,98 @@ test('game:move into event_031 (紅藍藥丸) opens a red/blue/give-up choice, a
   clientB.close();
   httpServer.close();
 });
+
+test('haunt-transition grace period end-to-end: a player already at the pre-haunt floor when the haunt starts is NOT healed -> dies at settlement -> gets removed next round with game:removedFromGame', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_haunt_test', name: '測試預兆', effects: [] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.stats.might.currentIndex = otherPlayer.stats.might.skullIndex + 1; // sitting at the pre-haunt floor
+  // This fixture's default knowledge stat (baseIndex 1, skullIndex 0) puts
+  // EVERY new player's knowledge.currentIndex exactly at skullIndex+1 too
+  // (currentIndex inits to baseIndex) -- without this, the grace check below
+  // would also kill currentPlayer via knowledge, not just otherPlayer via
+  // might, cascading straight past settlement instead of landing there.
+  const currentPlayer = getPlayer(gameState, currentPlayerId);
+  currentPlayer.stats.knowledge.currentIndex = currentPlayer.stats.knowledge.baseIndex + 1;
+
+  // Force the haunt to start: same proven technique as the existing "a haunt
+  // check summing over 5 sets hauntStarted" test above -- preset omenCount to
+  // 2 so this draw brings it to 3 (3 dice rolled), then mock Math.random to
+  // its max so 3 dice * max face 2 = 6 > 5 is guaranteed. (A single die's max
+  // face is only 2, so without presetting omenCount the sum could never
+  // exceed 5 no matter how Math.random is mocked.)
+  gameState.omenCount = 2;
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  const hauntStartedPromise = new Promise((resolve) => currentClient.once('game:hauntStarted', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // draws omen_haunt_test
+  await hauntStartedPromise;
+  rngSpy.mockRestore();
+
+  expect(gameState.hauntStarted).toBe(true);
+  expect(gameState.pendingHauntGraceCheck).toBe(true); // the flag this test exists to cover
+  expect(otherPlayer.isDead).toBe(false); // not dead yet -- haunt just started, no grace check run yet this round
+
+  // No healing happens -- drive the round to settlement without touching
+  // otherPlayer's stats. currentClient alone is enough (otherPlayerId isn't
+  // locked yet at this point, but is real/connected/not-dead, so the normal
+  // per-phase lock requirement still applies to them like anyone else until
+  // the grace check actually marks them dead).
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  const otherLockResult = await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_move -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_interact -> settlement, grace check runs here
+
+  expect(gameState.pendingHauntGraceCheck).toBe(false); // consumed
+  expect(otherPlayer.isDead).toBe(true); // still at the floor, no healing -> died
+
+  const removedPromise = new Promise((resolve) => otherClient.once('game:removedFromGame', resolve));
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // settlement -> wraps to a fresh player_move, removal happens here
+  const removedPayload = await removedPromise;
+  expect(removedPayload.reason).toBe('died');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+
+test('a dead player is rejected with PLAYER_IS_DEAD by game:move/game:selectAction/game:useStairs/game:lockPhase, with no side effects', async () => {
+  const { httpServer, clientA, clientB, currentClient, currentPlayerId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(makeContent());
+  const gameState = getGameState(gameManager, roomCode);
+  const player = getPlayer(gameState, currentPlayerId);
+  player.isDead = true;
+  const { x: startX, y: startY, floor: startFloor, actionPoints: startActionPoints, phaseLocked: startPhaseLocked } = player;
+
+  const moveResult = await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve));
+  expect(moveResult.error).toBe('PLAYER_IS_DEAD');
+
+  const selectActionResult = await new Promise((resolve) => currentClient.emit('game:selectAction', { actionType: 'room_action' }, resolve));
+  expect(selectActionResult.error).toBe('PLAYER_IS_DEAD');
+
+  const useStairsResult = await new Promise((resolve) => currentClient.emit('game:useStairs', {}, resolve));
+  expect(useStairsResult.error).toBe('PLAYER_IS_DEAD');
+
+  const lockPhaseResult = await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  expect(lockPhaseResult.error).toBe('PLAYER_IS_DEAD');
+
+  // None of the four rejected calls had any side effect on the player.
+  expect(player.x).toBe(startX);
+  expect(player.y).toBe(startY);
+  expect(player.floor).toBe(startFloor);
+  expect(player.actionPoints).toBe(startActionPoints);
+  expect(player.phaseLocked).toBe(startPhaseLocked);
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
