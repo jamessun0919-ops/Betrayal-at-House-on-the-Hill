@@ -125,7 +125,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
           players.map((p) => p.playerId),
           content.characters
         );
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts).catch((err) => {
+          console.error('advanceCharacterSelection error', err);
+        });
         ack({});
       } catch (err) {
         console.error('game:startCharacterSelect error', err);
@@ -152,7 +154,9 @@ function registerSocketHandlers(io, lobbyManager, gameManager, characterSelectio
         clearCharacterSelectTimeout(roomCode, characterSelectTimeouts);
         confirmCharacterChoice(entry.characterSelectionState, { playerId, characterId: optionId });
         io.to(roomCode).emit('game:promptResolved', result);
-        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts);
+        advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts).catch((err) => {
+          console.error('advanceCharacterSelection error', err);
+        });
         ack({});
       } catch (err) {
         console.error('game:promptRespond error', err);
@@ -1478,7 +1482,9 @@ function handleCharacterSelectTimeout(io, lobbyManager, gameManager, characterSe
       return;
     }
     io.to(roomCode).emit('game:promptResolved', result);
-    advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts);
+    advanceCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, characterSelectTimeoutMs, characterSelectTimeouts, phaseTimeouts).catch((err) => {
+      console.error('advanceCharacterSelection error', err);
+    });
   } catch (err) {
     console.error('character select timeout error', err);
   }
