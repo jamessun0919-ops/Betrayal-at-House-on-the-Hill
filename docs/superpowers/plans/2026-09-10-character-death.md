@@ -570,6 +570,28 @@ function handlePhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolv
 
 （每一處前導空白數量不同，取代時只需要比對`scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content);`這段本體，不用管前面的縮排；用支援「取代全部符合的地方」的編輯方式一次處理完，處理完後用`grep -n "scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content)" server/src/socketHandlers.js`確認沒有殘留舊版簽名的呼叫。）
 
+**修正（原計畫漏掉的第11處呼叫點）**：上面列的10處都在`registerSocketHandlers`的closure裡，直接就拿得到`lobbyManager`/`gameManager`/`characterSelectionManager`/`characterSelectTimeouts`。但`finishCharacterSelection`（[socketHandlers.js:1450](../../../server/src/socketHandlers.js)，角色選擇完成、遊戲正式開始時呼叫，會排定這個房間的第一個階段逾時）裡也有一處同樣的呼叫（約在1488行），這個函式簽名已經有`lobbyManager`/`gameManager`/`characterSelectionManager`，但**沒有**`characterSelectTimeouts`。它唯一的呼叫端`advanceCharacterSelection`（[socketHandlers.js:671](../../../server/src/socketHandlers.js)）本身的參數列裡就有`characterSelectTimeouts`，只是目前沒有往下傳給`finishCharacterSelection`。所以這一處除了跟其他10處一樣補4個參數給`scheduleOrRefreshPhaseTimeout`之外，還要多做兩件事：
+
+1. `finishCharacterSelection`的參數列尾端加上`characterSelectTimeouts`：
+
+```javascript
+function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts) {
+```
+
+2. `advanceCharacterSelection`裡呼叫`finishCharacterSelection`的那一行，補上這個參數：
+
+```javascript
+    finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts);
+```
+
+3. `finishCharacterSelection`內部呼叫`scheduleOrRefreshPhaseTimeout`那一行，比照其他10處補上4個參數（`characterSelectTimeouts`這次是從第9步驟新增的參數直接拿，不是從closure外層拿）：
+
+```javascript
+  scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
+```
+
+這樣加起來共11處呼叫點被更新，全域`grep`舊簽名字串應該回傳0筆——這是驗證是否處理完整的正確標準，不是10筆。
+
 - [ ] **Step 3: 執行全套件，確認純參數擴充沒有壞任何東西**
 
 Run: `cd server && npx jest --forceExit`
