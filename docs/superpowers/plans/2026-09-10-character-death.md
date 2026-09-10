@@ -940,6 +940,219 @@ Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
 
 ---
 
+## Task 5：最終全支線審查修正輪（開發者裁示）
+
+全支線最終審查（opus）發現4個Important，開發者已就每一點裁示方向，這次全部要修：
+
+### 修正①：`effectResolver.js`的imprint卡NPC移除級聯，也可能讓階段推進到`player_move`，但沒有觸發移出檢查
+
+審查抓到`effectResolver.js:158-160`（`handleRemoveImprint`，玩家消除銘印時連帶刪除操控中的NPC）也會呼叫`advancePhase`，這是除了`handleLockPhase`／`handlePhaseTimeout`之外第三個能讓階段真正推進的地方，但`removeDeadPlayersAtRoundStart`只掛在前兩處。`effectResolver.js`本身刻意保持不碰io（跟`phaseFlow.js`一樣的既有原則），所以修法不是在`effectResolver.js`裡加東西，而是在**所有**會呼叫到`resolveEffects`／`handleEffectResolveResult`的socket handler尾端，比照`handleLockPhase`已經做的，也接上`removeDeadPlayersAtRoundStart`——不逐一追蹤「哪些路徑理論上摸得到這個NPC移除級聯」（容易漏，這次的第11個呼叫點跟這個Important本身都是這樣漏掉的），而是統一在**所有**目前已經有`scheduleOrRefreshPhaseTimeout`呼叫的地方都補上，這樣不管未來效果解析鏈長成什麼樣子，都不會再漏。
+
+以下這8處呼叫（`game:move`、`game:selectAction`的4處、`game:effectPromptRespond`、`game:diceChoiceRespond`、`finishCharacterSelection`）目前只有`scheduleOrRefreshPhaseTimeout`、沒有`removeDeadPlayersAtRoundStart`，全部要補上（呼叫端所在的handler目前都不是`async`，要先改成`async`才能`await`）：
+
+**`game:move`**（[socketHandlers.js:163](../../../server/src/socketHandlers.js)）：
+
+```javascript
+    socket.on('game:move', async (payload, callback) => {
+```
+
+兩處`scheduleOrRefreshPhaseTimeout`呼叫（約188、212行）後面各自加一行：
+
+```javascript
+          scheduleOrRefreshPhaseTimeout(io, gameState, roomCode, phaseTimeouts, effectResolverManager, content, lobbyManager, gameManager, characterSelectionManager, characterSelectTimeouts);
+          await removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode);
+```
+
+**`game:selectAction`**（[socketHandlers.js:220](../../../server/src/socketHandlers.js)）：
+
+```javascript
+    socket.on('game:selectAction', async (payload, callback) => {
+```
+
+這個handler裡有4處`scheduleOrRefreshPhaseTimeout`呼叫（約249、337、363、420行，分別是`actingAsNpcId`分支、teleport分支、搜索分支、跟最後共用的收尾），每一處後面都加一行`await removeDeadPlayersAtRoundStart(...)`，參數順序跟上面`game:move`那行一模一樣。
+
+**`game:effectPromptRespond`**（[socketHandlers.js:525](../../../server/src/socketHandlers.js)）：
+
+```javascript
+    socket.on('game:effectPromptRespond', async (payload, callback) => {
+```
+
+約550行的`scheduleOrRefreshPhaseTimeout`後面加一行`await removeDeadPlayersAtRoundStart(...)`。
+
+**`game:diceChoiceRespond`**（[socketHandlers.js:559](../../../server/src/socketHandlers.js)）：
+
+```javascript
+    socket.on('game:diceChoiceRespond', async (payload, callback) => {
+```
+
+約590行的`scheduleOrRefreshPhaseTimeout`後面加一行`await removeDeadPlayersAtRoundStart(...)`。
+
+**`finishCharacterSelection`**（[socketHandlers.js:1466](../../../server/src/socketHandlers.js)，本來就是遊戲剛開始的地方，理論上不可能有人已經死亡，這裡補上純粹是為了跟其他10處一致、不留特例）：
+
+```javascript
+async function finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts) {
+```
+
+（原本不是`async`，要加）約1493行的`scheduleOrRefreshPhaseTimeout`後面加一行`await removeDeadPlayersAtRoundStart(...)`。`finishCharacterSelection`本身是`async`後，它唯一的呼叫端`advanceCharacterSelection`（[socketHandlers.js:671](../../../server/src/socketHandlers.js)）呼叫它那一行要補`await`：
+
+```javascript
+    await finishCharacterSelection(io, lobbyManager, gameManager, characterSelectionManager, effectResolverManager, content, roomCode, phaseTimeouts, characterSelectTimeouts);
+```
+
+（`advanceCharacterSelection`本身也要確認呼叫端`game:startCharacterSelect`／`game:promptRespond`／`handleCharacterSelectTimeout`三處呼叫`advanceCharacterSelection`的地方，如果因此需要跟著補`async`/`await`，一併處理——`advanceCharacterSelection`本身不需要變成`async`，只要它內部呼叫`finishCharacterSelection`那一行加`await`，`advanceCharacterSelection`函式本體其餘部分不變；但因為`advanceCharacterSelection`現在內部有一個`await`，它自己也必須宣告成`async function`，呼叫端則不強制要求跟著`await`它，除非該呼叫端本來就需要等它做完才能繼續——目前3個呼叫端都是fire-and-forget呼叫`advanceCharacterSelection`後就結束，不需要额外處理。）
+
+**這8處全部補齊後**，`removeDeadPlayersAtRoundStart`實際掛在全部11個`scheduleOrRefreshPhaseTimeout`呼叫點（原本3個＋新增8個），任何未來新的效果解析巢狀路徑都不會再漏接。
+
+### 修正②：全員陣亡時，每個死亡玩家仍要分別收到自己的`game:removedFromGame`
+
+開發者裁示：「全員陣亡」時，每個玩家的死亡通知是各自獨立的事情（各自的client要知道『我死了』），跟房間被回收的`lobby:closed`廣播是兩件不同的事、不同的訊息內容，不能只送`lobby:closed`打發。`removeDeadPlayersAtRoundStart`（[socketHandlers.js:1534](../../../server/src/socketHandlers.js)）的`!hasAnyViableRealPlayer`分支改成：
+
+```javascript
+async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode) {
+  if (!hasAnyViableRealPlayer(gameState)) {
+    // Nobody left who could ever lock another phase again. Each dead real
+    // player still gets their own individual death notification -- from
+    // that player's own perspective they died, this is a different event
+    // with different meaning than the room-wide lobby:closed broadcast
+    // closeLobbyRoom sends next, not a substitute for it. Emitted directly
+    // (not via removePlayerFromGame/handlePlayerDisconnectedFromGame) since
+    // closeLobbyRoom immediately below already does the socket.leave/
+    // socket.data cleanup and connected:false marking for everyone in the
+    // room -- no need to duplicate that per player here.
+    const deadPlayerIds = Array.from(gameState.players.values())
+      .filter((p) => !p.isNPC && p.isDead && p.connected)
+      .map((p) => p.playerId);
+    if (deadPlayerIds.length > 0) {
+      const sockets = await io.in(roomCode).fetchSockets();
+      for (const playerId of deadPlayerIds) {
+        const targetSocket = sockets.find((s) => s.data.playerId === playerId);
+        if (targetSocket) {
+          targetSocket.emit('game:removedFromGame', { reason: 'died' });
+        }
+      }
+    }
+    await closeLobbyRoom(io, lobbyManager, roomCode, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts);
+    return;
+  }
+  if (gameState.currentPhase !== 'player_move') {
+    return;
+  }
+  const toRemove = Array.from(gameState.players.values()).filter((p) => !p.isNPC && p.isDead && p.connected);
+  for (const player of toRemove) {
+    await removePlayerFromGame(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, phaseTimeouts, characterSelectTimeouts, gameState, roomCode, player.playerId, 'died');
+  }
+}
+```
+
+（比照`closeLobbyRoom`自己的既有原則——廣播要在任何人離開io房間之前送出，這裡的`game:removedFromGame`也是在`closeLobbyRoom`真正把大家踢出房間之前先送。）
+
+### 修正③：補上`pendingHauntGraceCheck`的端到端整合測試
+
+審查發現`socketHandlers.js`裡設定`gameState.pendingHauntGraceCheck = true`那一行完全沒有被任何測試斷言到——刪掉那一行，808個測試依然全綠，代表Task 2的核心機制沒有真正的端到端證據。補一個`server/test/socketHandlers.test.js`整合測試：
+
+```javascript
+test('haunt-transition grace period end-to-end: a player already at the pre-haunt floor when the haunt starts is NOT healed -> dies at settlement -> gets removed next round with game:removedFromGame', async () => {
+  const content = makeContent({
+    rooms: [{ id: 'room_new', doors: 4, floor: 'ground', drawType: 'omen' }],
+    cards: {
+      events: [],
+      items: [],
+      omens: [{ id: 'omen_haunt_test', name: '測試預兆', effects: [] }],
+    },
+  });
+  const { httpServer, clientA, clientB, currentClient, otherClient, currentPlayerId, aliceId, bobId, roomCode, gameManager } =
+    await setUpStartedGameWithContent(content);
+  const otherPlayerId = currentPlayerId === aliceId ? bobId : aliceId;
+  const gameState = getGameState(gameManager, roomCode);
+  const otherPlayer = getPlayer(gameState, otherPlayerId);
+  otherPlayer.stats.might.currentIndex = otherPlayer.stats.might.skullIndex + 1; // sitting at the pre-haunt floor
+
+  // Force the haunt to start: enough omen draws that rollDice(omenCount) > 5
+  // is effectively guaranteed. Simpler and more direct: drive it through the
+  // same production path the game already uses, by mocking Math.random so
+  // rollDice's sum lands above 5.
+  const rngSpy = jest.spyOn(Math, 'random').mockReturnValue(0.99);
+  const hauntStartedPromise = new Promise((resolve) => currentClient.once('game:hauntStarted', resolve));
+  await new Promise((resolve) => currentClient.emit('game:move', { direction: 'east' }, resolve)); // draws omen_haunt_test
+  await hauntStartedPromise;
+  rngSpy.mockRestore();
+
+  expect(gameState.hauntStarted).toBe(true);
+  expect(gameState.pendingHauntGraceCheck).toBe(true); // the flag this test exists to cover
+  expect(otherPlayer.isDead).toBe(false); // not dead yet -- haunt just started, no grace check run yet this round
+
+  // No healing happens -- drive the round to settlement without touching
+  // otherPlayer's stats. currentClient alone is enough (otherPlayerId isn't
+  // locked yet at this point, but is real/connected/not-dead, so the normal
+  // per-phase lock requirement still applies to them like anyone else until
+  // the grace check actually marks them dead).
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  const otherLockResult = await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_move -> player_interact
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve));
+  await new Promise((resolve) => otherClient.emit('game:lockPhase', {}, resolve)); // player_interact -> settlement, grace check runs here
+
+  expect(gameState.pendingHauntGraceCheck).toBe(false); // consumed
+  expect(otherPlayer.isDead).toBe(true); // still at the floor, no healing -> died
+
+  const removedPromise = new Promise((resolve) => otherClient.once('game:removedFromGame', resolve));
+  await new Promise((resolve) => currentClient.emit('game:lockPhase', {}, resolve)); // settlement -> wraps to a fresh player_move, removal happens here
+  const removedPayload = await removedPromise;
+  expect(removedPayload.reason).toBe('died');
+
+  clientA.close();
+  clientB.close();
+  httpServer.close();
+});
+```
+
+（如果`rollDice`的實際擲骰邏輯讓上面的`Math.random`mock沒辦法穩定讓`rollSum > 5`，改用這個測試檔案裡其他既有測試已經驗證過的、能穩定觸發`game:hauntStarted`的手法——可以先搜尋`game:hauntStarted`確認既有測試怎麼做，沿用同一招，不用自己重新設計觸發邪祟的方式。）
+
+### 修正④：死亡玩家在被移出前不能再行動
+
+開發者裁示：玩家死亡「當下」就不該再能行動（移動/搜索/用道具/操控NPC），前端要彈黑幕訊息窗＋按確認回開頭選單——**這部分UI是前端工作，不在這個backend-only的計畫範圍內，這次只做伺服器端擋下死亡玩家的行動**，讓前端未來接上時有明確的錯誤代碼可以判斷。
+
+`game:move`、`game:selectAction`、`game:useStairs`、`handleLockPhase`（[socketHandlers.js:470](../../../server/src/socketHandlers.js)附近，`game:endTurn`/`game:lockPhase`共用的那個函式）這4個handler，在確認`gameState`存在之後、既有3個pending-choice檢查之前，各自加入：
+
+```javascript
+        const actingPlayer = getPlayer(gameState, playerId);
+        if (actingPlayer.isDead) {
+          return ack({ error: 'PLAYER_IS_DEAD' });
+        }
+```
+
+（變數命名成`actingPlayer`避免跟這幾個handler後面原本就有的`const player = getPlayer(gameState, playerId);`重複宣告衝突——如果該handler後面本來就有一模一樣的`getPlayer`呼叫，改成重用`actingPlayer`這個名字、刪掉後面重複的宣告即可，不要留兩個變數指向同一個查詢。）
+
+**範圍刻意只到這4個handler**：`game:effectPromptRespond`／`game:diceChoiceRespond`／`game:inventoryChoiceRespond`（回應一個已經開啟的懸置提示，不是主動發起新行動）不在這次範圍內——這幾個懸置提示如果掛在一個已死亡的玩家身上，本來就會被`handlePhaseTimeout`的sweep（Task 3已經涵蓋`isDead`）強制逾時決議掉，不需要額外擋。
+
+**測試**：`server/test/socketHandlers.test.js`新增（或利用上面修正③已經寫的整合測試場景延伸）至少1個測試，直接把某玩家標記`isDead:true`後呼叫`game:move`／`game:selectAction`／`game:useStairs`／`game:lockPhase`四者之一，驗證回傳`{error:'PLAYER_IS_DEAD'}`、且沒有任何副作用（行動力沒扣、位置沒變）。
+
+### Task 5測試計畫總覽
+
+- `server/test/socketHandlers.test.js`：修正③的邪祟寬限期端到端測試（1個）、修正④的死亡玩家行動被擋測試（至少1個，可以拆成4個各自對應4個handler，或用參數化的方式合併）、既有涉及`removeDeadPlayersAtRoundStart`／全員陣亡的測試（Task 4已經寫的那個）確認在修正②之後還是綠的（`game:removedFromGame`現在會在全員陣亡時也收到，如果原測試沒有斷言收不到這個事件則不用改，只是行為變得更完整）
+- 跑一次全套件確認無回歸
+
+### Commit
+
+```bash
+git add server/src/socketHandlers.js server/src/game/effectResolver.js server/test/socketHandlers.test.js
+git commit -m "fix: close the remaining gaps from the final whole-branch review
+
+- removeDeadPlayersAtRoundStart now also runs after every other
+  effect-resolution path that could advance the phase (not just
+  handleLockPhase/handlePhaseTimeout), closing the imprint-NPC-removal
+  cascade gap found in effectResolver.js
+- each dead real player gets their own game:removedFromGame even when
+  the whole room is wiped out at once, distinct from the room-wide
+  lobby:closed broadcast
+- added end-to-end test coverage for the haunt-transition grace period
+  (pendingHauntGraceCheck had zero prior assertions)
+- a dead player can no longer move/act/lock a phase before being removed
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>"
+```
+
+---
+
 ## 自我檢查（Plan Self-Review）
 
 **Spec coverage**：設計文件的①②③④⑤⑥六個小節逐一對應——①→Task 1；②→Task 2；③→Task 3；④→Task 4（含`removePlayerFromGame`/`removeDeadPlayersAtRoundStart`）；⑤→Task 4的`removePlayerFromGame`直接重用`handlePlayerDisconnectedFromGame`，沒有另外寫程式碼；⑥→Task 4 Step 6在兩個指定位置補上註解，沒有寫任何邏輯。
