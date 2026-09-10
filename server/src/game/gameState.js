@@ -8,6 +8,7 @@ function createGameState(startingRooms, rooms, cards = {}, options = {}) {
     board: createBoard(startingRooms),
     players: new Map(),
     hauntStarted: false,
+    pendingHauntGraceCheck: false,
     omenCount: 0,
     roomDeck: createRoomDeck(rooms),
     eventDeck: createCardDeck(cards.events || []),

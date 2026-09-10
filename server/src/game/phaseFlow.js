@@ -1,5 +1,5 @@
 const { getPlayer } = require('./gameState');
-const { resetActionPoints, changeStat } = require('./playerEntity');
+const { resetActionPoints, changeStat, STATS } = require('./playerEntity');
 
 const PHASE_ORDER = ['player_move', 'npc_move', 'player_interact', 'npc_interact', 'settlement'];
 
@@ -86,6 +86,25 @@ function enterPhase(gameState, phase) {
       p.diceInterjectionUsedThisTurn = [];
       p.searchedThisTurn = false;
     }
+  }
+  // The haunt-transition grace period (physical-game rule): the instant the
+  // haunt begins isn't itself a stat-reduction event, so a player already
+  // sitting at the pre-haunt floor (skullIndex+1) doesn't die immediately --
+  // they get one round (this flag only fires once, right after
+  // gameState.hauntStarted flips true) to be healed back up before this
+  // settlement phase decides they're still stuck there.
+  if (phase === 'settlement' && gameState.pendingHauntGraceCheck) {
+    for (const p of gameState.players.values()) {
+      if (p.isNPC || p.isDead) continue;
+      for (const stat of STATS) {
+        const track = p.stats[stat];
+        if (track.currentIndex === track.skullIndex + 1) {
+          p.isDead = true;
+          break;
+        }
+      }
+    }
+    gameState.pendingHauntGraceCheck = false;
   }
   // A phase with zero eligible participants can never receive a lock, so it
   // must auto-advance immediately -- this cascades through consecutive empty

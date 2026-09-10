@@ -118,6 +118,47 @@ test('isParticipantDisconnected: a real player with no connected field at all is
   expect(isParticipantDisconnected(gameState, p1)).toBe(false);
 });
 
+test('enterPhase, entering settlement with pendingHauntGraceCheck true, marks isDead for a real player still stuck at skullIndex+1', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.hauntStarted = true;
+  gameState.pendingHauntGraceCheck = true;
+  gameState.players.get('p1').stats.might.currentIndex = 1; // skullIndex(0) + 1, the pre-haunt floor
+  enterPhase(gameState, 'settlement');
+  expect(gameState.players.get('p1').isDead).toBe(true);
+  expect(gameState.pendingHauntGraceCheck).toBe(false); // consumed, one-time only
+});
+
+test('enterPhase, entering settlement with pendingHauntGraceCheck true, does NOT mark isDead for a player whose stats are all above skullIndex+1', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.hauntStarted = true;
+  gameState.pendingHauntGraceCheck = true;
+  // Ensure all stats are above the floor (skullIndex+1): knowledge starts at baseIndex 1, which equals floor 1, so bump it up
+  gameState.players.get('p1').stats.knowledge.currentIndex = 2;
+  enterPhase(gameState, 'settlement'); // p1's stats are all now strictly above the floor
+  expect(gameState.players.get('p1').isDead).toBe(false);
+  expect(gameState.pendingHauntGraceCheck).toBe(false); // still consumed even when nobody matched
+});
+
+test('enterPhase entering settlement does nothing extra when pendingHauntGraceCheck is false', () => {
+  const gameState = makeGameStateWithPlayers(['p1']);
+  gameState.hauntStarted = true;
+  gameState.players.get('p1').stats.might.currentIndex = 1; // would match the floor check, but the flag is off
+  enterPhase(gameState, 'settlement');
+  expect(gameState.players.get('p1').isDead).toBe(false);
+});
+
+test('enterPhase\'s settlement grace check skips a player already marked isDead', () => {
+  const gameState = makeGameStateWithPlayers(['p1', 'p2']);
+  gameState.hauntStarted = true;
+  gameState.pendingHauntGraceCheck = true;
+  const p1 = gameState.players.get('p1');
+  p1.isDead = true;
+  p1.stats.might.currentIndex = 1; // would also match -- confirms no crash/double-processing on an already-dead player
+  enterPhase(gameState, 'settlement');
+  expect(p1.isDead).toBe(true); // unchanged
+  expect(gameState.pendingHauntGraceCheck).toBe(false);
+});
+
 test('enterPhase re-rolls action points for a move phase', () => {
   const gameState = makeGameStateWithPlayers(['p1']);
   const player = gameState.players.get('p1');

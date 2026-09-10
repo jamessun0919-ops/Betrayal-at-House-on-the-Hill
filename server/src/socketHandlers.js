@@ -1170,6 +1170,7 @@ function resolveCardDraw(io, effectResolverManager, gameState, roomCode, playerI
     io.to(roomCode).emit('game:hauntCheck', { omenCount: gameState.omenCount, rollSum });
     if (rollSum > 5) {
       gameState.hauntStarted = true;
+      gameState.pendingHauntGraceCheck = true;
       io.to(roomCode).emit('game:hauntStarted', { omenCount: gameState.omenCount, rollSum });
     }
   }
