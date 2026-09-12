@@ -1573,13 +1573,20 @@ async function removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effe
     // closeLobbyRoom immediately below already does the socket.leave/
     // socket.data cleanup and connected:false marking for everyone in the
     // room -- no need to duplicate that per player here.
-    const deadPlayerIds = Array.from(gameState.players.values())
-      .filter((p) => !p.isNPC && p.isDead && p.connected)
-      .map((p) => p.playerId);
-    if (deadPlayerIds.length > 0) {
+    const deadPlayers = Array.from(gameState.players.values())
+      .filter((p) => !p.isNPC && p.isDead && p.connected);
+    // Mark them synchronously, before the first await below -- otherwise a
+    // second concurrent call to this same function (e.g. two different
+    // still-connected players' own actions both discovering the wipeout at
+    // once) would compute the same deadPlayers list before either call's
+    // fetchSockets() resolves, and both would emit to the same sockets.
+    for (const p of deadPlayers) {
+      p.connected = false;
+    }
+    if (deadPlayers.length > 0) {
       const sockets = await io.in(roomCode).fetchSockets();
-      for (const playerId of deadPlayerIds) {
-        const targetSocket = sockets.find((s) => s.data.playerId === playerId);
+      for (const p of deadPlayers) {
+        const targetSocket = sockets.find((s) => s.data.playerId === p.playerId);
         if (targetSocket) {
           targetSocket.emit('game:removedFromGame', { reason: 'died' });
         }
@@ -1647,4 +1654,4 @@ function broadcastPlayers(io, lobbyManager, roomCode) {
   io.to(roomCode).emit('lobby:players', { players: lobbyManager.getPlayers(roomCode) });
 }
 
-module.exports = { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout };
+module.exports = { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout, removeDeadPlayersAtRoundStart };

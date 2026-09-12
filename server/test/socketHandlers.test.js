@@ -1,7 +1,7 @@
 const ioClient = require('socket.io-client');
 const { createServer } = require('../src/createServer');
 const { LobbyManager } = require('../src/lobbyManager');
-const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout } = require('../src/socketHandlers');
+const { registerSocketHandlers, resolveRollChoiceByTimeout, resolveInventoryChoiceByTimeout, resolveEffectChoiceByTimeout, clearPhaseTimeout, removeDeadPlayersAtRoundStart } = require('../src/socketHandlers');
 const { createGameManager } = require('../src/game/gameManager');
 const { createCharacterSelectionManager, getSelection, startSelection } = require('../src/game/characterSelectionManager');
 const { createEffectResolverManager, getResolver } = require('../src/game/effectResolverManager');
@@ -5449,6 +5449,83 @@ test('game:selectAction item mode:pickup: two real players trying to pick up the
 
   clientA.close();
   clientB.close();
+  httpServer.close();
+});
+
+test('removeDeadPlayersAtRoundStart does not double-emit game:removedFromGame when a full-wipeout room is torn down by two concurrent invocations racing each other', async () => {
+  // Regression test for a Minor finding from the character-death final
+  // review. This is specifically about the !hasAnyViableRealPlayer (full
+  // wipeout) branch, NOT the per-player one -- that branch's own emit loop
+  // reads sockets fetched independently by each call and, unlike the
+  // per-player branch (which self-protects via removePlayerFromGame nulling
+  // out socket.data.playerId, visible to a second call's live socket
+  // reference before it decides whether to emit), has nothing to stop two
+  // concurrent invocations from each finding the same dead players' sockets
+  // and each emitting to them, before closeLobbyRoom (which is what
+  // actually clears socket.data) ever runs. Calling the function directly
+  // twice (rather than driving it via real socket emits) makes the
+  // interleaving deterministic instead of depending on network scheduling.
+  const content = makeContent({
+    characters: [
+      { id: 'char_001', codename: 'Alice-character', stats: makeStats() },
+      { id: 'char_002', codename: 'Bob-character', stats: makeStats() },
+      { id: 'char_003', codename: 'Carol-character', stats: makeStats() },
+    ],
+  });
+  const { httpServer, port, gameManager, lobbyManager, characterSelectionManager, effectResolverManager, io } = await startTestServer(content);
+  const url = `http://localhost:${port}`;
+
+  const clientA = ioClient(url);
+  const created = await new Promise((resolve) => clientA.emit('lobby:create', { playerName: 'Alice' }, resolve));
+  const roomCode = created.roomCode;
+  const aliceId = created.playerId;
+
+  const clientB = ioClient(url);
+  const joinedB = await new Promise((resolve) => clientB.emit('lobby:join', { roomCode, playerName: 'Bob' }, resolve));
+  const bobId = joinedB.playerId;
+
+  const clientC = ioClient(url);
+  const joinedC = await new Promise((resolve) => clientC.emit('lobby:join', { roomCode, playerName: 'Carol' }, resolve));
+  const carolId = joinedC.playerId;
+
+  const liveClientsById = { [aliceId]: clientA, [bobId]: clientB, [carolId]: clientC };
+  const startedPromise = new Promise((resolve) => clientA.once('game:started', resolve));
+  clientA.on('game:prompt', (prompt) => {
+    const respondingClient = liveClientsById[prompt.targetPlayerId];
+    if (respondingClient) {
+      respondingClient.emit('game:promptRespond', { promptId: prompt.promptId, optionId: prompt.options[0] }, () => {});
+    }
+  });
+  await new Promise((resolve) => clientA.emit('game:startCharacterSelect', {}, resolve));
+  await startedPromise;
+
+  const gameState = getGameState(gameManager, roomCode);
+  // All three real players dead and still connected -- hasAnyViableRealPlayer
+  // is false, so both concurrent calls below land in the full-wipeout branch.
+  getPlayer(gameState, aliceId).isDead = true;
+  getPlayer(gameState, bobId).isDead = true;
+  getPlayer(gameState, carolId).isDead = true;
+
+  const removedCounts = { [aliceId]: 0, [bobId]: 0, [carolId]: 0 };
+  clientA.on('game:removedFromGame', () => { removedCounts[aliceId] += 1; });
+  clientB.on('game:removedFromGame', () => { removedCounts[bobId] += 1; });
+  clientC.on('game:removedFromGame', () => { removedCounts[carolId] += 1; });
+
+  await Promise.all([
+    removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, new Map(), new Map(), gameState, roomCode),
+    removeDeadPlayersAtRoundStart(io, lobbyManager, gameManager, effectResolverManager, characterSelectionManager, new Map(), new Map(), gameState, roomCode),
+  ]);
+  // The server-side calls above are done, but socket.io delivery to the
+  // client is a real network round-trip -- give it a moment before reading
+  // removedCounts, otherwise even a genuine double-emit wouldn't have arrived yet.
+  await new Promise((resolve) => setTimeout(resolve, 150));
+
+  expect(removedCounts).toEqual({ [aliceId]: 1, [bobId]: 1, [carolId]: 1 });
+  expect(getGameState(gameManager, roomCode)).toBeUndefined(); // room still correctly torn down exactly once
+
+  clientA.close();
+  clientB.close();
+  clientC.close();
   httpServer.close();
 });
 

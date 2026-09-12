@@ -123,7 +123,10 @@ test('enterPhase, entering settlement with pendingHauntGraceCheck true, marks is
   gameState.hauntStarted = true;
   gameState.pendingHauntGraceCheck = true;
   gameState.players.get('p1').stats.might.currentIndex = 1; // skullIndex(0) + 1, the pre-haunt floor
-  // p2 stays connected and above the floor for all stats so cascade doesn't loop forever
+  // p2 stays connected and above the floor for all stats -- not to prevent
+  // an infinite cascade (enterPhase's visitedPhases guard already handles
+  // that generically), just so this test's landing phase stays settlement
+  // instead of the guard tripping and leaving it somewhere else.
   // (knowledge default is at baseIndex 1, which equals floor 1, so need to bump it)
   gameState.players.get('p2').stats.knowledge.currentIndex = 2;
   enterPhase(gameState, 'settlement');
@@ -137,7 +140,8 @@ test('enterPhase, entering settlement with pendingHauntGraceCheck true, does NOT
   gameState.pendingHauntGraceCheck = true;
   // Ensure all stats are above the floor (skullIndex+1): knowledge starts at baseIndex 1, which equals floor 1, so bump it up
   gameState.players.get('p1').stats.knowledge.currentIndex = 2;
-  // p2 stays connected so cascade doesn't loop forever
+  // p2 stays connected -- just keeps the landing phase at settlement for
+  // this assertion, not preventing an infinite cascade (see the comment above).
   enterPhase(gameState, 'settlement'); // p1's stats are all now strictly above the floor
   expect(gameState.players.get('p1').isDead).toBe(false);
   expect(gameState.pendingHauntGraceCheck).toBe(false); // still consumed even when nobody matched
@@ -147,7 +151,7 @@ test('enterPhase entering settlement does nothing extra when pendingHauntGraceCh
   const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   gameState.hauntStarted = true;
   gameState.players.get('p1').stats.might.currentIndex = 1; // would match the floor check, but the flag is off
-  // p2 stays connected so cascade doesn't loop forever
+  // p2 stays connected -- keeps the landing phase at settlement (see the comment above).
   enterPhase(gameState, 'settlement');
   expect(gameState.players.get('p1').isDead).toBe(false);
 });
@@ -159,7 +163,7 @@ test('enterPhase\'s settlement grace check skips a player already marked isDead'
   const p1 = gameState.players.get('p1');
   p1.isDead = true;
   p1.stats.might.currentIndex = 1; // would also match -- confirms no crash/double-processing on an already-dead player
-  // p2 needs to be above the floor for all stats to avoid cascade loop
+  // p2 needs to be above the floor for all stats -- keeps the landing phase at settlement (see the comment above).
   gameState.players.get('p2').stats.knowledge.currentIndex = 2;
   enterPhase(gameState, 'settlement');
   expect(p1.isDead).toBe(true); // unchanged
@@ -412,12 +416,18 @@ test('resetPhaseLocks auto-locks a dead real player entering a new phase (displa
   expect(gameState.players.get('p2').phaseLocked).toBe(false);
 });
 
-test('enterPhase does not recurse forever when every real participant is dead and there are 0 NPCs -- it stops after one full lap with the phase left wherever it landed', () => {
+test('enterPhase does not recurse forever when every real participant is dead and there are 0 NPCs -- it stops after one full lap back at player_move', () => {
   const gameState = makeGameStateWithPlayers(['p1', 'p2']);
   gameState.players.get('p1').isDead = true;
   gameState.players.get('p2').isDead = true;
   expect(() => enterPhase(gameState, 'player_move')).not.toThrow();
-  expect(PHASE_ORDER).toContain(gameState.currentPhase); // landed somewhere valid, didn't crash
+  // gameState.currentPhase is set at the very top of enterPhase, before the
+  // guard's early return -- entering at player_move, with both participants
+  // dead-bypassed the whole way around (npc_move/npc_interact are empty too),
+  // the cascade visits every phase exactly once and the guard trips on the
+  // second attempt to enter player_move, leaving it there. This landing
+  // phase is deterministic for these inputs, not just "some valid phase".
+  expect(gameState.currentPhase).toBe('player_move');
 });
 
 test('hasAnyViableRealPlayer is true when at least one real player is connected and not dead', () => {
