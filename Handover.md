@@ -1,6 +1,15 @@
 # 交接文檔 Handover
 
-最後更新：2026-09-10（**角色死亡判定機制完整完成並合併進main（PR [#5](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/5)）——房間/遊戲生命週期清理三個結束條件（斷線／死亡／勝利）之一，走完整brainstorming→writing-plans→subagent-driven-development，5任務（含最終審查修正輪），810/810測試全綠**）。
+最後更新：2026-09-12（**修復角色死亡機制全分支審查記錄的5個Minor中的3個（①全員陣亡併發race／③遞迴防護測試斷言／④過期註解），②⑤裁定不修，直接commit在main，811/811測試全綠**）。
+
+**角色死亡機制5個Minor的處理結果**：
+- **①全員陣亡的併發窄視窗——已修復（commit `22ba77e`）**：原本以為問題在`removePlayerFromGame`（真人玩家逐一移出的分支），查證後發現那個分支其實已經被既有的`socket.data.playerId = null`副作用意外保護（第二個併發呼叫的`fetchSockets().find(...)`會找不到同一個socket）。**真正沒有保護的是`removeDeadPlayersAtRoundStart`的「全員陣亡」分支自己**（[socketHandlers.js:1561](server/src/socketHandlers.js:1561)）——這個分支有自己獨立的emit迴圈，不經過`removePlayerFromGame`，兩個幾乎同時觸發的呼叫（例如2個還活著的玩家的動作剛好同時發現房間已全滅）都能各自算出同一份待通知名單、各自對同一個玩家的socket發送`game:removedFromGame`。修法：在該分支進入第一個`await`之前，就同步把這些玩家標記`connected:false`，讓第二個併發呼叫的判斷依據已經更新。`removeDeadPlayersAtRoundStart`新增export（比照`resolveRollChoiceByTimeout`等既有的「直接測試」慣例），新增的3人房全滅測試直接呼叫兩次+`Promise.all`模擬併發，不依賴socket網路層排程的不確定性
+- **②死亡當下那個階段的`phaseLocked`廣播延遲——裁定不修**：純顯示層，`allParticipantsLocked`的OR-bypass已經正確處理邏輯本身。要讓死亡當下立刻更新`phaseLocked`廣播值，得讓`changeStat`（`playerEntity.js`）知道`phaseLocked`概念，或反過來讓`phaseFlow.js`被`playerEntity.js`引用——兩者都會破壞`changeStat`作為唯一屬性入口、刻意不用讓每個呼叫端處理額外邏輯的設計，也可能引入模組間循環依賴。不值得為了顯示瑕疵冒這個風險
+- **③遞迴防護回歸測試斷言偏弱——已修復**：[phaseFlow.test.js:415](server/test/game/phaseFlow.test.js:415)斷言從`expect(PHASE_ORDER).toContain(gameState.currentPhase)`（幾乎不可能失敗）改成`expect(gameState.currentPhase).toBe('player_move')`（該測試輸入的實際落點是確定的）
+- **④過期註解——已修復**：Task 2的4處測試註解（原本寫「p2 stays connected so cascade doesn't loop forever」）改寫，反映現在真正防止無限遞迴的是`visitedPhases`安全閥，p2連著只是為了讓測試落點可預期
+- **⑤`?? false`跟`!x`風格不一致——維持審查當時的裁定，不修**（`hasAnyViableRealPlayer`已用`!p.isNPC`濾掉沒有`isDead`欄位的NPC，兩種寫法在各自情境下都正確）
+
+810→811測試全綠，直接commit在main（沒有開worktree/走SDD，範圍小）。
 
 **角色死亡判定機制（房間/遊戲生命週期清理最後討論的三個「遊戲何時結束」條件之一，②已完成）**：查證後發現三個條件成熟度差很多——①所有玩家斷線：已完成（上次的斷線回收機制）；③任一陣營達成勝利條件：本質是整個劇本/陣營模組系統（叛徒生還者分配、私密勝利條件、`checkVictory()`掛鉤），等同M3核心骨架，列入未來待辦，這次不做；②所有玩家角色死亡：完全沒有機制、可獨立建置，選定為本次範圍。死亡規則確認自實體版：邪祟降臨後，任一能力刻度降到骷髏頭刻度即死亡；降臨當下若剛好卡在降臨前的最低格（不是新的扣血事件），不會立刻死，要等到那個回合的`settlement`階段還是卡在那格才死（給互動階段治療的機會）；降臨之後任何新的扣血直接命中骷髏頭刻度都是立即死亡。
 
