@@ -1,6 +1,10 @@
 # 交接文檔 Handover
 
-最後更新：2026-09-12（**修復角色死亡機制全分支審查記錄的5個Minor中的3個（①全員陣亡併發race／③遞迴防護測試斷言／④過期註解），②⑤裁定不修，直接commit在main，811/811測試全綠**）。
+最後更新：2026-09-14（**第2次工作階段：完成死亡玩家前端UI——`DeathOverlay.jsx`（不透明黑底遮罩）於`me.isDead`為true時顯示，確認鈕純前端返回開頭選單（不`emit`給伺服器，伺服器仍靠既有`removeDeadPlayersAtRoundStart`在回合結束真正移除玩家），commit `a52250c`，手動瀏覽器驗證通過（用React fiber直接注入`isDead`狀態觸發，未動用真實邪祟死亡流程）。第1次工作階段：修正Handover「下一步行動」裡一條過期的PR #2合併狀態描述，commit `6afa059`**）。
+
+**角色死亡機制的前端UI（2026-09-10 PR #5當時刻意排除的範圍）——已於2026-09-14完成**，見下方「死亡玩家前端UI」段落；下面2026-09-10區塊裡「尚未處理」清單提到的這一項目已經不是待辦，保留原文不修改（歷史記錄），以本段落為準。
+
+**死亡玩家前端UI**：`client/src/gameplay/DeathOverlay.jsx`（新增）——完全不透明黑色背景、`zIndex:100`蓋過現有所有彈窗（原本最高80）；`DebugGameScreen.jsx`在`me.isDead`為true時渲染（`me`本來就有算出來，判斷即時反映`game:stateUpdate`，不等回合結束的`game:removedFromGame`）；`LobbyScreen.jsx`把既有的`resetToStart`透過新的`onReturnToStart` prop傳給`DebugGameScreen`當確認鈕的callback。刻意選擇「確認鈕純前端返回選單、不`emit`任何事件給伺服器」（開發者選定的方案A）：伺服器端完全不用改，`removeDeadPlayersAtRoundStart`既有的回合結束移除機制（含全員陣亡併發保護）維持原樣獨立運作。手動瀏覽器驗證：兩人房完整跑到遊戲中畫面，因專案沒有前端自動化測試、且真實觸發死亡需要先讓邪祟降臨（設置成本高），改用瀏覽器console透過React fiber直接找到`DebugGameScreen`的`gameState` hook並dispatch一份`isDead:true`的更新來驗證正式渲染路徑，確認遮罩正確顯示、確認鈕正確返回開頭選單、console無錯誤。
 
 **角色死亡機制5個Minor的處理結果**：
 - **①全員陣亡的併發窄視窗——已修復（commit `22ba77e`）**：原本以為問題在`removePlayerFromGame`（真人玩家逐一移出的分支），查證後發現那個分支其實已經被既有的`socket.data.playerId = null`副作用意外保護（第二個併發呼叫的`fetchSockets().find(...)`會找不到同一個socket）。**真正沒有保護的是`removeDeadPlayersAtRoundStart`的「全員陣亡」分支自己**（[socketHandlers.js:1561](server/src/socketHandlers.js:1561)）——這個分支有自己獨立的emit迴圈，不經過`removePlayerFromGame`，兩個幾乎同時觸發的呼叫（例如2個還活著的玩家的動作剛好同時發現房間已全滅）都能各自算出同一份待通知名單、各自對同一個玩家的socket發送`game:removedFromGame`。修法：在該分支進入第一個`await`之前，就同步把這些玩家標記`connected:false`，讓第二個併發呼叫的判斷依據已經更新。`removeDeadPlayersAtRoundStart`新增export（比照`resolveRollChoiceByTimeout`等既有的「直接測試」慣例），新增的3人房全滅測試直接呼叫兩次+`Promise.all`模擬併發，不依賴socket網路層排程的不確定性
@@ -29,7 +33,7 @@
 
 **worktree session操作主副本的已知限制**：這次依然無法直接對主要checkout執行git操作（連`git -C <主副本路徑>`重導向都被沙盒擋下），沿用`git push`+`gh pr create`+`gh pr merge`的既有解法（PR [#5](https://github.com/jamessun0919-ops/Betrayal-at-House-on-the-Hill/pull/5)）。`ExitWorktree`清除已合併worktree時，工具本身偵測不到「已透過gh遠端合併」這件事（只看得到本機`main`分支沒有這些commit的祖先關係），會拒絕直接刪除、需要開發者額外確認`discard_changes:true`——這是`gh`合併解法的已知副作用，非bug。
 
-810/810測試全綠，commit範圍`df3a7f3..bf3c998`。**尚未處理、留給未來**：房間/遊戲生命週期清理最後一個子項目（任一陣營達成勝利條件，M3範圍）；死亡玩家的前端UI（黑幕彈窗、確認回選單）；全分支審查記錄的5個Minor（全員陣亡的併發窄視窗——`removePlayerFromGame`在await期間`connected`還沒更新，3人以上房間可能收到2次`game:removedFromGame`；死亡當下那個階段的`phaseLocked`廣播值有短暫延遲顯示；遞迴防護的回歸測試斷言偏弱；幾處過期註解；`?? false`跟`!x`兩種風格並存）；獨立待辦「全局廣播訊息清單及UI」；重連機制；AI代管斷線玩家/NPC（長期）；M3戰鬥/傷害系統。
+810/810測試全綠，commit範圍`df3a7f3..bf3c998`。**尚未處理、留給未來**：房間/遊戲生命週期清理最後一個子項目（任一陣營達成勝利條件，M3範圍）；~~死亡玩家的前端UI（黑幕彈窗、確認回選單）~~**已於2026-09-14完成，見檔案最上方**；全分支審查記錄的5個Minor（全員陣亡的併發窄視窗——`removePlayerFromGame`在await期間`connected`還沒更新，3人以上房間可能收到2次`game:removedFromGame`；死亡當下那個階段的`phaseLocked`廣播值有短暫延遲顯示；遞迴防護的回歸測試斷言偏弱；幾處過期註解；`?? false`跟`!x`兩種風格並存）；獨立待辦「全局廣播訊息清單及UI」；重連機制；AI代管斷線玩家/NPC（長期）；M3戰鬥/傷害系統。
 
 **Important①：自動鎖定的斷線玩家永久卡住懸置提示——已修復（commit `0f4c04d`）**：`handlePhaseTimeout`強制決議懸置選擇的sweep原本只看`!p.phaseLocked`,`resetPhaseLocks`把斷線參與者自動鎖定後就永遠不會再被掃到。**修法**：把`resetPhaseLocks`判斷「是否斷線」的邏輯抽成共用函式`isParticipantDisconnected(gameState, p)`（`phaseFlow.js`，已export），`handlePhaseTimeout`的filter改成`!p.phaseLocked || isParticipantDisconnected(gameState, p)`，兩處共用同一套標準——**這修正了Handover原本建議修法本身的一個遺漏**：原建議只加`p.connected===false`，但NPC沒有自己的`connected`欄位（是看操控者），照原建議寫法對NPC完全無效；改用共用函式後NPC情形也一併正確涵蓋。新增2個`phaseFlow.test.js`單元測試（真人/NPC各自的斷線判定）＋1個`socketHandlers.test.js`端到端整合測試（真人玩家給斷線且已鎖定階段的玩家道具→超過負重上限→階段逾時後確認提示被強制決議而非卡死，修復前先確認RED真的重現問題）。**目前NPC還無法被`give`/可指定目標道具鎖定（`TARGET_IS_NPC`擋住）**，所以NPC那一半目前只有單元測試鎖住`isParticipantDisconnected`本身，沒有端到端整合測試（沒有可達的生產路徑可以重現），等未來NPC真的能被鎖定提示時這個共用函式已經是對的。
 
