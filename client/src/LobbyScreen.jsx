@@ -157,6 +157,7 @@ export default function LobbyScreen() {
           roomCode={roomCode}
           playerId={playerId}
           initialGameState={gameStartedPayload}
+          onReturnToStart={resetToStart}
         />
       )}
     </div>

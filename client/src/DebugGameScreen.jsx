@@ -6,6 +6,7 @@ import NpcPanel from './gameplay/NpcPanel';
 import PhaseCountdownPopup from './gameplay/PhaseCountdownPopup';
 import CheckModal from './gameplay/CheckModal';
 import SimplePopup from './gameplay/SimplePopup';
+import DeathOverlay from './gameplay/DeathOverlay';
 import { getAvailableDirections, findRoomInfo, findCardInfo, findCardName, getRoomActions, STAT_LABELS } from './gameplay/mapUtils';
 import './gameplay/playingLayout.css';
 
@@ -88,7 +89,7 @@ function wrapLabel(text, chunkSize) {
   ));
 }
 
-export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState }) {
+export default function DebugGameScreen({ socket, roomCode, playerId, initialGameState, onReturnToStart }) {
   const [phase, setPhase] = useState(initialGameState ? 'playing' : 'character_select');
   const [prompt, setPrompt] = useState(null);
   const [characterSelectState, setCharacterSelectState] = useState(null);
@@ -658,6 +659,7 @@ export default function DebugGameScreen({ socket, roomCode, playerId, initialGam
               onDone={handleLockPhase}
             />
           )}
+          {me.isDead && <DeathOverlay onConfirm={onReturnToStart} />}
         </div>
       )}
     </div>
